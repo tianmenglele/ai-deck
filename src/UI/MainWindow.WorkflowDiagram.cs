@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Effects;
 using System.Windows.Shapes;
 using System.Windows.Threading;
 using AICollabHub.Models;
@@ -30,10 +31,21 @@ public partial class MainWindow
     private string _workflowDiagramLayoutSig = "";
     private bool _workflowDiagramPreviewOverride;
     private bool _workflowDiagramHooksWired;
-    private Path? _workflowDiagramActiveFlowPath;
-    private Path? _workflowDiagramReworkPath;
-    private Ellipse? _workflowDiagramPulseDot;
+    private Border? _workflowDiagramMasterGlow;
+    private Ellipse? _workflowDiagramAurora;
     private readonly List<Border> _workflowDiagramNodeBorders = new();
+    private readonly List<MindMapFlowTrack> _workflowDiagramFlowTracks = new();
+
+    private sealed class MindMapFlowTrack
+    {
+        public PathGeometry Geometry = null!;
+        public Ellipse Core = null!;
+        public Ellipse Tail1 = null!;
+        public Ellipse Tail2 = null!;
+        public bool Reverse;
+        public double Speed = 0.38;
+        public double PhaseOffset;
+    }
 
     private static readonly string[] WorkflowDiagramDemoPhases =
     {
@@ -192,7 +204,6 @@ public partial class MainWindow
             }
         }
 
-        // 活跃工作优先：working 中的最高阶段
         var working = liveMap.Values
             .Where(v => v != null && (v.Status == "working" || v.Status == "reworking" ||
                                       string.Equals(v.WorkflowPhase, "reworking", StringComparison.OrdinalIgnoreCase) ||
@@ -319,7 +330,6 @@ public partial class MainWindow
         var proj = _reg.GetActiveProject();
         var master = RoutingService.ResolveMasterPlanner(_reg, proj);
         var enabled = _reg.UserConfig.Agents.Where(a => a.Enabled).ToList();
-        // 主脑不重复列入执行阵列；只剩主脑一人时它兼任执行
         var workers = enabled
             .Where(a => master == null || !string.Equals(a.Id, master.Id, StringComparison.OrdinalIgnoreCase))
             .ToList();
@@ -386,150 +396,811 @@ public partial class MainWindow
 
         WorkflowDiagramCanvas.Children.Clear();
         _workflowDiagramNodeBorders.Clear();
-        _workflowDiagramActiveFlowPath = null;
-        _workflowDiagramReworkPath = null;
-        _workflowDiagramPulseDot = null;
+        _workflowDiagramFlowTracks.Clear();
+        _workflowDiagramMasterGlow = null;
+        _workflowDiagramAurora = null;
 
         double w = WorkflowDiagramCanvas.ActualWidth;
         if (w < 40) w = Math.Max(40, ActualWidth - 80);
         double h = WorkflowDiagramCanvas.ActualHeight;
-        if (h < 40) h = 158;
+        if (h < 40) h = 264;
 
-        double padX = 10;
-        double usable = Math.Max(200, w - padX * 2);
-        double nodeW = Math.Clamp(usable / 5.35, 96, 168);
-        double gap = Math.Max(10, (usable - nodeW * 5) / 4.0);
-        double y = 10;
-        double nodeH = 86;
-        double[] xs = new double[5];
-        for (int i = 0; i < 5; i++)
-            xs[i] = padX + i * (nodeW + gap);
+        double cx = w * 0.5;
+        double cy = h * 0.5;
 
+        DrawMindMapStarGrid(w, h);
+        DrawMindMapAurora(cx, cy);
+
+        const double masterW = 196, masterH = 92;
+        const double sideW = 168, sideH = 64;
+        const double workerW = 184, workerH = 58;
+        const double leftX = 0.16;
+        const double rightX = 0.84;
+
+        string projShort = ResolveProjectShortName(proj);
+        string intakeSub = _workflowDiagramPhase == "paused"
+            ? "已暂停"
+            : (_workflowDiagramPhase == "idle" ? $"工程 · {projShort}" : "接单流转中");
+        string verifySub = _workflowDiagramPhase switch
+        {
+            "reworking" => $"打回 R{_workflowDiagramRound}/{_workflowDiagramMaxRounds}",
+            "verified_delivered" => "达标交付",
+            "master_verifying" => "Diff·编译·实测",
+            _ => "Diff·编译·实测"
+        };
+
+        // 左侧：需求入口 / 验收交付
+        var intakeNode = AddMindMapSideNode(
+            tag: "MindMapNode:intake",
+            centerX: w * leftX,
+            centerY: cy - 48,
+            width: sideW,
+            height: sideH,
+            title: "需求入口",
+            subtitle: intakeSub,
+            tip: $"活跃工程：{proj?.Name ?? "未选择"}\n路径：{proj?.PrimaryRoot ?? "—"}\n状态：{intakeSub}",
+            iconKind: "intake",
+            accent: SideAccent("intake"),
+            anchorOnRight: true,
+            onClick: () => NavDialogs.IsChecked = true);
+
+        var verifyNode = AddMindMapSideNode(
+            tag: "MindMapNode:verify",
+            centerX: w * leftX,
+            centerY: cy + 48,
+            width: sideW,
+            height: sideH,
+            title: "验收交付",
+            subtitle: verifySub,
+            tip: $"验收闸门：Diff / 编译 / 实测\n阶段：{_workflowDiagramPhaseLabel}",
+            iconKind: "verify",
+            accent: SideAccent("verify"),
+            anchorOnRight: true,
+            onClick: () => NavDialogs.IsChecked = true);
+
+        // 右侧：执行 AI（最多 4，超出收敛 +N）
+        var liveMap = AutoDispatchService.ReadMergedGlobalWorkStatesWithDesktopLive();
+        var displayWorkers = BuildDisplayWorkers(workers);
+        int n = Math.Max(1, displayWorkers.Count);
+        double span = Math.Min(h - workerH - 16, Math.Max(workerH, (n - 1) * (workerH + 10)));
+        double startY = cy - span / 2.0;
+        var workerNodes = new List<(AgentRosterEntry? Agent, Border Card, Point LeftAnchor, bool IsOverflow)>();
+        for (int i = 0; i < displayWorkers.Count; i++)
+        {
+            var item = displayWorkers[i];
+            double yCenter = n == 1 ? cy : startY + (n == 1 ? 0 : i * (span / Math.Max(1, n - 1)));
+            LiveAgentWorkState? live = null;
+            if (item.Agent != null)
+            {
+                liveMap.TryGetValue(item.Agent.Id, out live);
+                live ??= liveMap.Values.FirstOrDefault(v =>
+                    string.Equals(v.AgentId, item.Agent.Id, StringComparison.OrdinalIgnoreCase));
+            }
+            var node = AddMindMapWorkerNode(
+                centerX: w * rightX,
+                centerY: yCenter,
+                width: workerW,
+                height: workerH,
+                agent: item.Agent,
+                overflowLabel: item.OverflowLabel,
+                live: live,
+                tipOverflow: item.OverflowTip);
+            workerNodes.Add((item.Agent, node.Card, node.LeftAnchor, item.Agent == null));
+        }
+
+        // 中央主脑
+        string masterName = master?.Name ?? "主脑";
+        string masterTier = master != null
+            ? RoutingService.EffortTierVisualLabel(master.PreferredEffortTier)
+            : "—";
+        string masterSub = string.IsNullOrWhiteSpace(_workflowDiagramPhaseLabel)
+            ? masterTier
+            : ShortName(_workflowDiagramPhaseLabel, 14);
+        var masterNode = AddMindMapMasterNode(
+            centerX: cx,
+            centerY: cy,
+            width: masterW,
+            height: masterH,
+            master: master,
+            title: ShortName(masterName, 12),
+            subtitle: masterSub,
+            tip: $"主脑：{masterName}\n模型档位：{masterTier}\n职责：深度分析 / 派单 / 终验\n当前阶段：{_workflowDiagramPhaseLabel} · 轮次 R{_workflowDiagramRound}/{_workflowDiagramMaxRounds}",
+            onClick: () => NavDialogs.IsChecked = true);
+
+        // 底层静默连线 + 激活彗星流光
+        string? activeWorkerId = ResolveActiveWorkerId(workers);
+        DrawMindMapEdge(intakeNode.RightAnchor, masterNode.LeftAnchor, IsEdgeActive("intake_master"), EdgeTone("intake_master"), reverse: false);
+        DrawMindMapEdge(masterNode.LeftAnchor, verifyNode.RightAnchor, IsEdgeActive("master_verify"), EdgeTone("master_verify"), reverse: IsEdgeReverse("master_verify"));
+
+        foreach (var wn in workerNodes)
+        {
+            bool isTarget = wn.Agent != null &&
+                            !string.IsNullOrWhiteSpace(activeWorkerId) &&
+                            string.Equals(wn.Agent.Id, activeWorkerId, StringComparison.OrdinalIgnoreCase);
+            bool allWorkersHot = _workflowDiagramPhase == "verified_delivered";
+            bool active = !paused && (allWorkersHot || isTarget ||
+                                      (_workflowDiagramPhase is "dispatching" or "executing" or "reworking" or "master_verifying" && isTarget));
+            if (_workflowDiagramPhase == "verified_delivered") active = !paused;
+            else if (_workflowDiagramPhase is "dispatching" or "executing" or "reworking" or "master_verifying")
+                active = !paused && isTarget;
+            else
+                active = false;
+
+            bool reverse = _workflowDiagramPhase is "master_verifying" or "reworking";
+            bool bidirectional = _workflowDiagramPhase == "executing" && isTarget;
+            string tone = EdgeTone("master_worker");
+            DrawMindMapEdge(masterNode.RightAnchor, wn.LeftAnchor, active, tone, reverse: reverse, bidirectional: bidirectional);
+        }
+
+        _workflowDiagramLayoutSig =
+            $"{_workflowDiagramPhase}|{_workflowDiagramRound}|{_workflowDiagramMaxRounds}|{_workflowDiagramActiveWorkerId}|{_reg.UserConfig.WorkflowEngineEnabled}|{string.Join(",", _workflowDiagramWorkerIds)}|{_workflowDiagramDemoMode}";
+    }
+
+    private string? ResolveActiveWorkerId(List<AgentRosterEntry> workers)
+    {
+        if (!string.IsNullOrWhiteSpace(_workflowDiagramActiveWorkerId) &&
+            workers.Any(w => string.Equals(w.Id, _workflowDiagramActiveWorkerId, StringComparison.OrdinalIgnoreCase)))
+            return _workflowDiagramActiveWorkerId;
+        return workers.FirstOrDefault()?.Id;
+    }
+
+    private static string ResolveProjectShortName(ProjectProfile? proj)
+    {
         string projShort = string.IsNullOrWhiteSpace(proj?.Name) ? (proj?.Id ?? "—") : proj!.Name;
-        if (projShort.Length > 11) projShort = projShort[..10] + "…";
-        // Prefer folder leaf for XX-style roots
         if (!string.IsNullOrWhiteSpace(proj?.PrimaryRoot))
         {
             try
             {
                 var leaf = System.IO.Path.GetFileName(proj.PrimaryRoot.TrimEnd('\\', '/'));
-                if (!string.IsNullOrWhiteSpace(leaf)) projShort = leaf.Length > 11 ? leaf[..10] + "…" : leaf;
+                if (!string.IsNullOrWhiteSpace(leaf)) projShort = leaf;
             }
-            catch { }
+            catch { /* ignore */ }
         }
+        return ShortName(projShort, 12);
+    }
 
-        var liveMap = AutoDispatchService.ReadMergedGlobalWorkStatesWithDesktopLive();
-        string intakeState = _workflowDiagramPhase == "idle" || _workflowDiagramPhase == "paused"
-            ? (_workflowDiagramPhase == "paused" ? "已暂停" : "待命接单")
-            : "接单流转中";
+    private sealed class DisplayWorkerItem
+    {
+        public AgentRosterEntry? Agent;
+        public string? OverflowLabel;
+        public string? OverflowTip;
+    }
 
-        // ① 全入口接单
-        AddDiagramNode(0, xs[0], y, nodeW, nodeH,
-            title: "① 全入口接单",
-            body: $"{projShort}\n{intakeState}",
-            tip: $"活跃工程：{proj?.Name ?? "未选择"}\n路径：{proj?.PrimaryRoot ?? "—"}\n状态：{intakeState}",
-            accent: ActiveAccentForNode(0),
-            onClick: () => NavDialogs.IsChecked = true);
-
-        // ② 主脑统筹分析
-        string masterName = master?.Name ?? "主脑";
-        string masterTier = master != null
-            ? RoutingService.EffortTierVisualLabel(master.PreferredEffortTier)
-            : "—";
-        var masterVisual = master != null
-            ? OfficialBrandIconService.CreateCircularAvatarVisual(master.Id, 22, master, OfficialBrandIconService.GetBrandColor(master.Id), 1.15)
-            : null;
-        AddDiagramNode(1, xs[1], y, nodeW, nodeH,
-            title: "② 主脑统筹",
-            body: $"{ShortName(masterName, 14)}\n{masterTier}",
-            tip: $"主脑：{masterName}\n模型档位：{masterTier}\n职责：深度分析 / 派单 / 终验\n当前阶段：{_workflowDiagramPhaseLabel} · 轮次 R{_workflowDiagramRound}/{_workflowDiagramMaxRounds}\n点击跳转「对话与派单」",
-            accent: ActiveAccentForNode(1),
-            avatar: masterVisual,
-            onClick: () => NavDialogs.IsChecked = true);
-
-        // ③ 实操执行阵列
-        AddWorkerArrayNode(2, xs[2], y, nodeW, nodeH, workers, liveMap);
-
-        // ④ 主脑严格验收
-        AddDiagramNode(3, xs[3], y, nodeW, nodeH,
-            title: "④ 严格验收",
-            body: "Diff·编译·实测",
-            tip: "主脑验收闸门：Diff 落盘核对 / 编译构建 / 实测画面与行为",
-            accent: ActiveAccentForNode(3),
-            onClick: () => NavDialogs.IsChecked = true);
-
-        // ⑤ 达标交付
-        string deliverBody = _workflowDiagramPhase == "verified_delivered"
-            ? AutoDispatchService.ExtractCleanTaskBrief(_workflowDiagramSubFull, 14)
-            : "终验通过";
-        AddDiagramNode(4, xs[4], y, nodeW, nodeH,
-            title: "⑤ 达标交付",
-            body: deliverBody,
-            tip: $"交付摘要：{_workflowDiagramSubFull}",
-            accent: ActiveAccentForNode(4),
-            onClick: () => NavDialogs.IsChecked = true);
-
-        // Forward edges ①→②→③→④→⑤
-        int activeEdge = ActiveEdgeIndex();
-        for (int i = 0; i < 4; i++)
+    private List<DisplayWorkerItem> BuildDisplayWorkers(List<AgentRosterEntry> workers)
+    {
+        var list = new List<DisplayWorkerItem>();
+        if (workers.Count == 0)
         {
-            double x1 = xs[i] + nodeW;
-            double x2 = xs[i + 1];
-            double midY = y + nodeH * 0.45;
-            bool active = !paused && activeEdge == i;
-            var path = DrawFlowEdge(x1, midY, x2, midY, active, reverse: false);
-            if (active) _workflowDiagramActiveFlowPath = path;
+            list.Add(new DisplayWorkerItem { OverflowLabel = "暂无执行 AI", OverflowTip = "请在 AI 配置中启用执行工具" });
+            return list;
         }
-
-        // Rework loop ④ → ③ (bottom arc)
-        double reworkY = y + nodeH + 8;
-        double rx1 = xs[3] + nodeW * 0.45;
-        double rx2 = xs[2] + nodeW * 0.55;
-        bool reworkActive = !paused && _workflowDiagramPhase == "reworking";
-        var reworkPath = DrawReworkArc(rx1, y + nodeH, rx2, y + nodeH, reworkY + 18, reworkActive);
-        _workflowDiagramReworkPath = reworkPath;
-
-        string reworkLabel = reworkActive
-            ? $"打回精修 R{_workflowDiagramRound}/{_workflowDiagramMaxRounds}"
-            : $"打回精修 (≤{_workflowDiagramMaxRounds}轮)";
-        var reworkTb = new TextBlock
+        if (workers.Count <= 4)
         {
-            Text = reworkLabel,
-            FontSize = 10.5,
-            FontWeight = reworkActive ? FontWeights.SemiBold : FontWeights.Normal,
-            Foreground = Hex(reworkActive ? "#FB923C" : "#64748B"),
-            ToolTip = "验收未通过时从④回环至③继续精修，轮次受配置方案上限约束"
-        };
-        WorkflowDiagramCanvas.Children.Add(reworkTb);
-        double labelX = (rx1 + rx2) / 2 - 48;
-        Canvas.SetLeft(reworkTb, Math.Max(xs[2], labelX));
-        Canvas.SetTop(reworkTb, reworkY + 20);
-
-        // Pulse dot on active edge
-        if (!paused && (_workflowDiagramPhase is not "idle" and not "paused" || _workflowDiagramDemoMode))
+            foreach (var w in workers)
+                list.Add(new DisplayWorkerItem { Agent = w });
+            return list;
+        }
+        foreach (var w in workers.Take(3))
+            list.Add(new DisplayWorkerItem { Agent = w });
+        var overflow = workers.Skip(3).ToList();
+        list.Add(new DisplayWorkerItem
         {
-            string glow = reworkActive ? "#F97316" : "#818CF8";
-            _workflowDiagramPulseDot = new Ellipse
+            OverflowLabel = $"+{overflow.Count} 位成员",
+            OverflowTip = string.Join("\n", overflow.Select(o => o.Name))
+        });
+        return list;
+    }
+
+    private void DrawMindMapStarGrid(double w, double h)
+    {
+        const double gap = 22;
+        const double r = 1.4;
+        var brush = Hex("#18253A");
+        for (double y = 8; y < h; y += gap)
+        {
+            for (double x = 8; x < w; x += gap)
             {
-                Width = 8,
-                Height = 8,
-                Fill = Hex(reworkActive ? "#FB923C" : "#A5B4FC"),
-                IsHitTestVisible = false,
-                Effect = new System.Windows.Media.Effects.DropShadowEffect
+                var dot = new Ellipse
                 {
-                    Color = (Color)ColorConverter.ConvertFromString(glow),
-                    BlurRadius = 8,
-                    ShadowDepth = 0,
-                    Opacity = 0.9
+                    Width = r * 2,
+                    Height = r * 2,
+                    Fill = brush,
+                    IsHitTestVisible = false,
+                    Opacity = 0.5
+                };
+                WorkflowDiagramCanvas.Children.Add(dot);
+                Canvas.SetLeft(dot, x);
+                Canvas.SetTop(dot, y);
+            }
+        }
+    }
+
+    private void DrawMindMapAurora(double cx, double cy)
+    {
+        var (c0, c1, c2) = AuroraColors(_workflowDiagramPhase);
+        var brush = new RadialGradientBrush
+        {
+            GradientOrigin = new Point(0.5, 0.5),
+            Center = new Point(0.5, 0.5),
+            RadiusX = 0.55,
+            RadiusY = 0.55
+        };
+        brush.GradientStops.Add(new GradientStop((Color)ColorConverter.ConvertFromString(c0), 0));
+        brush.GradientStops.Add(new GradientStop((Color)ColorConverter.ConvertFromString(c1), 0.45));
+        brush.GradientStops.Add(new GradientStop((Color)ColorConverter.ConvertFromString(c2), 1));
+
+        _workflowDiagramAurora = new Ellipse
+        {
+            Width = 360,
+            Height = 230,
+            Fill = brush,
+            IsHitTestVisible = false,
+            Opacity = 0.55
+        };
+        WorkflowDiagramCanvas.Children.Add(_workflowDiagramAurora);
+        Canvas.SetLeft(_workflowDiagramAurora, cx - 180);
+        Canvas.SetTop(_workflowDiagramAurora, cy - 115);
+        Panel.SetZIndex(_workflowDiagramAurora, 0);
+    }
+
+    private static (string C0, string C1, string C2) AuroraColors(string phase) => phase switch
+    {
+        "master_analyzing" => ("#6644CC88", "#312E8188", "#0F141D00"),
+        "dispatching" or "executing" => ("#22D3EE66", "#0E749088", "#0F141D00"),
+        "master_verifying" => ("#C084FC66", "#6D28D988", "#0F141D00"),
+        "reworking" => ("#FBBF2466", "#B4530988", "#0F141D00"),
+        "verified_delivered" => ("#34D39966", "#065F4688", "#0F141D00"),
+        "paused" => ("#64748B44", "#1E293B66", "#0F141D00"),
+        _ => ("#818CF666", "#4C1D9588", "#0F141D00") // idle 柔和蓝紫
+    };
+
+    private string? SideAccent(string kind)
+    {
+        if (_workflowDiagramPhase == "paused" && !_workflowDiagramDemoMode) return null;
+        return kind switch
+        {
+            "intake" when _workflowDiagramPhase is "idle" or "master_analyzing" => "#818CF8",
+            "verify" when _workflowDiagramPhase is "master_verifying" or "verified_delivered" =>
+                _workflowDiagramPhase == "verified_delivered" ? "#10B981" : "#A78BFA",
+            "verify" when _workflowDiagramPhase == "reworking" => "#F59E0B",
+            _ => null
+        };
+    }
+
+    private bool IsEdgeActive(string edge)
+    {
+        if (_workflowDiagramPhase == "paused" && !_workflowDiagramDemoMode) return false;
+        return edge switch
+        {
+            "intake_master" => _workflowDiagramPhase is "master_analyzing" or "verified_delivered",
+            "master_verify" => _workflowDiagramPhase is "master_verifying" or "reworking" or "verified_delivered",
+            _ => false
+        };
+    }
+
+    private bool IsEdgeReverse(string edge) =>
+        edge == "master_verify" && _workflowDiagramPhase == "reworking";
+
+    private string EdgeTone(string edge) => _workflowDiagramPhase switch
+    {
+        "reworking" => "#F59E0B",
+        "verified_delivered" => "#10B981",
+        "master_verifying" => "#A78BFA",
+        "executing" or "dispatching" => "#22D3EE",
+        "master_analyzing" => "#818CF8",
+        _ => "#475569"
+    };
+
+    private (Border Card, Point LeftAnchor, Point RightAnchor) AddMindMapMasterNode(
+        double centerX,
+        double centerY,
+        double width,
+        double height,
+        AgentRosterEntry? master,
+        string title,
+        string subtitle,
+        string tip,
+        Action? onClick)
+    {
+        double left = centerX - width / 2;
+        double top = centerY - height / 2;
+
+        _workflowDiagramMasterGlow = new Border
+        {
+            Width = width + 10,
+            Height = height + 10,
+            CornerRadius = new CornerRadius(16),
+            BorderBrush = Hex("#818CF8"),
+            BorderThickness = new Thickness(1.5),
+            Background = Brushes.Transparent,
+            IsHitTestVisible = false,
+            Opacity = 0.35,
+            Effect = new DropShadowEffect
+            {
+                Color = (Color)ColorConverter.ConvertFromString("#818CF8"),
+                BlurRadius = 18,
+                ShadowDepth = 0,
+                Opacity = 0.55
+            }
+        };
+        WorkflowDiagramCanvas.Children.Add(_workflowDiagramMasterGlow);
+        Canvas.SetLeft(_workflowDiagramMasterGlow, left - 5);
+        Canvas.SetTop(_workflowDiagramMasterGlow, top - 5);
+        Panel.SetZIndex(_workflowDiagramMasterGlow, 1);
+
+        var innerBg = new LinearGradientBrush
+        {
+            StartPoint = new Point(0, 0),
+            EndPoint = new Point(1, 1)
+        };
+        innerBg.GradientStops.Add(new GradientStop((Color)ColorConverter.ConvertFromString("#1A2236"), 0));
+        innerBg.GradientStops.Add(new GradientStop((Color)ColorConverter.ConvertFromString("#12182A"), 1));
+
+        var grid = new Grid { Margin = new Thickness(12, 10, 12, 10) };
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+        var avatar = master != null
+            ? OfficialBrandIconService.CreateCircularAvatarVisual(master.Id, 32, master, OfficialBrandIconService.GetBrandColor(master.Id), 1.15)
+            : MakeMindMapVectorIcon("master", 28, Hex("#C4B5FD"));
+        avatar.VerticalAlignment = VerticalAlignment.Center;
+        avatar.Margin = new Thickness(0, 0, 10, 0);
+        Grid.SetColumn(avatar, 0);
+
+        var textCol = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
+        var titleRow = new StackPanel { Orientation = Orientation.Horizontal };
+        titleRow.Children.Add(new TextBlock
+        {
+            Text = title,
+            FontSize = 13.5,
+            FontWeight = FontWeights.SemiBold,
+            Foreground = Hex("#F8FAFC"),
+            TextWrapping = TextWrapping.NoWrap,
+            TextTrimming = TextTrimming.CharacterEllipsis,
+            MaxWidth = 96,
+            VerticalAlignment = VerticalAlignment.Center
+        });
+        titleRow.Children.Add(new Border
+        {
+            Background = Hex("#2E1065"),
+            BorderBrush = Hex("#7C3AED"),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(4),
+            Padding = new Thickness(6, 1, 6, 1),
+            Margin = new Thickness(8, 0, 0, 0),
+            VerticalAlignment = VerticalAlignment.Center,
+            Child = new TextBlock
+            {
+                Text = "主脑",
+                FontSize = 10.5,
+                Foreground = Hex("#DDD6FE"),
+                FontWeight = FontWeights.SemiBold
+            }
+        });
+        textCol.Children.Add(titleRow);
+        textCol.Children.Add(new TextBlock
+        {
+            Text = subtitle,
+            FontSize = 11.5,
+            Foreground = Hex("#94A3B8"),
+            Margin = new Thickness(0, 4, 0, 0),
+            TextWrapping = TextWrapping.NoWrap,
+            TextTrimming = TextTrimming.CharacterEllipsis
+        });
+        Grid.SetColumn(textCol, 1);
+        grid.Children.Add(avatar);
+        grid.Children.Add(textCol);
+
+        var card = new Border
+        {
+            Tag = "MindMapNode:master",
+            Width = width,
+            Height = height,
+            Background = innerBg,
+            BorderBrush = Hex("#6366F1"),
+            BorderThickness = new Thickness(1.4),
+            CornerRadius = new CornerRadius(14),
+            Child = grid,
+            Cursor = Cursors.Hand,
+            ToolTip = BuildDarkTip(tip),
+            Effect = new DropShadowEffect
+            {
+                Color = (Color)ColorConverter.ConvertFromString("#312E81"),
+                BlurRadius = 16,
+                ShadowDepth = 0,
+                Opacity = 0.55
+            }
+        };
+        if (onClick != null)
+            card.MouseLeftButtonUp += (_, _) => onClick();
+        _workflowDiagramNodeBorders.Add(card);
+        WorkflowDiagramCanvas.Children.Add(card);
+        Canvas.SetLeft(card, left);
+        Canvas.SetTop(card, top);
+        Panel.SetZIndex(card, 3);
+
+        var leftAnchor = AddAnchorDot(left, centerY);
+        var rightAnchor = AddAnchorDot(left + width, centerY);
+        return (card, leftAnchor, rightAnchor);
+    }
+
+    private (Border Card, Point RightAnchor) AddMindMapSideNode(
+        string tag,
+        double centerX,
+        double centerY,
+        double width,
+        double height,
+        string title,
+        string subtitle,
+        string tip,
+        string iconKind,
+        string? accent,
+        bool anchorOnRight,
+        Action? onClick)
+    {
+        double left = centerX - width / 2;
+        double top = centerY - height / 2;
+
+        var row = new Grid { Margin = new Thickness(10, 8, 10, 8) };
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+        var icon = MakeMindMapVectorIcon(iconKind, 22, Hex(accent ?? "#94A3B8"));
+        icon.Margin = new Thickness(0, 0, 8, 0);
+        icon.VerticalAlignment = VerticalAlignment.Center;
+        Grid.SetColumn(icon, 0);
+
+        var texts = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
+        texts.Children.Add(new TextBlock
+        {
+            Text = title,
+            FontSize = 12.5,
+            FontWeight = FontWeights.SemiBold,
+            Foreground = Hex("#E2E8F0"),
+            TextWrapping = TextWrapping.NoWrap,
+            TextTrimming = TextTrimming.CharacterEllipsis
+        });
+        texts.Children.Add(new TextBlock
+        {
+            Text = subtitle,
+            FontSize = 11,
+            Foreground = Hex("#94A3B8"),
+            Margin = new Thickness(0, 2, 0, 0),
+            TextWrapping = TextWrapping.NoWrap,
+            TextTrimming = TextTrimming.CharacterEllipsis
+        });
+        Grid.SetColumn(texts, 1);
+        row.Children.Add(icon);
+        row.Children.Add(texts);
+
+        var card = new Border
+        {
+            Tag = tag,
+            Width = width,
+            Height = height,
+            Background = Hex("#121824"),
+            BorderBrush = Hex(accent ?? "#24324B"),
+            BorderThickness = new Thickness(accent != null ? 1.4 : 1),
+            CornerRadius = new CornerRadius(12),
+            Child = row,
+            Cursor = Cursors.Hand,
+            ToolTip = BuildDarkTip(tip)
+        };
+        if (accent != null)
+        {
+            card.Effect = new DropShadowEffect
+            {
+                Color = (Color)ColorConverter.ConvertFromString(accent),
+                BlurRadius = 12,
+                ShadowDepth = 0,
+                Opacity = 0.45
+            };
+        }
+        if (onClick != null)
+            card.MouseLeftButtonUp += (_, _) => onClick();
+        _workflowDiagramNodeBorders.Add(card);
+        WorkflowDiagramCanvas.Children.Add(card);
+        Canvas.SetLeft(card, left);
+        Canvas.SetTop(card, top);
+        Panel.SetZIndex(card, 3);
+
+        Point anchor = anchorOnRight
+            ? AddAnchorDot(left + width, centerY)
+            : AddAnchorDot(left, centerY);
+        return (card, anchor);
+    }
+
+    private (Border Card, Point LeftAnchor) AddMindMapWorkerNode(
+        double centerX,
+        double centerY,
+        double width,
+        double height,
+        AgentRosterEntry? agent,
+        string? overflowLabel,
+        LiveAgentWorkState? live,
+        string? tipOverflow)
+    {
+        double left = centerX - width / 2;
+        double top = centerY - height / 2;
+
+        bool hot = agent != null && (
+            string.Equals(agent.Id, _workflowDiagramActiveWorkerId, StringComparison.OrdinalIgnoreCase) &&
+            _workflowDiagramPhase is "executing" or "dispatching" or "reworking" or "master_verifying");
+        bool done = _workflowDiagramPhase == "verified_delivered" ||
+                    (live != null && (live.Status == "done" ||
+                                      string.Equals(live.WorkflowPhase, "verified_delivered", StringComparison.OrdinalIgnoreCase)));
+        string? accent = hot ? "#22D3EE" : (done ? "#10B981" : null);
+
+        var grid = new Grid { Margin = new Thickness(10, 6, 10, 6) };
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+        FrameworkElement avatar;
+        string name;
+        string sub;
+        string tip;
+        if (agent != null)
+        {
+            avatar = OfficialBrandIconService.CreateCircularAvatarVisual(
+                agent.Id, 24, agent, OfficialBrandIconService.GetBrandColor(agent.Id), 1.05);
+            name = agent.Name;
+            string tier = !string.IsNullOrWhiteSpace(live?.SelectedTierBadge)
+                ? live!.SelectedTierBadge
+                : RoutingService.EffortTierVisualLabel(agent.PreferredEffortTier);
+            sub = ShortName(live?.SelectedModel ?? tier, 16);
+            tip = DescribeWorkerTip(agent, live);
+        }
+        else
+        {
+            avatar = MakeMindMapVectorIcon("workers", 22, Hex("#94A3B8"));
+            name = overflowLabel ?? "+N";
+            sub = "更多成员";
+            tip = tipOverflow ?? name;
+        }
+        avatar.VerticalAlignment = VerticalAlignment.Center;
+        avatar.Margin = new Thickness(0, 0, 8, 0);
+        Grid.SetColumn(avatar, 0);
+
+        var texts = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
+        texts.Children.Add(new TextBlock
+        {
+            Text = name,
+            FontSize = 12.5,
+            FontWeight = FontWeights.SemiBold,
+            Foreground = Hex("#F1F5F9"),
+            TextWrapping = TextWrapping.NoWrap,
+            TextTrimming = TextTrimming.CharacterEllipsis
+        });
+        texts.Children.Add(new TextBlock
+        {
+            Text = sub,
+            FontSize = 10.5,
+            Foreground = Hex("#94A3B8"),
+            Margin = new Thickness(0, 2, 0, 0),
+            TextWrapping = TextWrapping.NoWrap,
+            TextTrimming = TextTrimming.CharacterEllipsis
+        });
+        Grid.SetColumn(texts, 1);
+
+        var statusDot = new Ellipse
+        {
+            Width = 8,
+            Height = 8,
+            Fill = Hex(hot ? "#22D3EE" : (done ? "#10B981" : "#64748B")),
+            VerticalAlignment = VerticalAlignment.Top,
+            Margin = new Thickness(4, 4, 0, 0)
+        };
+        Grid.SetColumn(statusDot, 2);
+
+        grid.Children.Add(avatar);
+        grid.Children.Add(texts);
+        grid.Children.Add(statusDot);
+
+        var card = new Border
+        {
+            Tag = agent != null ? "MindMapNode:worker" : "MindMapNode:worker_overflow",
+            Width = width,
+            Height = height,
+            Background = Hex("#121824"),
+            BorderBrush = Hex(accent ?? "#24324B"),
+            BorderThickness = new Thickness(accent != null ? 1.5 : 1),
+            CornerRadius = new CornerRadius(12),
+            Child = grid,
+            Cursor = agent != null ? Cursors.Hand : Cursors.Arrow,
+            ToolTip = BuildDarkTip(tip)
+        };
+        if (accent != null)
+        {
+            card.Effect = new DropShadowEffect
+            {
+                Color = (Color)ColorConverter.ConvertFromString(accent),
+                BlurRadius = 14,
+                ShadowDepth = 0,
+                Opacity = 0.5
+            };
+        }
+        if (agent != null)
+        {
+            var ag = agent;
+            card.MouseLeftButtonUp += (_, _) =>
+            {
+                if (AutoDispatchService.ResolveGuiExecutable(ag) != null)
+                {
+                    var proj = _reg.GetActiveProject();
+                    SetStatus(_autoDispatch.EnsureOrActivateAgentWindow(ag, proj?.PrimaryRoot, activateIfRunning: true));
+                }
+                else
+                {
+                    OpenRosterAgentConfig(ag);
                 }
             };
-            WorkflowDiagramCanvas.Children.Add(_workflowDiagramPulseDot);
-            Canvas.SetLeft(_workflowDiagramPulseDot, -20);
-            Canvas.SetTop(_workflowDiagramPulseDot, -20);
         }
+        _workflowDiagramNodeBorders.Add(card);
+        WorkflowDiagramCanvas.Children.Add(card);
+        Canvas.SetLeft(card, left);
+        Canvas.SetTop(card, top);
+        Panel.SetZIndex(card, 3);
 
-        _workflowDiagramLayoutSig =
-            $"{_workflowDiagramPhase}|{_workflowDiagramRound}|{_workflowDiagramMaxRounds}|{_workflowDiagramActiveWorkerId}|{_reg.UserConfig.WorkflowEngineEnabled}|{string.Join(",", _workflowDiagramWorkerIds)}|{_workflowDiagramDemoMode}";
+        var leftAnchor = AddAnchorDot(left, centerY);
+        return (card, leftAnchor);
+    }
+
+    private Point AddAnchorDot(double x, double y)
+    {
+        var dot = new Ellipse
+        {
+            Width = 6,
+            Height = 6,
+            Fill = Hex("#64748B"),
+            Stroke = Hex("#94A3B8"),
+            StrokeThickness = 0.8,
+            IsHitTestVisible = false
+        };
+        WorkflowDiagramCanvas.Children.Add(dot);
+        Canvas.SetLeft(dot, x - 3);
+        Canvas.SetTop(dot, y - 3);
+        Panel.SetZIndex(dot, 4);
+        return new Point(x, y);
+    }
+
+    private FrameworkElement MakeMindMapVectorIcon(string kind, double size, Brush stroke)
+    {
+        string data = kind switch
+        {
+            "intake" => "M4,6 H20 V16 H12 L8,20 V16 H4 Z",
+            "verify" => "M12,3 L20,7 V12 C20,17 16,20 12,21 C8,20 4,17 4,12 V7 Z M8,12 L11,15 L16,9",
+            "master" => "M12,3 L14,9 H20 L15,13 L17,20 L12,16 L7,20 L9,13 L4,9 H10 Z",
+            _ => "M6,8 H18 V16 H6 Z M9,8 V16 M15,8 V16"
+        };
+        return new Viewbox
+        {
+            Width = size,
+            Height = size,
+            Child = new Path
+            {
+                Data = Geometry.Parse(data),
+                Stroke = stroke,
+                StrokeThickness = 1.5,
+                StrokeStartLineCap = PenLineCap.Round,
+                StrokeEndLineCap = PenLineCap.Round,
+                StrokeLineJoin = PenLineJoin.Round,
+                Fill = Brushes.Transparent,
+                Stretch = Stretch.Uniform
+            }
+        };
+    }
+
+    private void DrawMindMapEdge(
+        Point from,
+        Point to,
+        bool active,
+        string toneHex,
+        bool reverse = false,
+        bool bidirectional = false)
+    {
+        // 水平切线三次贝塞尔（思维导图弧度）
+        double dx = Math.Abs(to.X - from.X);
+        double c1x = from.X + dx * 0.45;
+        double c2x = to.X - dx * 0.45;
+        var geo = new PathGeometry();
+        var fig = new PathFigure
+        {
+            StartPoint = from,
+            IsClosed = false,
+            IsFilled = false
+        };
+        fig.Segments.Add(new BezierSegment(
+            new Point(c1x, from.Y),
+            new Point(c2x, to.Y),
+            to,
+            true));
+        geo.Figures.Add(fig);
+
+        // 静默暗蓝底层细线
+        var basePath = new Path
+        {
+            Data = geo,
+            Stroke = Hex("#1E3A5F"),
+            StrokeThickness = 1.15,
+            Opacity = 0.55,
+            IsHitTestVisible = false
+        };
+        WorkflowDiagramCanvas.Children.Add(basePath);
+        Panel.SetZIndex(basePath, 1);
+
+        if (active)
+        {
+            // 柔光宽底晕
+            var glowPath = new Path
+            {
+                Data = geo,
+                Stroke = Hex(toneHex),
+                StrokeThickness = 4.5,
+                Opacity = 0.22,
+                IsHitTestVisible = false
+            };
+            WorkflowDiagramCanvas.Children.Add(glowPath);
+            Panel.SetZIndex(glowPath, 1);
+
+            // 高亮流光线
+            var hiPath = new Path
+            {
+                Data = geo,
+                Stroke = Hex(toneHex),
+                StrokeThickness = 1.7,
+                Opacity = 0.9,
+                IsHitTestVisible = false
+            };
+            WorkflowDiagramCanvas.Children.Add(hiPath);
+            Panel.SetZIndex(hiPath, 2);
+
+            AddCometTrack(geo, toneHex, reverse, bidirectional ? 0 : 0);
+            if (bidirectional)
+                AddCometTrack(geo, toneHex, reverse: !reverse, phaseOffset: 0.5);
+        }
+    }
+
+    private void AddCometTrack(PathGeometry geo, string toneHex, bool reverse, double phaseOffset = 0)
+    {
+        Ellipse MakeDot(double size, double opacity) => new()
+        {
+            Width = size,
+            Height = size,
+            Fill = Hex(toneHex),
+            IsHitTestVisible = false,
+            Opacity = opacity,
+            Effect = new DropShadowEffect
+            {
+                Color = (Color)ColorConverter.ConvertFromString(toneHex),
+                BlurRadius = size * 2.2,
+                ShadowDepth = 0,
+                Opacity = 0.85
+            }
+        };
+
+        var core = MakeDot(7, 1.0);
+        var tail1 = MakeDot(5, 0.55);
+        var tail2 = MakeDot(3.5, 0.28);
+        WorkflowDiagramCanvas.Children.Add(tail2);
+        WorkflowDiagramCanvas.Children.Add(tail1);
+        WorkflowDiagramCanvas.Children.Add(core);
+        Panel.SetZIndex(tail2, 5);
+        Panel.SetZIndex(tail1, 5);
+        Panel.SetZIndex(core, 6);
+        Canvas.SetLeft(core, -20);
+        Canvas.SetTop(core, -20);
+
+        _workflowDiagramFlowTracks.Add(new MindMapFlowTrack
+        {
+            Geometry = geo,
+            Core = core,
+            Tail1 = tail1,
+            Tail2 = tail2,
+            Reverse = reverse,
+            PhaseOffset = phaseOffset,
+            Speed = 0.36
+        });
     }
 
     private (string Bg, string Border, string Fg) PhaseBadgeColors(string phase) => phase switch
@@ -545,181 +1216,6 @@ public partial class MainWindow
         _ => ("#1E293B", "#334155", "#94A3B8")
     };
 
-    private string? ActiveAccentForNode(int nodeIndex)
-    {
-        if (_workflowDiagramPhase == "paused" && !_workflowDiagramDemoMode) return null;
-        return (_workflowDiagramPhase, nodeIndex) switch
-        {
-            ("master_analyzing", 1) => "#6366F1",
-            ("dispatching", 1) or ("dispatching", 2) => "#6366F1",
-            ("executing", 2) => "#F59E0B",
-            ("reworking", 2) => "#F97316",
-            ("master_verifying", 3) => "#06B6D4",
-            ("verified_delivered", 4) => "#10B981",
-            ("idle", 0) => "#34D399",
-            _ => null
-        };
-    }
-
-    private int ActiveEdgeIndex() => _workflowDiagramPhase switch
-    {
-        "master_analyzing" => 0,
-        "dispatching" => 1,
-        "executing" or "reworking" => 2,
-        "master_verifying" => 3,
-        "verified_delivered" => 3,
-        _ => -1
-    };
-
-    private void AddWorkerArrayNode(
-        int index,
-        double x,
-        double y,
-        double nodeW,
-        double nodeH,
-        List<AgentRosterEntry> workers,
-        Dictionary<string, LiveAgentWorkState> liveMap)
-    {
-        var panel = new StackPanel { Margin = new Thickness(8, 6, 8, 6) };
-        panel.Children.Add(new TextBlock
-        {
-            Text = "③ 实操执行",
-            FontSize = 11,
-            FontWeight = FontWeights.SemiBold,
-            Foreground = Hex("#E2E8F0"),
-            Margin = new Thickness(0, 0, 0, 4)
-        });
-
-        var tip = new StringBuilder();
-        tip.AppendLine($"工作流已启用执行 AI：{workers.Count}");
-        const int maxShow = 3;
-        var show = workers.Take(maxShow).ToList();
-        var overflow = workers.Skip(maxShow).ToList();
-
-        if (workers.Count == 0)
-        {
-            panel.Children.Add(new TextBlock
-            {
-                Text = "暂无启用执行 AI",
-                FontSize = 10.5,
-                Foreground = Hex("#64748B")
-            });
-            tip.Append("请在「工作流开关」或「AI 阵容与路由」启用具备直改工程权限的工具");
-        }
-        else
-        {
-            LiveAgentWorkState? LiveOf(AgentRosterEntry a)
-            {
-                liveMap.TryGetValue(a.Id, out var lv);
-                return lv ?? liveMap.Values.FirstOrDefault(v =>
-                    string.Equals(v.AgentId, a.Id, StringComparison.OrdinalIgnoreCase));
-            }
-
-            foreach (var w in workers)
-                tip.AppendLine($"· {DescribeWorkerTip(w, LiveOf(w))}");
-            tip.Append("点击跳转「AI 阵容与路由」");
-
-            if (workers.Count <= 3)
-            {
-                foreach (var w in show)
-                    panel.Children.Add(BuildMiniWorkerChip(w, LiveOf(w)));
-            }
-            else
-            {
-                // 双列紧凑：恰好 4 个全部展示，更多时前 3 个 + 溢出胶囊
-                var grid = new System.Windows.Controls.Primitives.UniformGrid { Columns = 2 };
-                var visible = workers.Count == 4 ? workers : show;
-                foreach (var w in visible)
-                    grid.Children.Add(BuildMiniWorkerChip(w, LiveOf(w), compact: true));
-                if (workers.Count > 4)
-                {
-                    grid.Children.Add(new Border
-                    {
-                        Background = Hex("#1E293B"),
-                        BorderBrush = Hex("#334155"),
-                        BorderThickness = new Thickness(1),
-                        CornerRadius = new CornerRadius(8),
-                        Padding = new Thickness(6, 0, 6, 1),
-                        Margin = new Thickness(0, 1, 2, 1),
-                        HorizontalAlignment = HorizontalAlignment.Left,
-                        VerticalAlignment = VerticalAlignment.Center,
-                        Child = new TextBlock
-                        {
-                            Text = $"+{overflow.Count} 项",
-                            FontSize = 10,
-                            Foreground = Hex("#94A3B8")
-                        },
-                        ToolTip = BuildDarkTip(string.Join("\n", overflow.Select(o => DescribeWorkerTip(o, LiveOf(o)))))
-                    });
-                }
-                panel.Children.Add(grid);
-            }
-        }
-
-        bool workerHot = _workflowDiagramPhase is "executing" or "dispatching" or "reworking";
-        string? accent = ActiveAccentForNode(index);
-        if (workerHot && !string.IsNullOrWhiteSpace(_workflowDiagramActiveWorkerId))
-            accent = _workflowDiagramPhase == "reworking" ? "#F97316" : "#F59E0B";
-
-        var border = new Border
-        {
-            Width = nodeW,
-            Height = nodeH,
-            Background = Hex("#121824"),
-            BorderBrush = Hex(accent ?? "#24324B"),
-            BorderThickness = new Thickness(accent != null ? 1.6 : 1),
-            CornerRadius = new CornerRadius(8),
-            Child = panel,
-            Cursor = Cursors.Hand,
-            ToolTip = BuildDarkTip(tip.ToString().TrimEnd())
-        };
-        border.MouseLeftButtonUp += (_, _) => NavSettings.IsChecked = true;
-        _workflowDiagramNodeBorders.Add(border);
-        WorkflowDiagramCanvas.Children.Add(border);
-        Canvas.SetLeft(border, x);
-        Canvas.SetTop(border, y);
-    }
-
-    private FrameworkElement BuildMiniWorkerChip(AgentRosterEntry agent, LiveAgentWorkState? live, bool compact = false)
-    {
-        bool hot = live != null && (
-            string.Equals(live.WorkflowPhase, "executing", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(live.WorkflowPhase, "dispatching", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(live.WorkflowPhase, "reworking", StringComparison.OrdinalIgnoreCase) ||
-            live.Status == "working" || live.Status == "reworking" ||
-            string.Equals(agent.Id, _workflowDiagramActiveWorkerId, StringComparison.OrdinalIgnoreCase));
-
-        var sp = new StackPanel
-        {
-            Orientation = Orientation.Horizontal,
-            Margin = new Thickness(0, 0, compact ? 2 : 0, 2),
-            ToolTip = BuildDarkTip(DescribeWorkerTip(agent, live))
-        };
-        var avatar = OfficialBrandIconService.CreateCircularAvatarVisual(
-            agent.Id, compact ? 16 : 18, agent, OfficialBrandIconService.GetBrandColor(agent.Id), 1.0);
-        avatar.Margin = new Thickness(0, 0, 4, 0);
-        sp.Children.Add(avatar);
-
-        var dot = new Ellipse
-        {
-            Width = 6,
-            Height = 6,
-            Fill = Hex(hot ? "#F59E0B" : (live?.Status == "done" ? "#10B981" : "#64748B")),
-            Margin = new Thickness(0, 0, 3, 0),
-            VerticalAlignment = VerticalAlignment.Center
-        };
-        sp.Children.Add(dot);
-        sp.Children.Add(new TextBlock
-        {
-            Text = ShortName(agent.Name, compact ? 5 : 9),
-            FontSize = 10,
-            Foreground = Hex(hot ? "#FDE68A" : "#CBD5E1"),
-            VerticalAlignment = VerticalAlignment.Center,
-            TextTrimming = TextTrimming.CharacterEllipsis
-        });
-        return sp;
-    }
-
     private string DescribeWorkerTip(AgentRosterEntry agent, LiveAgentWorkState? live)
     {
         string tier = !string.IsNullOrWhiteSpace(live?.SelectedTierBadge)
@@ -731,13 +1227,6 @@ public partial class MainWindow
         if (live != null)
         {
             sb.Append($" · R{Math.Max(1, live.CurrentRound)}/{Math.Max(1, live.MaxRounds)}");
-            if (DateTime.TryParse(live.StartedAt, out var started) &&
-                (live.Status == "working" || live.Status == "reworking"))
-            {
-                var span = DateTime.Now - started;
-                if (span.TotalSeconds > 0)
-                    sb.Append(span.TotalMinutes >= 1 ? $" · 已耗时 {(int)span.TotalMinutes} 分" : $" · 已耗时 {(int)span.TotalSeconds} 秒");
-            }
         }
         return sb.ToString();
     }
@@ -751,140 +1240,6 @@ public partial class MainWindow
         if (p == "master_verifying") return "待验收";
         if (p == "verified_delivered" || live.Status == "done") return "已交付";
         return live.Status ?? "待命";
-    }
-
-    private void AddDiagramNode(
-        int index,
-        double x,
-        double y,
-        double nodeW,
-        double nodeH,
-        string title,
-        string body,
-        string tip,
-        string? accent,
-        FrameworkElement? avatar = null,
-        Action? onClick = null)
-    {
-        var panel = new StackPanel { Margin = new Thickness(8, 6, 8, 6) };
-        var titleRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 4) };
-        if (avatar != null)
-        {
-            avatar.Margin = new Thickness(0, 0, 5, 0);
-            avatar.VerticalAlignment = VerticalAlignment.Center;
-            titleRow.Children.Add(avatar);
-        }
-        titleRow.Children.Add(new TextBlock
-        {
-            Text = title,
-            FontSize = 11,
-            FontWeight = FontWeights.SemiBold,
-            Foreground = Hex("#E2E8F0"),
-            VerticalAlignment = VerticalAlignment.Center,
-            TextTrimming = TextTrimming.CharacterEllipsis
-        });
-        panel.Children.Add(titleRow);
-        panel.Children.Add(new TextBlock
-        {
-            Text = body,
-            FontSize = 10.5,
-            Foreground = Hex("#94A3B8"),
-            TextWrapping = TextWrapping.Wrap,
-            LineHeight = 14,
-            MaxHeight = 40,
-            MaxWidth = Math.Max(40, nodeW - 16),
-            TextTrimming = TextTrimming.CharacterEllipsis
-        });
-
-        var border = new Border
-        {
-            Width = nodeW,
-            Height = nodeH,
-            Background = Hex("#121824"),
-            BorderBrush = Hex(accent ?? "#24324B"),
-            BorderThickness = new Thickness(accent != null ? 1.6 : 1),
-            CornerRadius = new CornerRadius(8),
-            Child = panel,
-            Cursor = onClick != null ? Cursors.Hand : Cursors.Arrow,
-            ToolTip = BuildDarkTip(tip)
-        };
-        if (onClick != null)
-            border.MouseLeftButtonUp += (_, _) => onClick();
-        _workflowDiagramNodeBorders.Add(border);
-        WorkflowDiagramCanvas.Children.Add(border);
-        Canvas.SetLeft(border, x);
-        Canvas.SetTop(border, y);
-    }
-
-    private Path DrawFlowEdge(double x1, double y1, double x2, double y2, bool active, bool reverse)
-    {
-        double cx = (x1 + x2) / 2;
-        var geo = new PathGeometry();
-        var fig = new PathFigure { StartPoint = new Point(x1 + 2, y1), IsClosed = false };
-        fig.Segments.Add(new BezierSegment(
-            new Point(cx - 8, y1),
-            new Point(cx + 8, y2),
-            new Point(x2 - 10, y2),
-            true));
-        geo.Figures.Add(fig);
-
-        var path = new Path
-        {
-            Data = geo,
-            Stroke = Hex(active ? "#818CF8" : "#334155"),
-            StrokeThickness = active ? 1.8 : 1.2,
-            StrokeDashArray = active ? new DoubleCollection { 4, 3 } : new DoubleCollection { 2, 4 },
-            Opacity = active ? 1.0 : 0.75
-        };
-        WorkflowDiagramCanvas.Children.Add(path);
-
-        // Arrow head
-        var arrow = new Polygon
-        {
-            Points = new PointCollection
-            {
-                new Point(x2 - 2, y2),
-                new Point(x2 - 9, y2 - 4),
-                new Point(x2 - 9, y2 + 4)
-            },
-            Fill = Hex(active ? "#A5B4FC" : "#475569")
-        };
-        WorkflowDiagramCanvas.Children.Add(arrow);
-        return path;
-    }
-
-    private Path DrawReworkArc(double xFrom, double yFrom, double xTo, double yTo, double dipY, bool active)
-    {
-        var geo = new PathGeometry();
-        var fig = new PathFigure { StartPoint = new Point(xFrom, yFrom), IsClosed = false };
-        fig.Segments.Add(new BezierSegment(
-            new Point(xFrom + 12, dipY),
-            new Point(xTo - 12, dipY),
-            new Point(xTo, yTo),
-            true));
-        geo.Figures.Add(fig);
-        var path = new Path
-        {
-            Data = geo,
-            Stroke = Hex(active ? "#F97316" : "#3F3F46"),
-            StrokeThickness = active ? 1.8 : 1.15,
-            StrokeDashArray = active ? new DoubleCollection { 4, 3 } : new DoubleCollection { 3, 5 },
-            Opacity = active ? 1.0 : 0.7
-        };
-        WorkflowDiagramCanvas.Children.Add(path);
-
-        var arrow = new Polygon
-        {
-            Points = new PointCollection
-            {
-                new Point(xTo, yTo),
-                new Point(xTo + 6, yTo + 7),
-                new Point(xTo - 5, yTo + 5)
-            },
-            Fill = Hex(active ? "#FB923C" : "#52525B")
-        };
-        WorkflowDiagramCanvas.Children.Add(arrow);
-        return path;
     }
 
     private static ToolTip BuildDarkTip(string text) => new()
@@ -923,7 +1278,15 @@ public partial class MainWindow
             (_workflowDiagramDemoMode ||
              (_reg.UserConfig.WorkflowEngineEnabled &&
               _workflowDiagramPhase is not "idle" and not "paused") ||
-             _workflowDiagramPreviewOverride);
+             _workflowDiagramPreviewOverride ||
+             (_reg.UserConfig.WorkflowEngineEnabled && _workflowDiagramPhase == "idle"));
+
+        // idle 也允许轻微呼吸（中心光晕），但自检隔离环境仍停表
+        if (AppPaths.IsIsolatedTest)
+        {
+            StopWorkflowDiagramAnimTimer();
+            return;
+        }
 
         if (shouldRun)
             StartWorkflowDiagramAnimTimer();
@@ -934,7 +1297,7 @@ public partial class MainWindow
     private void StartWorkflowDiagramAnimTimer()
     {
         if (_workflowDiagramAnimTimer != null) return;
-        _workflowDiagramAnimTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(55) };
+        _workflowDiagramAnimTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(33) };
         _workflowDiagramAnimTimer.Tick += WorkflowDiagramAnimTimer_Tick;
         _workflowDiagramAnimTimer.Start();
     }
@@ -958,63 +1321,33 @@ public partial class MainWindow
 
         _workflowDiagramDashOffset -= 0.55;
         if (_workflowDiagramDashOffset < -40) _workflowDiagramDashOffset = 0;
-        _workflowDiagramPulseT += 0.055;
+        _workflowDiagramPulseT += 0.045;
 
-        if (_workflowDiagramActiveFlowPath != null)
-            _workflowDiagramActiveFlowPath.StrokeDashOffset = _workflowDiagramDashOffset;
-        if (_workflowDiagramReworkPath != null && _workflowDiagramPhase == "reworking")
-            _workflowDiagramReworkPath.StrokeDashOffset = -_workflowDiagramDashOffset;
+        // 主脑外层呼吸：仅改 Opacity，绝不改尺寸
+        if (_workflowDiagramMasterGlow != null)
+        {
+            double breathe = 0.28 + 0.42 * (0.5 + 0.5 * Math.Sin(_workflowDiagramPulseT * 2.1));
+            _workflowDiagramMasterGlow.Opacity = breathe;
+        }
+        if (_workflowDiagramAurora != null)
+        {
+            double a = 0.42 + 0.22 * (0.5 + 0.5 * Math.Sin(_workflowDiagramPulseT * 1.4));
+            _workflowDiagramAurora.Opacity = a;
+        }
 
-        // Breathing status dot
         if (WorkflowDiagramStatusDot != null)
         {
             double breathe = 0.72 + 0.28 * (0.5 + 0.5 * Math.Sin(_workflowDiagramPulseT * 2.2));
             WorkflowDiagramStatusDot.Opacity = breathe;
         }
 
-        // Pulse border opacity on active nodes
-        foreach (var b in _workflowDiagramNodeBorders)
+        foreach (var track in _workflowDiagramFlowTracks)
         {
-            if (b.BorderThickness.Left >= 1.5)
-            {
-                double pulse = 0.55 + 0.45 * (0.5 + 0.5 * Math.Sin(_workflowDiagramPulseT * 3.0));
-                b.Opacity = 0.82 + 0.18 * pulse;
-            }
-        }
-
-        if (_workflowDiagramPulseDot != null && WorkflowDiagramCanvas != null)
-        {
-            double w = WorkflowDiagramCanvas.ActualWidth;
-            if (w < 40) w = Math.Max(40, ActualWidth - 80);
-            double padX = 10;
-            double usable = Math.Max(200, w - padX * 2);
-            double nodeW = Math.Clamp(usable / 5.35, 96, 168);
-            double gap = Math.Max(10, (usable - nodeW * 5) / 4.0);
-            double yMid = 10 + 86 * 0.45 - 4;
-            if (_workflowDiagramPhase == "reworking")
-            {
-                double xs3 = padX + 3 * (nodeW + gap);
-                double xs2 = padX + 2 * (nodeW + gap);
-                double t = (_workflowDiagramPulseT * 0.35) % 1.0;
-                double x = xs3 + nodeW * 0.45 + (xs2 + nodeW * 0.55 - (xs3 + nodeW * 0.45)) * t;
-                double baseY = 10 + 86;
-                double dip = baseY + 26;
-                double yy = baseY + Math.Sin(t * Math.PI) * (dip - baseY);
-                Canvas.SetLeft(_workflowDiagramPulseDot, x);
-                Canvas.SetTop(_workflowDiagramPulseDot, yy);
-            }
-            else
-            {
-                int edge = ActiveEdgeIndex();
-                if (edge >= 0)
-                {
-                    double x1 = padX + edge * (nodeW + gap) + nodeW;
-                    double x2 = padX + (edge + 1) * (nodeW + gap);
-                    double t = (_workflowDiagramPulseT * 0.4) % 1.0;
-                    Canvas.SetLeft(_workflowDiagramPulseDot, x1 + (x2 - x1) * t);
-                    Canvas.SetTop(_workflowDiagramPulseDot, yMid);
-                }
-            }
+            double t = ((_workflowDiagramPulseT * track.Speed) + track.PhaseOffset) % 1.0;
+            if (track.Reverse) t = 1.0 - t;
+            PlaceCometDot(track.Geometry, track.Core, t, track.Core.Width);
+            PlaceCometDot(track.Geometry, track.Tail1, Wrap01(t - 0.055), track.Tail1.Width);
+            PlaceCometDot(track.Geometry, track.Tail2, Wrap01(t - 0.11), track.Tail2.Width);
         }
 
         if (_workflowDiagramDemoMode)
@@ -1028,6 +1361,20 @@ public partial class MainWindow
                 RebuildWorkflowDiagramCanvas();
             }
         }
+    }
+
+    private static double Wrap01(double t)
+    {
+        t %= 1.0;
+        if (t < 0) t += 1.0;
+        return t;
+    }
+
+    private static void PlaceCometDot(PathGeometry geo, Ellipse dot, double t, double size)
+    {
+        geo.GetPointAtFractionLength(t, out Point pt, out _);
+        Canvas.SetLeft(dot, pt.X - size / 2);
+        Canvas.SetTop(dot, pt.Y - size / 2);
     }
 
     private void SyncWorkflowDiagramAfterOverviewRender()

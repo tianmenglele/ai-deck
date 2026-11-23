@@ -48,6 +48,8 @@
                     <TextBlock x:Name="HeaderBrandText" Text="AIDeck · 多 AI 协同中心" FontSize="14.5" FontWeight="SemiBold" Foreground="#F8FAFC" VerticalAlignment="Center" Margin="0,0,8,0" TextWrapping="NoWrap"/>
                     <Button x:Name="HeaderVersionBtn"
                             Style="{StaticResource ActionBtn}"
+                            MinWidth="54"
+                            Height="24"
                             Padding="8,2"
                             Margin="0,0,6,0"
                             FontSize="11.5"
@@ -81,7 +83,9 @@
                 <StackPanel Grid.Column="4" Orientation="Horizontal" VerticalAlignment="Center">
                     <Button x:Name="WorkflowSwitchBtn"
                             Style="{StaticResource SuccessBtn}"
-                            Padding="8,3"
+                            Width="58"
+                            Height="28"
+                            Padding="6,2"
                             Margin="0,0,6,0"
                             AutomationProperties.Name="协同开关"
                             ToolTip="协同已开启，点击关闭"
@@ -254,10 +258,10 @@
                     </StackPanel>
 
                     <StackPanel DockPanel.Dock="Bottom" VerticalAlignment="Bottom">
-                        <Border Background="{DynamicResource BgInputBrush}" BorderBrush="{DynamicResource BorderSectionBrush}" BorderThickness="1" CornerRadius="6" Padding="10,8" Margin="0">
-                            <StackPanel>
-                                <TextBlock x:Name="SidebarWorkflowBadge" Text="协同运行" Foreground="#34D399" FontSize="12" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
-                                <TextBlock x:Name="NetworkHealthBadge" Text="网络在线" Foreground="#94A3B8" FontSize="11.5" Margin="0,4,0,0" TextTrimming="CharacterEllipsis"/>
+                        <Border Height="54" Background="{DynamicResource BgInputBrush}" BorderBrush="{DynamicResource BorderSectionBrush}" BorderThickness="1" CornerRadius="6" Padding="10,6" Margin="0">
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock x:Name="SidebarWorkflowBadge" Text="协同运行" Foreground="#34D399" FontSize="12" FontWeight="SemiBold" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"/>
+                                <TextBlock x:Name="NetworkHealthBadge" Text="网络在线" Foreground="#94A3B8" FontSize="11.5" Margin="0,4,0,0" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"/>
                                 <TextBlock x:Name="McpBadgeText" Text="就绪" Visibility="Collapsed" Foreground="#64748B" FontSize="11"/>
                                 <TextBlock x:Name="AiChatRootBadge" Visibility="Collapsed"/>
                             </StackPanel>
@@ -273,20 +277,21 @@
                 <ScrollViewer x:Name="PageOverview" Visibility="Visible" VerticalScrollBarVisibility="Auto">
                     <StackPanel>
                         <!-- 顶部：单行清爽主脑统筹条 -->
-                        <Border x:Name="OverviewTopBannerCard" Style="{StaticResource SectionCard}" Padding="16,12" Margin="0,0,0,14">
+                        <Border x:Name="OverviewTopBannerCard" Style="{StaticResource SectionCard}" Height="52" Padding="16,8" Margin="0,0,0,14">
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,12,0">
-                                    <Border x:Name="OverviewModeBadge" Background="#12352C" BorderBrush="#1D6B55" BorderThickness="1" CornerRadius="4" Padding="8,2" Margin="0,0,10,0" VerticalAlignment="Center">
-                                        <TextBlock x:Name="OverviewModeBadgeText" Text="运行中" FontSize="12" FontWeight="SemiBold" Foreground="#A7F3D0"/>
+                                    <Border x:Name="OverviewModeBadge" Width="58" Background="#12352C" BorderBrush="#1D6B55" BorderThickness="1" CornerRadius="4" Padding="4,2" Margin="0,0,10,0" VerticalAlignment="Center" HorizontalAlignment="Left">
+                                        <TextBlock x:Name="OverviewModeBadgeText" Text="运行中" FontSize="12" FontWeight="SemiBold" Foreground="#A7F3D0" HorizontalAlignment="Center" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"/>
                                     </Border>
                                     <TextBlock Text="主脑" FontSize="12.5" Foreground="#94A3B8" VerticalAlignment="Center" Margin="0,0,8,0"/>
                                     <TextBlock x:Name="OverviewMasterBrainText"
                                                Text="—"
-                                               FontSize="14" FontWeight="SemiBold" Foreground="#F8FAFC" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                                               FontSize="14" FontWeight="SemiBold" Foreground="#F8FAFC" VerticalAlignment="Center"
+                                               TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"/>
                                 </StackPanel>
                                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                                     <Button x:Name="OverviewRefreshBtn" Visibility="Collapsed" Click="OverviewRefreshBtn_Click"/>
@@ -331,14 +336,14 @@
                                     <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,12,0">
                                         <Ellipse x:Name="WorkflowDiagramStatusDot" Width="9" Height="9" Fill="#34D399" Margin="0,0,8,0" VerticalAlignment="Center"/>
                                         <TextBlock Text="动态工作流" FontSize="14" FontWeight="SemiBold" Foreground="#F8FAFC" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                                        <Border x:Name="WorkflowDiagramPhaseBadge" Background="#1E293B" BorderBrush="#334155" BorderThickness="1" CornerRadius="10" Padding="9,2" Margin="0,0,10,0" VerticalAlignment="Center">
-                                            <TextBlock x:Name="WorkflowDiagramPhaseBadgeText" Text="空闲待命" FontSize="11" FontWeight="SemiBold" Foreground="#94A3B8"/>
+                                        <Border x:Name="WorkflowDiagramPhaseBadge" Width="84" Background="#1E293B" BorderBrush="#334155" BorderThickness="1" CornerRadius="10" Padding="4,2" Margin="0,0,10,0" VerticalAlignment="Center">
+                                            <TextBlock x:Name="WorkflowDiagramPhaseBadgeText" Text="空闲待命" FontSize="11" FontWeight="SemiBold" Foreground="#94A3B8" HorizontalAlignment="Center" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"/>
                                         </Border>
-                                        <TextBlock x:Name="WorkflowDiagramSubText" Text="等待全入口接单" FontSize="11.5" Foreground="#64748B" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="360"/>
+                                        <TextBlock x:Name="WorkflowDiagramSubText" Text="等待全入口接单" FontSize="11.5" Foreground="#64748B" VerticalAlignment="Center" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" MaxWidth="360"/>
                                     </StackPanel>
                                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                                        <Border Background="#111827" BorderBrush="#24324B" BorderThickness="1" CornerRadius="8" Padding="8,3" Margin="0,0,8,0" VerticalAlignment="Center">
-                                            <TextBlock x:Name="WorkflowDiagramRosterSummary" Text="主脑 0 · 执行 0" FontSize="11" Foreground="#94A3B8"/>
+                                        <Border MinWidth="96" Background="#111827" BorderBrush="#24324B" BorderThickness="1" CornerRadius="8" Padding="8,3" Margin="0,0,8,0" VerticalAlignment="Center" HorizontalAlignment="Center">
+                                            <TextBlock x:Name="WorkflowDiagramRosterSummary" Text="主脑 0 · 执行 0" FontSize="11" Foreground="#94A3B8" HorizontalAlignment="Center" TextWrapping="NoWrap"/>
                                         </Border>
                                         <Button x:Name="WorkflowDiagramDemoBtn" Style="{StaticResource IconToolBtn}"
                                                 AutomationProperties.Name="演示流转"
@@ -350,7 +355,7 @@
                                         </Button>
                                     </StackPanel>
                                 </Grid>
-                                <Canvas x:Name="WorkflowDiagramCanvas" Height="158" ClipToBounds="True" SizeChanged="WorkflowDiagramCanvas_SizeChanged"/>
+                                <Canvas x:Name="WorkflowDiagramCanvas" Height="264" ClipToBounds="True" SizeChanged="WorkflowDiagramCanvas_SizeChanged"/>
                             </DockPanel>
                         </Border>
 
@@ -375,11 +380,11 @@
                                 <Border Style="{StaticResource SectionCard}" Margin="0,0,0,14">
                                     <StackPanel>
                                         <TextBlock Text="最近协同回执" FontSize="14" FontWeight="SemiBold" Foreground="#F8FAFC" Margin="0,0,0,8"/>
-                                        <Border Background="#111722" BorderBrush="#202B3D" BorderThickness="1" CornerRadius="6" Padding="12,10" Margin="0,0,0,10">
+                                        <Border Height="138" Background="#111722" BorderBrush="#202B3D" BorderThickness="1" CornerRadius="6" Padding="12,10" Margin="0,0,0,10" ClipToBounds="True">
                                             <StackPanel>
-                                                <TextBlock x:Name="LatestDispatchHeaderText" Text="正在读取最近协同记录..." FontSize="12.5" FontWeight="SemiBold" Foreground="#E2E8F0" TextWrapping="Wrap"/>
-                                                <TextBlock x:Name="LatestDispatchMetaText" Text="" FontSize="11.5" Foreground="#64748B" Margin="0,3,0,6" TextWrapping="Wrap"/>
-                                                <TextBlock x:Name="LatestDispatchSnippetText" Text="" FontSize="12" Foreground="#94A3B8" LineHeight="18" TextWrapping="Wrap" MaxHeight="96" TextTrimming="CharacterEllipsis"/>
+                                                <TextBlock x:Name="LatestDispatchHeaderText" Text="正在读取最近协同记录..." FontSize="12.5" FontWeight="SemiBold" Foreground="#E2E8F0" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"/>
+                                                <TextBlock x:Name="LatestDispatchMetaText" Text="" FontSize="11.5" Foreground="#64748B" Margin="0,3,0,6" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"/>
+                                                <TextBlock x:Name="LatestDispatchSnippetText" Text="" FontSize="12" Foreground="#94A3B8" LineHeight="18" TextWrapping="Wrap" MaxHeight="72" TextTrimming="CharacterEllipsis"/>
                                             </StackPanel>
                                         </Border>
                                         <WrapPanel>

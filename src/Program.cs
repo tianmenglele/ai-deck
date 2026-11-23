@@ -3759,6 +3759,74 @@ public static class Program
                     AssertTrue(!demoOff && !fxHost.GetWorkflowDiagramNodeSummaryForTest().DemoActive, "演示流转模式关闭返回 false");
                     fxHost.RefreshWorkflowDiagram();
                     fxHost.UpdateLayout();
+
+                    // —— Magpie 思维导图拓扑断言 ——
+                    var canvas = fxHost.WorkflowDiagramCanvas;
+                    AssertTrue(canvas != null && canvas.Children.Count > 0, "思维导图画布非空");
+                    FrameworkElement? FindByTag(string tag) =>
+                        canvas!.Children.OfType<FrameworkElement>()
+                            .FirstOrDefault(fe => string.Equals(fe.Tag as string, tag, StringComparison.Ordinal));
+                    var masterNode = FindByTag("MindMapNode:master");
+                    var intakeNode = FindByTag("MindMapNode:intake");
+                    var verifyNode = FindByTag("MindMapNode:verify");
+                    var workerNode = canvas!.Children.OfType<FrameworkElement>()
+                        .FirstOrDefault(fe => (fe.Tag as string)?.StartsWith("MindMapNode:worker", StringComparison.Ordinal) == true);
+                    AssertTrue(masterNode != null, "存在 Tag=MindMapNode:master 主脑节点");
+                    AssertTrue(intakeNode != null && verifyNode != null, "左侧存在 intake / verify 节点");
+                    AssertTrue(workerNode != null, "右侧存在 MindMapNode:worker 节点");
+                    double canvasMidX = canvas.ActualWidth > 1 ? canvas.ActualWidth * 0.5 : 0;
+                    double masterLeft = Canvas.GetLeft(masterNode!);
+                    double masterCx = masterLeft + masterNode!.ActualWidth / 2.0;
+                    AssertTrue(Math.Abs(masterCx - canvasMidX) <= 36,
+                        $"主脑水平中心落在画布中点±36px (masterCx={masterCx:F1}, mid={canvasMidX:F1})");
+                    AssertTrue(Canvas.GetLeft(intakeNode!) < masterLeft && Canvas.GetLeft(verifyNode!) < masterLeft,
+                        "intake/verify 位于主脑左侧");
+                    AssertTrue(Canvas.GetLeft(workerNode!) > masterLeft + masterNode.ActualWidth * 0.4,
+                        "worker 位于主脑右侧");
+                    bool hasBezier = canvas.Children.OfType<System.Windows.Shapes.Path>()
+                        .Select(p => p.Data)
+                        .OfType<PathGeometry>()
+                        .SelectMany(g => g.Figures)
+                        .SelectMany(f => f.Segments)
+                        .Any(s => s is BezierSegment);
+                    AssertTrue(hasBezier, "画布 Path 含 BezierSegment 曲线段");
+
+                    // —— UI 定尺防抖断言 ——
+                    fxHost.UpdateLayout();
+                    {
+                        bool prev = reg.UserConfig.WorkflowEngineEnabled;
+                        reg.UserConfig.WorkflowEngineEnabled = true;
+                        fxHost.UpdateWorkflowSwitchBadges();
+                        fxHost.UpdateLayout();
+                        double wfWOn = fxHost.WorkflowSwitchBtn.ActualWidth;
+                        reg.UserConfig.WorkflowEngineEnabled = false;
+                        fxHost.UpdateWorkflowSwitchBadges();
+                        fxHost.UpdateLayout();
+                        double wfWOff = fxHost.WorkflowSwitchBtn.ActualWidth;
+                        AssertTrue(Math.Abs(wfWOn - wfWOff) < 0.5,
+                            $"WorkflowSwitchBtn 开/关 ActualWidth 相等 (on={wfWOn:F1}, off={wfWOff:F1})");
+                        reg.UserConfig.WorkflowEngineEnabled = prev;
+                        fxHost.UpdateWorkflowSwitchBadges();
+                    }
+                    fxHost.SwitchToTabForTest(6);
+                    fxHost.UpdateLayout();
+                    var segTabs = new RadioButton?[]
+                    {
+                        fxHost.TabSettingsGeneral,
+                        fxHost.TabSettingsAppearance,
+                        fxHost.TabSettingsResilience,
+                        fxHost.TabSettingsAbout
+                    }.Where(t => t != null).Cast<RadioButton>().ToList();
+                    AssertTrue(segTabs.Count == 4, $"设置二级页 4 个 SettingsSegTabBtn 可见 (n={segTabs.Count})");
+                    double segW0 = segTabs[0].ActualWidth;
+                    AssertTrue(segTabs.All(t => Math.Abs(t.ActualWidth - segW0) < 0.5),
+                        $"SettingsSegTabBtn ActualWidth 全部相等 (w={segW0:F1})");
+                    fxHost.SwitchToTabForTest(1);
+                    fxHost.UpdateLayout();
+                    var overviewCards = fxHost.OverviewAgentsCards.Children.OfType<Border>().ToList();
+                    AssertTrue(overviewCards.Count == 0 || overviewCards.All(c =>
+                            Math.Abs(c.Height - 66) < 0.5 || Math.Abs(c.ActualHeight - 66) < 1.5),
+                        $"OverviewAgentsCards 卡片 Height/ActualHeight 均为 66 (count={overviewCards.Count})");
                 }
                 finally
                 {

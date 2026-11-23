@@ -363,8 +363,8 @@ public static partial class Dialogs
         {
             IsChecked = isOn,
             Tag = "WorkflowToggle:" + agentId,
-            Width = 86,
-            Height = 28,
+            Width = 66,
+            Height = 26,
             Cursor = interactive ? System.Windows.Input.Cursors.Hand : System.Windows.Input.Cursors.Arrow,
             ToolTip = isOn
                 ? "工作流已开启：该 AI 可参与自动派单与路由。点击关闭。"

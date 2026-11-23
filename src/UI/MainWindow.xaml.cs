@@ -31,6 +31,9 @@ public partial class MainWindow : Window
     private const string GeoSliders = "M3,6 H21 M3,12 H21 M3,18 H21 M9,4 V8 M16,10 V14 M7,16 V20";
     private const string GeoWindow = "M4,5 H20 V19 H4 Z M4,9 H20";
     private const string GeoPlay = "M8,6 L17,12 L8,18 Z";
+    private const string GeoChat = "M4,5 H20 V14 H12 L8,18 V14 H4 Z";
+    private const string GeoWrench = "M14,4 L18,8 L12,14 L10,16 L8,14 L10,12 Z M5,19 L9,15";
+    private const string GeoReset = "M16,5 V9 H12 M16,9 A6,6 0 1 1 14,5.2";
     private bool _allowFullExit;
     private bool _suppressMinimizeToTray;
     private bool _sessionEnding;
@@ -1478,12 +1481,14 @@ public partial class MainWindow : Window
 
             var rowBorder = new Border
             {
+                Height = 66,
                 Background = isWorking ? Hex("#1B1914") : Hex("#141B26"),
                 BorderBrush = isWorking ? Hex("#B45309") : Hex("#222C3D"),
                 BorderThickness = new Thickness(1),
                 CornerRadius = new CornerRadius(7),
-                Padding = new Thickness(16, 14, 16, 14),
-                Margin = new Thickness(0, 0, 0, isLast ? 0 : 12)
+                Padding = new Thickness(12, 8, 12, 8),
+                Margin = new Thickness(0, 0, 0, isLast ? 0 : 10),
+                ClipToBounds = true
             };
 
             var stack = new StackPanel();
@@ -1491,7 +1496,7 @@ public partial class MainWindow : Window
             topGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             topGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
-            var titleWrap = new WrapPanel { VerticalAlignment = VerticalAlignment.Center };
+            var titleWrap = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
             var overviewAvatar = OfficialBrandIconService.CreateCircularAvatarVisual(
                 ag.Id, 22, ag, isWorking ? "#B45309" : "#334155", 1.2);
             overviewAvatar.Margin = new Thickness(0, 0, 8, 0);
@@ -1504,7 +1509,10 @@ public partial class MainWindow : Window
                 FontWeight = FontWeights.SemiBold,
                 Foreground = Hex("#F1F5F9"),
                 VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(0, 0, 8, 0)
+                Margin = new Thickness(0, 0, 8, 0),
+                TextWrapping = TextWrapping.NoWrap,
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                MaxWidth = 160
             });
 
             bool isMaster = masterAg != null && string.Equals(masterAg.Id, ag.Id, StringComparison.OrdinalIgnoreCase);
@@ -1522,37 +1530,23 @@ public partial class MainWindow : Window
                 {
                     Text = roleTag,
                     FontSize = 11,
-                    Foreground = isMaster ? Hex("#C4B5FD") : Hex("#94A3B8")
+                    Foreground = isMaster ? Hex("#C4B5FD") : Hex("#94A3B8"),
+                    TextWrapping = TextWrapping.NoWrap
                 }
             });
 
             var cachedWin = GetCachedWindowState(ag);
             Grid.SetColumn(titleWrap, 0);
 
-            var actionWrap = new WrapPanel { VerticalAlignment = VerticalAlignment.Center };
+            // 右侧操作区：统一 30x26 纯矢量图标按钮，像素级对齐
+            var actionWrap = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
             if (agLive != null && (agLive.Status == "error" || agLive.WorkflowPhase == "awaiting_user_choice"))
             {
-                var resolveBtn = new Button
-                {
-                    Content = "🛠 解决",
-                    Style = (Style)FindResource("PrimaryBtn"),
-                    Padding = new Thickness(8, 3, 8, 3),
-                    Margin = new Thickness(0, 0, 6, 0),
-                    FontSize = 11.5,
-                    ToolTip = "选择解决方式：清理卡住弹窗后台重试 / 切纯 CLI 通道 / 改派其他 AI / 交由主脑接管"
-                };
+                var resolveBtn = MakeIconButton(GeoWrench, "选择解决方式：清理卡住弹窗后台重试 / 切纯 CLI 通道 / 改派其他 AI / 交由主脑接管");
                 resolveBtn.Click += (_, _) => OpenStallResolutionDialogAndExecute(ag, this);
                 actionWrap.Children.Add(resolveBtn);
 
-                var resetErrBtn = new Button
-                {
-                    Content = "复位",
-                    Style = (Style)FindResource("AmberBtn"),
-                    Padding = new Thickness(8, 3, 8, 3),
-                    Margin = new Thickness(0, 0, 6, 0),
-                    FontSize = 11.5,
-                    ToolTip = "后台静默清理卡死弹窗并清除此 AI 的异常状态记录"
-                };
+                var resetErrBtn = MakeIconButton(GeoReset, "后台静默清理卡死弹窗并清除此 AI 的异常状态记录");
                 resetErrBtn.Click += (_, _) =>
                 {
                     _ = System.Threading.Tasks.Task.Run(AutoDispatchService.DismissStuckAgentModalsSilent);
@@ -1568,14 +1562,7 @@ public partial class MainWindow : Window
             if (agLive != null && !string.IsNullOrWhiteSpace(agLive.SessionId))
             {
                 var targetSid = agLive.SessionId;
-                var viewDlgBtn = new Button
-                {
-                    Content = "对话",
-                    Style = (Style)FindResource("ActionBtn"),
-                    Padding = new Thickness(8, 3, 8, 3),
-                    Margin = new Thickness(0, 0, 6, 0),
-                    FontSize = 11.5
-                };
+                var viewDlgBtn = MakeIconButton(GeoChat, $"打开「{ag.Name}」关联的对话框");
                 viewDlgBtn.Click += (_, _) =>
                 {
                     _selectedDialogSessionId = targetSid;
@@ -1702,9 +1689,10 @@ public partial class MainWindow : Window
             stack.Children.Add(new TextBlock
             {
                 Text = summaryLine,
-                FontSize = 12.5,
+                FontSize = 12,
                 Foreground = summaryBrush,
-                Margin = new Thickness(0, 8, 0, 0),
+                Margin = new Thickness(0, 4, 0, 0),
+                TextWrapping = TextWrapping.NoWrap,
                 TextTrimming = TextTrimming.CharacterEllipsis,
                 ToolTip = rowBorder.ToolTip
             });
@@ -3588,12 +3576,14 @@ public partial class MainWindow : Window
 
             var rowBorder = new Border
             {
+                Height = 72,
                 Background = dispEnabled ? Hex("#121824") : Hex("#0E131D"),
                 BorderBrush = Hex(dispEnabled ? "#1E293B" : "#18202E"),
                 BorderThickness = new Thickness(1),
                 CornerRadius = new CornerRadius(7),
-                Padding = new Thickness(16, 12, 16, 12),
-                Margin = new Thickness(0, 0, 0, isLast ? 0 : 8)
+                Padding = new Thickness(14, 10, 14, 10),
+                Margin = new Thickness(0, 0, 0, isLast ? 0 : 8),
+                ClipToBounds = true
             };
 
             var rowGrid = new Grid();
@@ -3617,7 +3607,10 @@ public partial class MainWindow : Window
                 FontWeight = FontWeights.SemiBold,
                 Foreground = Hex(dispEnabled ? "#F8FAFC" : "#94A3B8"),
                 VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(0, 0, 8, 0)
+                Margin = new Thickness(0, 0, 8, 0),
+                TextWrapping = TextWrapping.NoWrap,
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                MaxWidth = 180
             });
 
             var badgeItems = new List<(string Text, string Bg, string Fg)>();
@@ -3758,11 +3751,13 @@ public partial class MainWindow : Window
                         rowBorder.ToolTip = tip0 + $"\nCLI 已安装{verTag}：{cliSt.InstalledPath}";
                     rightWrap.Children.Add(new Border
                     {
+                        Width = 36,
+                        Height = 24,
                         Background = Hex("#064E3B"),
                         BorderBrush = Hex("#10B981"),
                         BorderThickness = new Thickness(1),
                         CornerRadius = new CornerRadius(4),
-                        Padding = new Thickness(6, 2, 6, 2),
+                        Padding = new Thickness(0),
                         Margin = new Thickness(0, 0, 6, 0),
                         VerticalAlignment = VerticalAlignment.Center,
                         ToolTip = $"命令行工具已安装{verTag}：{cliSrc.DisplayName}",
@@ -3771,7 +3766,10 @@ public partial class MainWindow : Window
                             Text = "CLI",
                             FontSize = 11,
                             FontWeight = FontWeights.SemiBold,
-                            Foreground = Hex("#A7F3D0")
+                            Foreground = Hex("#A7F3D0"),
+                            HorizontalAlignment = HorizontalAlignment.Center,
+                            VerticalAlignment = VerticalAlignment.Center,
+                            TextWrapping = TextWrapping.NoWrap
                         }
                     });
                 }
@@ -3784,21 +3782,14 @@ public partial class MainWindow : Window
                         if (verb.Contains("安装", StringComparison.Ordinal)) isUpdateMode = false;
                         else if (verb.Contains("更新", StringComparison.Ordinal) || cliSt.IsInstalled) isUpdateMode = true;
                     }
-                    string idleLabel = isUpdateMode ? "⬆ 更新 CLI" : "⬇ 安装 CLI";
-                    var cliBtn = new Button
-                    {
-                        Content = idleLabel,
-                        Style = (Style)FindResource("ActionBtn"),
-                        Padding = new Thickness(9, 3, 9, 3),
-                        Margin = new Thickness(0, 0, 6, 0),
-                        FontSize = 11.5,
-                        Background = isUpdateMode ? Hex("#3B240E") : Hex("#2B1C0E"),
-                        BorderBrush = Hex("#F59E0B"),
-                        Foreground = Hex("#FDE68A"),
-                        ToolTip = isUpdateMode
+                    string idleLabel = isUpdateMode ? "更新中" : "安装中";
+                    var cliBtn = MakeIconButton(
+                        isUpdateMode ? GeoReset : GeoPlay,
+                        isUpdateMode
                             ? $"检测到 {cliSrc.DisplayName} 有新版本可用：v{cliSt.LocalVersion} ➔ v{cliSt.LatestVersion}\n点击立即在线升级至最新版本"
-                            : $"本机已安装桌面端但尚未就绪 {cliSrc.DisplayName}，点击自动下载安装\n官方命令：{cliSrc.InstallCommandHint}"
-                    };
+                            : $"本机已安装桌面端但尚未就绪 {cliSrc.DisplayName}，点击自动下载安装\n官方命令：{cliSrc.InstallCommandHint}");
+                    cliBtn.Background = isUpdateMode ? Hex("#3B240E") : Hex("#2B1C0E");
+                    cliBtn.BorderBrush = Hex("#F59E0B");
                     LongActionTracker.Arm(cliBtn, cliKey, idleLabel);
                     if (cliBusy) LongActionTracker.ShowBusy(cliBtn);
 
