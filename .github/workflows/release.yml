@@ -1,0 +1,154 @@
+name: Release AIDeck
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag (e.g. v1.9.14)'
+        required: false
+        default: 'v1.9.14'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Resolve tag
+        id: ver
+        shell: pwsh
+        run: |
+          $tag = "${{ github.event.inputs.tag }}".Trim()
+          if ([string]::IsNullOrWhiteSpace($tag)) {
+            $tag = $env:GITHUB_REF_NAME
+          }
+          if ([string]::IsNullOrWhiteSpace($tag)) {
+            throw "Unable to resolve release tag."
+          }
+          if (-not $tag.StartsWith('v')) {
+            $tag = "v$tag"
+          }
+          Write-Host "Resolved tag: $tag"
+          "tag=$tag" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+      - name: Build Release
+        shell: pwsh
+        run: |
+          dotnet build src/AICollabHub.csproj -c Release --nologo
+
+      - name: Publish standalone (self-contained single-file)
+        shell: pwsh
+        run: |
+          $tag = "${{ steps.ver.outputs.tag }}"
+          New-Item -ItemType Directory -Force -Path dist/standalone, release_assets | Out-Null
+          dotnet publish src/AICollabHub.csproj -c Release -r win-x64 --self-contained true `
+            -p:PublishSingleFile=true `
+            -p:IncludeNativeLibrariesForSelfExtract=true `
+            -p:DebugType=none `
+            -p:DebugSymbols=false `
+            -o dist/standalone --nologo
+
+          $exeSrc = Join-Path "dist/standalone" "AI协同中心.exe"
+          if (-not (Test-Path -LiteralPath $exeSrc)) {
+            throw "Standalone publish missing AI协同中心.exe"
+          }
+          Copy-Item -LiteralPath $exeSrc -Destination "release_assets/AIDeck-$tag-win-x64.exe" -Force
+
+          $portableRoot = "dist/portable_staging"
+          if (Test-Path $portableRoot) { Remove-Item -Recurse -Force $portableRoot }
+          New-Item -ItemType Directory -Force -Path $portableRoot | Out-Null
+          Copy-Item -LiteralPath $exeSrc -Destination (Join-Path $portableRoot "AI协同中心.exe") -Force
+          Copy-Item -Recurse -Force registry $portableRoot
+          Copy-Item -Recurse -Force plugins $portableRoot
+          Copy-Item -Force "启动协同中心.ps1" $portableRoot
+          Copy-Item -Force README.md $portableRoot
+          Copy-Item -Force LICENSE $portableRoot
+
+          $portableZip = "release_assets/AIDeck-$tag-win-x64-portable.zip"
+          if (Test-Path $portableZip) { Remove-Item -Force $portableZip }
+          Compress-Archive -Path (Join-Path $portableRoot '*') -DestinationPath $portableZip -Force
+
+      - name: Publish lite (framework-dependent single-file)
+        shell: pwsh
+        run: |
+          $tag = "${{ steps.ver.outputs.tag }}"
+          New-Item -ItemType Directory -Force -Path dist/lite, release_assets | Out-Null
+          dotnet publish src/AICollabHub.csproj -c Release -r win-x64 --self-contained false `
+            -p:PublishSingleFile=true `
+            -p:DebugType=none `
+            -p:DebugSymbols=false `
+            -o dist/lite --nologo
+
+          $exeSrc = Join-Path "dist/lite" "AI协同中心.exe"
+          if (-not (Test-Path -LiteralPath $exeSrc)) {
+            throw "Lite publish missing AI协同中心.exe"
+          }
+
+          $liteRoot = "dist/lite_staging"
+          if (Test-Path $liteRoot) { Remove-Item -Recurse -Force $liteRoot }
+          New-Item -ItemType Directory -Force -Path $liteRoot | Out-Null
+          Copy-Item -LiteralPath $exeSrc -Destination (Join-Path $liteRoot "AI协同中心.exe") -Force
+          Copy-Item -Recurse -Force registry $liteRoot
+          Copy-Item -Recurse -Force plugins $liteRoot
+          Copy-Item -Force "启动协同中心.ps1" $liteRoot
+          Copy-Item -Force README.md $liteRoot
+          Copy-Item -Force LICENSE $liteRoot
+
+          $liteZip = "release_assets/AIDeck-$tag-win-x64-lite.zip"
+          if (Test-Path $liteZip) { Remove-Item -Force $liteZip }
+          Compress-Archive -Path (Join-Path $liteRoot '*') -DestinationPath $liteZip -Force
+
+      - name: Generate SHA256SUMS.txt
+        shell: pwsh
+        run: |
+          $dir = "release_assets"
+          $lines = @()
+          Get-ChildItem -LiteralPath $dir -File |
+            Where-Object { $_.Extension -in '.exe', '.zip' } |
+            Sort-Object Name |
+            ForEach-Object {
+              $hash = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+              $lines += "$hash  $($_.Name)"
+            }
+          $sumsPath = Join-Path $dir "SHA256SUMS.txt"
+          $lines -join "`n" | Set-Content -LiteralPath $sumsPath -Encoding utf8NoBOM
+          Get-Content -LiteralPath $sumsPath
+
+      - name: Create / update GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.ver.outputs.tag }}
+          name: AIDeck ${{ steps.ver.outputs.tag }}
+          generate_release_notes: true
+          body: |
+            ## 下载说明（Windows x64）
+
+            | 文件 | 用途 |
+            | --- | --- |
+            | `AIDeck-${{ steps.ver.outputs.tag }}-win-x64.exe` | **独立免装单文件版**（自包含 .NET 8 运行时，双击即可运行） |
+            | `AIDeck-${{ steps.ver.outputs.tag }}-win-x64-portable.zip` | **绿色便携包**（含 `AI协同中心.exe`、`registry/`、`plugins/`、启动脚本与说明） |
+            | `AIDeck-${{ steps.ver.outputs.tag }}-win-x64-lite.zip` | **轻量便携包**（需本机已安装 .NET 8 桌面运行时） |
+            | `SHA256SUMS.txt` | 上述产物的 SHA256 校验清单 |
+
+            ### 推荐用法
+            1. 普通用户：下载 `.exe` 独立单文件，或解压 `portable.zip` 后运行 `AI协同中心.exe` / `启动协同中心.ps1`。
+            2. 本机已装 .NET 8：可选用体积更小的 `lite.zip`。
+            3. 下载后请对照 `SHA256SUMS.txt` 校验完整性。
+
+            软件内更新源可配置为本仓库，检查目标对应本 Releases 页；命名规则与 `AppUpdateService` 的 `.exe` + `win` + `x64` 识别一致。
+          files: |
+            release_assets/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
