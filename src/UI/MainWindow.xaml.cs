@@ -3518,7 +3518,7 @@ public partial class MainWindow : Window
                         .Select(w => (w.Label, Score: modelRow.GetCapabilityScore(w.Id)))
                         .Where(x => x.Score > 0)
                         .OrderByDescending(x => x.Score)
-                        .Take(3)
+                        .Take(2)
                         .Select(c => $"{c.Label}{c.Score}★"));
                     tipSb.AppendLine("  " + modelRow.ModelName + " · " + own.BadgeText + (string.IsNullOrWhiteSpace(caps) ? "" : " · " + caps));
                 }
