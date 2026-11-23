@@ -5923,6 +5923,23 @@ public partial class MainWindow : Window
             SliderFloatingOpacity.Value = clampedOpacity;
             TextFloatingOpacityPct.Text = $"{clampedOpacity}%";
             SelectComboByTag(ComboFloatingRefresh, cfg.FloatingRefreshIntervalMs.ToString());
+            if (ComboCompletionToastDuration != null)
+            {
+                int toastSec = UserHubConfig.NormalizeCompletionToastDuration(cfg.CompletionToastDurationSeconds);
+                int[] toastOptions = { 4, 8, 12, 20, 30 };
+                int toastShown = 8;
+                int bestDist = int.MaxValue;
+                foreach (int opt in toastOptions)
+                {
+                    int dist = Math.Abs(opt - toastSec);
+                    if (dist < bestDist)
+                    {
+                        bestDist = dist;
+                        toastShown = opt;
+                    }
+                }
+                SelectComboByTag(ComboCompletionToastDuration, toastShown.ToString());
+            }
 
             ChkEnableNetRetry.IsChecked = cfg.EnableNetworkAutoRetry;
             ChkWaitLocalNetRecover.IsChecked = cfg.WaitForLocalNetworkRecovery;
@@ -6200,6 +6217,38 @@ public partial class MainWindow : Window
             _floatingWindow?.ApplyUserPreferencesFromSettings();
             SetStatus($"已将实时状态刷新频率调整为 {ms / 1000.0:0.0} 秒/次。");
         }
+    }
+
+    private void ComboCompletionToastDuration_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_suppressEvents || !IsLoaded || ComboCompletionToastDuration == null) return;
+        if (ComboCompletionToastDuration.SelectedItem is ComboBoxItem item &&
+            int.TryParse(item.Tag?.ToString(), out int sec))
+        {
+            _reg.UserConfig.CompletionToastDurationSeconds = UserHubConfig.NormalizeCompletionToastDuration(sec);
+            _reg.SaveUserConfig();
+            SetStatus($"已将完成提示停留时长调整为 {_reg.UserConfig.CompletionToastDurationSeconds} 秒。");
+        }
+    }
+
+    private void BtnPreviewCompletionBubble_Click(object sender, RoutedEventArgs e)
+    {
+        bool wasClosed = _floatingWindow == null || !_floatingWindow.IsVisible || !_reg.UserConfig.FloatingWindowEnabled;
+        if (wasClosed)
+        {
+            _reg.UserConfig.FloatingWindowEnabled = true;
+            _reg.SaveUserConfig();
+            ShowFloatingOverlayWindow();
+            SetStatus("悬浮窗已按当前形态打开，正在预览完成气泡。");
+        }
+        else
+        {
+            ShowFloatingOverlayWindow();
+        }
+        _floatingWindow?.PreviewCompletionBubble();
+        UpdateFloatingButtonBadge();
+        if (!wasClosed)
+            SetStatus("已预览悬浮窗完成气泡。");
     }
 
     private void BtnPreviewExpandFloating_Click(object sender, RoutedEventArgs e)

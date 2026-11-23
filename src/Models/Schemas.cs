@@ -185,6 +185,8 @@ public sealed class UserHubConfig
     [JsonPropertyName("floating_window_translucent")] public bool FloatingWindowTranslucent { get; set; } = false;
     [JsonPropertyName("floating_opacity_percent")] public int FloatingOpacityPercent { get; set; } = 96;
     [JsonPropertyName("floating_refresh_interval_ms")] public int FloatingRefreshIntervalMs { get; set; } = 1000;
+    /// <summary>悬浮窗完成气泡停留秒数。默认 8，展示前经 NormalizeCompletionToastDuration 夹紧。</summary>
+    [JsonPropertyName("completion_toast_duration_seconds")] public int CompletionToastDurationSeconds { get; set; } = 8;
     /// <summary>已废弃：悬浮窗形态绝对锁定，状态变化不得自动展开。保留字段仅兼容旧配置落盘。</summary>
     [JsonPropertyName("floating_auto_expand_on_working")] public bool FloatingAutoExpandOnWorking { get; set; } = false;
     /// <summary>已废弃：悬浮窗形态绝对锁定，任务完成不得自动收起。保留字段仅兼容旧配置落盘。</summary>
@@ -211,6 +213,13 @@ public sealed class UserHubConfig
     /// <summary>已完成或主动跳过 3 步新手引导。旧配置缺省该字段时为 false。</summary>
     [JsonPropertyName("has_completed_onboarding")]
     public bool HasCompletedOnboarding { get; set; } = false;
+
+    /// <summary>完成气泡停留秒数：非正数回落 8，其余夹在 3 到 30。</summary>
+    public static int NormalizeCompletionToastDuration(int sec)
+    {
+        if (sec <= 0) return 8;
+        return Math.Clamp(sec, 3, 30);
+    }
 }
 
 public sealed class TeamAgentSnapshot

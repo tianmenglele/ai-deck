@@ -87,6 +87,9 @@ public partial class FloatingOverlayWindow : Window
             HeaderLegendDots.MouseLeftButtonDown += HeaderLegendDots_MouseLeftButtonDown;
         }
 
+        if (VerifyCelebrationPopup != null)
+            VerifyCelebrationPopup.CustomPopupPlacementCallback = PlaceVerifyCelebrationBubble;
+
         ApplySavedPositionAndAppearance();
         SyncQuickSoundButtonUi();
         SoundFxService.ApplySoundPreference(_reg.UserConfig);

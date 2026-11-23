@@ -108,6 +108,13 @@ public partial class FloatingOverlayWindow
     private bool _interactionBaselineReady;
     private bool _sizeDragActive;
     private DispatcherTimer? _verifyBannerTimer;
+    private double _verifyRemainSec;
+    private double _verifyTotalSec = 8;
+    private bool _verifyBannerHoverPaused;
+    private bool _verifyBubbleDismissArmed;
+    private int _verifyBubbleEpoch;
+    private bool _bubbleAnchoredBelow = true;
+    private double _bubbleTailLeft = 154;
     private int _interactionAnimCount;
     private int _verifyBannerCount;
     private string? _lastCelebratedSignature;
@@ -248,12 +255,58 @@ public partial class FloatingOverlayWindow
         _interactionAnimCount++;
     }
 
-    /// <summary>离屏自检：触发主脑验收通过横幅与外框流光。</summary>
-    public bool TriggerVerifyBannerForTest(string taskTitle, string? masterAgentId = null, string? workerAgentId = null)
+    /// <summary>离屏自检：触发主脑验收通过气泡与外框流光。detailSummary 缺省时标题与正文仍分开写。</summary>
+    public bool TriggerVerifyBannerForTest(string taskTitle, string? masterAgentId = null, string? workerAgentId = null, string? detailSummary = null)
     {
         EnsureShownForFx();
-        ShowVerificationCelebration(taskTitle, masterAgentId ?? "antigravity", workerAgentId ?? "cursor");
+        ShowVerificationCelebration(taskTitle, masterAgentId ?? "antigravity", workerAgentId ?? "cursor", detailSummary);
         return VerifyCelebrationBanner.Visibility == Visibility.Visible || _verifyBannerCount > 0;
+    }
+
+    /// <summary>设置页试看：标题与正文分离的完成气泡。</summary>
+    public void PreviewCompletionBubble()
+    {
+        EnsureShownForFx();
+        ShowVerificationCelebration("悬浮窗气泡样式预览", "antigravity", "cursor", "已适配折叠胶囊与全部展开样式");
+    }
+
+    /// <summary>截图前把气泡定格为完全可见，避免入场 Opacity=0 拍成空图。</summary>
+    public void SnapCompletionBubbleFullyVisibleForCapture()
+    {
+        _verifyBubbleDismissArmed = false;
+        _verifyBannerHoverPaused = true;
+        try { _verifyBannerTimer?.Stop(); } catch { }
+        if (VerifyCelebrationBanner != null)
+        {
+            VerifyCelebrationBanner.BeginAnimation(OpacityProperty, null);
+            VerifyCelebrationBanner.Opacity = 1;
+            VerifyCelebrationBanner.Visibility = Visibility.Visible;
+            if (VerifyCelebrationBanner.RenderTransform is TransformGroup group)
+            {
+                foreach (var child in group.Children)
+                {
+                    if (child is TranslateTransform tt)
+                    {
+                        tt.BeginAnimation(TranslateTransform.YProperty, null);
+                        tt.Y = 0;
+                    }
+                    else if (child is ScaleTransform sc)
+                    {
+                        sc.BeginAnimation(ScaleTransform.ScaleXProperty, null);
+                        sc.BeginAnimation(ScaleTransform.ScaleYProperty, null);
+                        sc.ScaleX = 1;
+                        sc.ScaleY = 1;
+                    }
+                }
+            }
+        }
+        if (VerifyBubbleProgressScale != null)
+        {
+            VerifyBubbleProgressScale.BeginAnimation(ScaleTransform.ScaleXProperty, null);
+            VerifyBubbleProgressScale.ScaleX = 0.64;
+        }
+        if (VerifyBubbleTailTop != null) VerifyBubbleTailTop.Visibility = Visibility.Visible;
+        if (VerifyBubbleTailBottom != null) VerifyBubbleTailBottom.Visibility = Visibility.Collapsed;
     }
 
     private void EnsureShownForFx()
@@ -795,6 +848,8 @@ public partial class FloatingOverlayWindow
         if (!quiet) return;
         try
         {
+            _verifyBubbleDismissArmed = false;
+            _verifyBannerHoverPaused = false;
             _verifyBannerTimer?.Stop();
             InteractionFxCanvas?.Children.Clear();
             if (VerifyCelebrationBanner != null)
@@ -955,7 +1010,8 @@ public partial class FloatingOverlayWindow
                     {
                         PlayInteractionKind("deliver", ag.Id, masterId, lv?.TaskSummary);
                     }
-                    ShowVerificationCelebration(ExtractConciseTaskTitle(lv?.TaskSummary), masterId, ag.Id);
+                    string? detail = string.IsNullOrWhiteSpace(lv?.VerificationSummary) ? null : lv!.VerificationSummary;
+                    ShowVerificationCelebration(ExtractConciseTaskTitle(lv?.TaskSummary), masterId, ag.Id, detail);
                 }
             }
 
@@ -1695,71 +1751,306 @@ public partial class FloatingOverlayWindow
         }
     }
 
-    private void ShowVerificationCelebration(string taskTitle, string masterAgentId, string workerAgentId)
+    private void ShowVerificationCelebration(string taskTitle, string masterAgentId, string workerAgentId, string? detailSummary = null)
     {
+        _verifyBubbleEpoch++;
         _verifyBannerCount++;
-        string shortTitle = string.IsNullOrWhiteSpace(taskTitle) ? "任务" : taskTitle.Trim();
-        if (shortTitle.Length > 24) shortTitle = shortTitle[..24] + "…";
-        VerifyCelebrationText.Text = $"✅ 主脑验收通过 · {shortTitle} 已达标交付";
-        SoundFxService.Play(_reg.UserConfig, SoundFxService.SoundKind.VerifyPassed);
-        if (_reg.UserConfig.FloatingWindowCollapsed && CapsuleBriefText != null)
+        string task = string.IsNullOrWhiteSpace(taskTitle) ? "任务" : taskTitle.Trim().Replace('\r', ' ').Replace('\n', ' ');
+        if (task.Length > 28) task = task[..28] + "…";
+
+        string title;
+        string content;
+        if (string.IsNullOrWhiteSpace(detailSummary))
         {
-            string celebrateTip = $"✅ 主脑验收通过 · {shortTitle}";
-            CapsuleBriefText.Text = celebrateTip;
-            CapsuleBriefText.Foreground = Hex("#ECFDF5");
+            title = "主脑验收通过 · 已交付";
+            content = $"{task} · 已达标交付";
+        }
+        else
+        {
+            title = task;
+            content = detailSummary.Trim().Replace('\r', ' ').Replace('\n', ' ');
+            if (content.Length > 72) content = content[..72] + "…";
+        }
+        if (string.IsNullOrWhiteSpace(content)) content = "已达标交付";
+
+        if (VerifyCelebrationTitle != null) VerifyCelebrationTitle.Text = title;
+        if (VerifyCelebrationContent != null) VerifyCelebrationContent.Text = content;
+        if (VerifyCelebrationText != null) VerifyCelebrationText.Text = content;
+        if (VerifyCelebrationAgentBadge != null)
+            VerifyCelebrationAgentBadge.Text = ResolveCelebrationAgentLabel(workerAgentId);
+
+        SoundFxService.Play(_reg.UserConfig, SoundFxService.SoundKind.VerifyPassed);
+
+        string celebrateTip = title + "\n" + content;
+        if (CapsuleBriefText != null)
+        {
+            CapsuleBriefText.Text = content;
+            CapsuleBriefText.Foreground = Hex("#D1FAE5");
+            CapsuleBriefText.Visibility = Visibility.Collapsed;
+            CapsuleBriefText.Width = 0;
+            CapsuleBriefText.Height = 0;
+        }
+        if (CollapsedMiniCapsule != null)
+        {
             CollapsedMiniCapsule.ToolTip = celebrateTip;
+            ToolTipService.SetInitialShowDelay(CollapsedMiniCapsule, 280);
+            ToolTipService.SetShowDuration(CollapsedMiniCapsule, 16000);
         }
 
-        double bannerW = ActualWidth > 40 ? ActualWidth : Width;
-        VerifyCelebrationBanner.Width = Math.Clamp(bannerW, Math.Min(196, bannerW), 860);
+        const double bubbleW = 324;
+        VerifyCelebrationBanner.MinWidth = 310;
+        VerifyCelebrationBanner.MaxWidth = 348;
+        VerifyCelebrationBanner.Width = Math.Clamp(bubbleW, 310, 348);
+        VerifyCelebrationBanner.HorizontalAlignment = HorizontalAlignment.Left;
+        VerifyCelebrationBanner.BeginAnimation(OpacityProperty, null);
         VerifyCelebrationBanner.Visibility = Visibility.Visible;
         VerifyCelebrationBanner.Opacity = 0;
+        VerifyCelebrationBanner.UpdateLayout();
+        double trackW = VerifyBubbleProgressTrack != null && VerifyBubbleProgressTrack.ActualWidth > 8
+            ? VerifyBubbleProgressTrack.ActualWidth
+            : 292;
+        if (VerifyBubbleProgressFill != null)
+        {
+            VerifyBubbleProgressFill.Width = trackW;
+            VerifyBubbleProgressFill.HorizontalAlignment = HorizontalAlignment.Left;
+        }
+        if (VerifyBubbleProgressScale != null)
+        {
+            VerifyBubbleProgressScale.BeginAnimation(ScaleTransform.ScaleXProperty, null);
+            VerifyBubbleProgressScale.ScaleX = 1;
+        }
+
+        _bubbleAnchoredBelow = EstimateBubbleAnchoredBelow(120);
+        ApplyBubbleTailVisual(_bubbleAnchoredBelow, _bubbleTailLeft);
         if (!AppPaths.IsIsolatedTest && VerifyCelebrationPopup != null)
         {
+            if (VerifyCelebrationPopup.CustomPopupPlacementCallback == null)
+                VerifyCelebrationPopup.CustomPopupPlacementCallback = PlaceVerifyCelebrationBubble;
             VerifyCelebrationPopup.IsOpen = true;
         }
-        var slideY = new TranslateTransform(0, -8);
-        VerifyCelebrationBanner.RenderTransform = slideY;
-        var slide = new DoubleAnimation(-8, 0, TimeSpan.FromMilliseconds(240))
-        {
-            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
-        };
-        var fadeIn = new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(240));
-        slideY.BeginAnimation(TranslateTransform.YProperty, slide);
-        VerifyCelebrationBanner.BeginAnimation(OpacityProperty, fadeIn);
 
-        // 外框翠绿流光呼吸（仅播放 1 次后自动回到稳态边框）
+        double slideFrom = _bubbleAnchoredBelow ? -8 : 8;
+        var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
+        var dur = TimeSpan.FromMilliseconds(260);
+        var scaleTf = new ScaleTransform(0.95, 0.95);
+        var slideTf = new TranslateTransform(0, slideFrom);
+        var group = new TransformGroup();
+        group.Children.Add(scaleTf);
+        group.Children.Add(slideTf);
+        VerifyCelebrationBanner.RenderTransformOrigin = new Point(0.5, _bubbleAnchoredBelow ? 0 : 1);
+        VerifyCelebrationBanner.RenderTransform = group;
+        scaleTf.BeginAnimation(ScaleTransform.ScaleXProperty, new DoubleAnimation(0.95, 1, dur) { EasingFunction = ease });
+        scaleTf.BeginAnimation(ScaleTransform.ScaleYProperty, new DoubleAnimation(0.95, 1, dur) { EasingFunction = ease });
+        slideTf.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(slideFrom, 0, dur) { EasingFunction = ease });
+        VerifyCelebrationBanner.BeginAnimation(OpacityProperty, new DoubleAnimation(0, 1, dur) { EasingFunction = ease });
+
+        double staySec = UserHubConfig.NormalizeCompletionToastDuration(_reg.UserConfig.CompletionToastDurationSeconds);
         var glowBrush = new SolidColorBrush(((SolidColorBrush)Hex("#10B981")).Color);
         OuterFrame.BorderBrush = glowBrush;
         var breath = new ColorAnimationUsingKeyFrames
         {
-            Duration = TimeSpan.FromSeconds(4.5),
+            Duration = TimeSpan.FromSeconds(staySec),
             RepeatBehavior = new RepeatBehavior(1)
         };
         breath.KeyFrames.Add(new EasingColorKeyFrame(Color.FromRgb(0x34, 0xD3, 0x99), KeyTime.FromTimeSpan(TimeSpan.FromSeconds(0))));
-        breath.KeyFrames.Add(new EasingColorKeyFrame(Color.FromRgb(0x6E, 0xE7, 0xB7), KeyTime.FromTimeSpan(TimeSpan.FromSeconds(1.1))));
-        breath.KeyFrames.Add(new EasingColorKeyFrame(Color.FromRgb(0x10, 0xB9, 0x81), KeyTime.FromTimeSpan(TimeSpan.FromSeconds(2.2))));
-        breath.KeyFrames.Add(new EasingColorKeyFrame(Color.FromRgb(0x34, 0xD3, 0x99), KeyTime.FromTimeSpan(TimeSpan.FromSeconds(3.3))));
-        breath.KeyFrames.Add(new EasingColorKeyFrame(Color.FromRgb(0x2A, 0x3F, 0x5F), KeyTime.FromTimeSpan(TimeSpan.FromSeconds(4.5))));
+        breath.KeyFrames.Add(new EasingColorKeyFrame(Color.FromRgb(0x6E, 0xE7, 0xB7), KeyTime.FromTimeSpan(TimeSpan.FromSeconds(staySec * 0.24))));
+        breath.KeyFrames.Add(new EasingColorKeyFrame(Color.FromRgb(0x10, 0xB9, 0x81), KeyTime.FromTimeSpan(TimeSpan.FromSeconds(staySec * 0.48))));
+        breath.KeyFrames.Add(new EasingColorKeyFrame(Color.FromRgb(0x34, 0xD3, 0x99), KeyTime.FromTimeSpan(TimeSpan.FromSeconds(staySec * 0.74))));
+        breath.KeyFrames.Add(new EasingColorKeyFrame(Color.FromRgb(0x2A, 0x3F, 0x5F), KeyTime.FromTimeSpan(TimeSpan.FromSeconds(staySec))));
         glowBrush.BeginAnimation(SolidColorBrush.ColorProperty, breath);
 
         PulseAvatarRing(masterAgentId, "#34D399");
         PulseAvatarRing(workerAgentId, "#34D399");
+        StartVerifyCountdown(staySec);
+    }
 
-        _verifyBannerTimer?.Stop();
-        _verifyBannerTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(4.5) };
-        _verifyBannerTimer.Tick += (_, _) =>
+    private string ResolveCelebrationAgentLabel(string? agentId)
+    {
+        string id = string.IsNullOrWhiteSpace(agentId) ? "cursor" : agentId.Trim();
+        string? name = _reg.UserConfig.Agents.FirstOrDefault(a => string.Equals(a.Id, id, StringComparison.OrdinalIgnoreCase))?.Name;
+        if (string.IsNullOrWhiteSpace(name))
         {
-            _verifyBannerTimer.Stop();
-            var fadeOut = new DoubleAnimation(1, 0, TimeSpan.FromMilliseconds(300));
-            fadeOut.Completed += (_, _) =>
+            name = id.ToLowerInvariant() switch
             {
-                VerifyCelebrationBanner.Visibility = Visibility.Collapsed;
-                if (VerifyCelebrationPopup != null) VerifyCelebrationPopup.IsOpen = false;
-                ApplyThemeVisual();
+                "cursor" => "Cursor",
+                "antigravity" => "Antigravity",
+                "grok_bot" => "Grok",
+                _ => id
             };
-            VerifyCelebrationBanner.BeginAnimation(OpacityProperty, fadeOut);
-        };
+        }
+        name = ShortAgentName(name);
+        return string.IsNullOrWhiteSpace(name) ? "AI" : name;
+    }
+
+    private void StartVerifyCountdown(double seconds)
+    {
+        _verifyBubbleDismissArmed = false;
+        try { _verifyBannerTimer?.Stop(); } catch { }
+        _verifyTotalSec = Math.Max(0.2, seconds);
+        _verifyRemainSec = _verifyTotalSec;
+        _verifyBannerHoverPaused = false;
+        _verifyBubbleDismissArmed = true;
+        _verifyBannerTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(16) };
+        _verifyBannerTimer.Tick += OnVerifyCountdownTick;
         _verifyBannerTimer.Start();
+    }
+
+    private void OnVerifyCountdownTick(object? sender, EventArgs e)
+    {
+        if (!_verifyBubbleDismissArmed)
+        {
+            try { _verifyBannerTimer?.Stop(); } catch { }
+            return;
+        }
+        if (_verifyBannerHoverPaused) return;
+        _verifyRemainSec -= 0.016;
+        double ratio = _verifyTotalSec <= 0 ? 0 : Math.Clamp(_verifyRemainSec / _verifyTotalSec, 0, 1);
+        if (VerifyBubbleProgressScale != null)
+            VerifyBubbleProgressScale.ScaleX = ratio;
+        if (_verifyRemainSec > 0) return;
+        _verifyBubbleDismissArmed = false;
+        try { _verifyBannerTimer?.Stop(); } catch { }
+        FadeOutVerifyBubble();
+    }
+
+    private void VerifyCelebrationBanner_MouseEnter(object sender, MouseEventArgs e)
+    {
+        if (!_verifyBubbleDismissArmed) return;
+        _verifyBannerHoverPaused = true;
+    }
+
+    private void VerifyCelebrationBanner_MouseLeave(object sender, MouseEventArgs e)
+    {
+        if (!_verifyBannerHoverPaused) return;
+        _verifyBannerHoverPaused = false;
+    }
+
+    private void BtnDismissVerifyBubble_Click(object sender, RoutedEventArgs e)
+    {
+        e.Handled = true;
+        _verifyBubbleDismissArmed = false;
+        _verifyBannerHoverPaused = false;
+        try { _verifyBannerTimer?.Stop(); } catch { }
+        FadeOutVerifyBubble();
+    }
+
+    private void FadeOutVerifyBubble()
+    {
+        if (VerifyCelebrationBanner == null) return;
+        int epoch = _verifyBubbleEpoch;
+        var fadeOut = new DoubleAnimation(VerifyCelebrationBanner.Opacity, 0, TimeSpan.FromMilliseconds(220))
+        {
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseIn }
+        };
+        fadeOut.Completed += (_, _) =>
+        {
+            if (epoch != _verifyBubbleEpoch || _verifyBubbleDismissArmed) return;
+            VerifyCelebrationBanner.Visibility = Visibility.Collapsed;
+            if (VerifyCelebrationPopup != null) VerifyCelebrationPopup.IsOpen = false;
+            try { ApplyThemeVisual(); } catch { }
+        };
+        VerifyCelebrationBanner.BeginAnimation(OpacityProperty, fadeOut);
+    }
+
+    private bool EstimateBubbleAnchoredBelow(double bubbleHeight)
+    {
+        if (!TryGetOverlayScreenRect(out double winLeft, out double winTop, out _, out double winH, out Rect wa))
+            return true;
+        bool offscreen = winLeft > wa.Right + 20 || winLeft + 40 < wa.Left - 20 || winTop > wa.Bottom + 20 || winTop + winH < wa.Top - 20;
+        if (offscreen) return true;
+        double spaceBelow = wa.Bottom - (winTop + winH) - 8;
+        double spaceAbove = winTop - wa.Top - 8;
+        return !(spaceBelow < bubbleHeight && spaceAbove > spaceBelow);
+    }
+
+    private bool TryGetOverlayScreenRect(out double winLeft, out double winTop, out double winW, out double winH, out Rect wa)
+    {
+        wa = SystemParameters.WorkArea;
+        winW = OuterFrame != null && OuterFrame.ActualWidth > 20 ? OuterFrame.ActualWidth : (ActualWidth > 20 ? ActualWidth : Width);
+        winH = OuterFrame != null && OuterFrame.ActualHeight > 16 ? OuterFrame.ActualHeight : (ActualHeight > 16 ? ActualHeight : 48);
+        if (winW < 20) winW = 180;
+        if (winH < 16) winH = 48;
+        winLeft = Left;
+        winTop = Top;
+        try
+        {
+            if (OuterFrame != null && PresentationSource.FromVisual(OuterFrame) is PresentationSource src && src.CompositionTarget != null)
+            {
+                double dpiX = src.CompositionTarget.TransformToDevice.M11;
+                double dpiY = src.CompositionTarget.TransformToDevice.M22;
+                if (dpiX < 0.1) dpiX = 1;
+                if (dpiY < 0.1) dpiY = 1;
+                Point screenPx = OuterFrame.PointToScreen(new Point(0, 0));
+                winLeft = screenPx.X / dpiX;
+                winTop = screenPx.Y / dpiY;
+            }
+        }
+        catch
+        {
+            winLeft = Left;
+            winTop = Top;
+        }
+        return true;
+    }
+
+    private CustomPopupPlacement[] PlaceVerifyCelebrationBubble(Size popupSize, Size targetSize, Point offset)
+    {
+        _ = offset;
+        double popW = popupSize.Width > 1 ? popupSize.Width : 324;
+        double popH = popupSize.Height > 1 ? popupSize.Height : 118;
+        double targetW = targetSize.Width > 1 ? targetSize.Width : (ActualWidth > 20 ? ActualWidth : 180);
+        double targetH = targetSize.Height > 1 ? targetSize.Height : (ActualHeight > 16 ? ActualHeight : 48);
+        TryGetOverlayScreenRect(out double winLeft, out double winTop, out _, out _, out Rect wa);
+        double winW = targetW;
+        double winH = targetH;
+        bool offscreen = winLeft > wa.Right + 40 || winLeft + winW < wa.Left - 40 || winTop > wa.Bottom + 40 || winTop + winH < wa.Top - 40;
+        const double gap = 8;
+        const double margin = 6;
+        bool placeBelow = true;
+        if (!offscreen)
+        {
+            double spaceBelow = wa.Bottom - (winTop + winH) - gap - margin;
+            double spaceAbove = winTop - wa.Top - gap - margin;
+            if (spaceBelow < popH && spaceAbove > spaceBelow)
+                placeBelow = false;
+        }
+        double bubbleLeft = winLeft + (winW - popW) / 2.0;
+        if (!offscreen)
+        {
+            double minL = wa.Left + margin;
+            double maxL = wa.Right - popW - margin;
+            if (maxL < minL) maxL = minL;
+            bubbleLeft = Math.Clamp(bubbleLeft, minL, maxL);
+        }
+        double x = bubbleLeft - winLeft;
+        double y = placeBelow ? winH + gap : -popH - gap;
+        double tailCenter = (winLeft + winW / 2.0) - bubbleLeft;
+        tailCenter = Math.Clamp(tailCenter, 18, Math.Max(18, popW - 18));
+        _bubbleAnchoredBelow = placeBelow;
+        _bubbleTailLeft = tailCenter - 8;
+        bool belowCopy = placeBelow;
+        double leftCopy = _bubbleTailLeft;
+        Dispatcher.BeginInvoke(DispatcherPriority.Render, new Action(() => ApplyBubbleTailVisual(belowCopy, leftCopy)));
+        return new[] { new CustomPopupPlacement(new Point(x, y), PopupPrimaryAxis.Horizontal) };
+    }
+
+    private void ApplyBubbleTailVisual(bool placeBelow, double tailLeft)
+    {
+        double width = VerifyCelebrationBanner != null && VerifyCelebrationBanner.Width > 40
+            ? VerifyCelebrationBanner.Width
+            : 324;
+        double left = Math.Clamp(tailLeft, 10, Math.Max(10, width - 26));
+        if (VerifyBubbleTailTop != null)
+        {
+            VerifyBubbleTailTop.Visibility = placeBelow ? Visibility.Visible : Visibility.Collapsed;
+            VerifyBubbleTailTop.HorizontalAlignment = HorizontalAlignment.Left;
+            VerifyBubbleTailTop.Margin = new Thickness(left, 0, 0, -1);
+        }
+        if (VerifyBubbleTailBottom != null)
+        {
+            VerifyBubbleTailBottom.Visibility = placeBelow ? Visibility.Collapsed : Visibility.Visible;
+            VerifyBubbleTailBottom.HorizontalAlignment = HorizontalAlignment.Left;
+            VerifyBubbleTailBottom.Margin = new Thickness(left, -1, 0, 0);
+        }
     }
 }

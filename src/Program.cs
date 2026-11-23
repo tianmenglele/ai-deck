@@ -2615,6 +2615,77 @@ public static class Program
                 Math.Abs(floatFx.Width - (reg.UserConfig.FloatingCustomWidth ?? FloatingOverlayWindow.ExpandedWidthDefault)) < 1.0,
                 $"恢复默认自适应高度后 FloatingCustomHeight 为空且维持 Full 档 (Mode={floatFx.CurrentCompactModeForTest}, W={floatFx.Width})");
 
+            AssertTrue(
+                new UserHubConfig().CompletionToastDurationSeconds == 8 &&
+                UserHubConfig.NormalizeCompletionToastDuration(0) == 8 &&
+                UserHubConfig.NormalizeCompletionToastDuration(1) == 3 &&
+                UserHubConfig.NormalizeCompletionToastDuration(99) == 30 &&
+                UserHubConfig.NormalizeCompletionToastDuration(8) == 8,
+                "完成提示时长默认 8 秒，NormalizeCompletionToastDuration 边界 0->8、1->3、99->30");
+            AssertTrue(
+                fxHost.FindName("ComboCompletionToastDuration") is System.Windows.Controls.ComboBox toastCombo &&
+                toastCombo.Items.Count >= 5 &&
+                fxHost.FindName("BtnPreviewCompletionBubble") is System.Windows.Controls.Button,
+                "设置页存在 ComboCompletionToastDuration 与 BtnPreviewCompletionBubble");
+
+            {
+                bool bakCol = reg.UserConfig.FloatingWindowCollapsed;
+                string bakMode = reg.UserConfig.FloatingLayoutMode ?? "auto";
+                double? bakW = reg.UserConfig.FloatingCustomWidth;
+                double? bakUw = reg.UserConfig.FloatingUltraCustomWidth;
+                double? bakH = reg.UserConfig.FloatingCustomHeight;
+                double? bakCw = reg.UserConfig.FloatingCollapsedCustomWidth;
+                try
+                {
+                    foreach (string mode in new[] { "collapsed", "ultra", "compact", "full" })
+                    {
+                        reg.UserConfig.FloatingCustomWidth = null;
+                        reg.UserConfig.FloatingUltraCustomWidth = null;
+                        reg.UserConfig.FloatingCustomHeight = null;
+                        reg.UserConfig.FloatingCollapsedCustomWidth = null;
+                        if (mode == "collapsed")
+                        {
+                            reg.UserConfig.FloatingWindowCollapsed = true;
+                            reg.UserConfig.FloatingLayoutMode = "full";
+                        }
+                        else
+                        {
+                            reg.UserConfig.FloatingWindowCollapsed = false;
+                            reg.UserConfig.FloatingLayoutMode = mode;
+                        }
+                        floatFx.ApplyCollapsedVisual(reg.UserConfig.FloatingWindowCollapsed, preserveRightAnchor: false);
+                        floatFx.RefreshOverlayData(force: true);
+                        floatFx.UpdateLayout();
+                        bool shown = floatFx.TriggerVerifyBannerForTest("任务名", "antigravity", "cursor", "完成要点");
+                        string title = floatFx.VerifyCelebrationTitle.Text ?? "";
+                        string body = floatFx.VerifyCelebrationContent.Text ?? "";
+                        double bw = floatFx.VerifyCelebrationBanner.Width;
+                        bool separated =
+                            !string.IsNullOrWhiteSpace(title) &&
+                            !string.IsNullOrWhiteSpace(body) &&
+                            !string.Equals(title.Trim(), body.Trim(), StringComparison.Ordinal) &&
+                            title.IndexOf(body, StringComparison.Ordinal) < 0 &&
+                            body.IndexOf(title, StringComparison.Ordinal) < 0;
+                        bool widthOk = bw >= 290 && bw <= 380;
+                        bool notSqueezed = mode != "collapsed" || bw >= floatFx.Width + 30;
+                        AssertTrue(
+                            shown && separated && widthOk && notSqueezed,
+                            $"完成气泡 {mode} 标题内容分离且不被胶囊压窄 (title={title}, body={body}, bw={bw:0}, win={floatFx.Width:0}, modeNow={floatFx.CurrentCompactModeForTest})");
+                    }
+                }
+                finally
+                {
+                    reg.UserConfig.FloatingWindowCollapsed = bakCol;
+                    reg.UserConfig.FloatingLayoutMode = bakMode;
+                    reg.UserConfig.FloatingCustomWidth = bakW;
+                    reg.UserConfig.FloatingUltraCustomWidth = bakUw;
+                    reg.UserConfig.FloatingCustomHeight = bakH;
+                    reg.UserConfig.FloatingCollapsedCustomWidth = bakCw;
+                    floatFx.ApplyCollapsedVisual(bakCol, preserveRightAnchor: false);
+                    floatFx.RefreshOverlayData(force: true);
+                }
+            }
+
             // ========== v1.9.12 断言：悬浮窗去主面板按钮 / 底部外置完成提示 / 6套全局主题 / 配置方案新建复制改名及全模型原子切换 ==========
             AssertTrue(
                 floatFx.OpenMainBtn.Visibility == Visibility.Collapsed &&
@@ -5114,6 +5185,11 @@ public static class Program
                 (int)Math.Round(floatWin.ActualWidth > 40 ? floatWin.ActualWidth : floatWin.Width));
             int collapsedH = Math.Max(40, MeasureExactOverlayHeight(floatWin, collapsedW));
             CaptureElementPng(floatWin, collapsedW, collapsedH, Path.Combine(outDir, "live_08_floating_collapsed.png"));
+            CaptureCollapsedWithBubblePng(
+                floatWin,
+                collapsedW,
+                collapsedH,
+                Path.Combine(outDir, "live_08b_floating_collapsed_bubble.png"));
         }
         finally
         {
@@ -5497,6 +5573,66 @@ public static class Program
         if (first >= 0 && last >= first)
             activeSec = (last - first + 1) / (double)sampleRate;
         return true;
+    }
+
+    private static RenderTargetBitmap RenderVisualBrush(UIElement element, int width, int height)
+    {
+        element.Measure(new Size(width, Math.Max(height, 1)));
+        element.Arrange(new Rect(0, 0, width, Math.Max(height, 1)));
+        element.UpdateLayout();
+        var rtb = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32);
+        var dv = new DrawingVisual();
+        using (var dc = dv.RenderOpen())
+        {
+            var vb = new VisualBrush(element)
+            {
+                Stretch = Stretch.None,
+                AlignmentX = AlignmentX.Left,
+                AlignmentY = AlignmentY.Top
+            };
+            dc.DrawRectangle(vb, null, new Rect(0, 0, width, height));
+        }
+        rtb.Render(dv);
+        return rtb;
+    }
+
+    private static void CaptureCollapsedWithBubblePng(FloatingOverlayWindow floatWin, int collapsedW, int collapsedH, string filePath)
+    {
+        floatWin.ApplyCollapsedVisual(true, preserveRightAnchor: false);
+        floatWin.RefreshOverlayData(force: true);
+        floatWin.UpdateLayout();
+        var root = VisualTreeHelper.GetChildrenCount(floatWin) > 0 && VisualTreeHelper.GetChild(floatWin, 0) is UIElement rc
+            ? rc
+            : (UIElement)floatWin.Content;
+        var capBmp = RenderVisualBrush(root, collapsedW, collapsedH);
+
+        floatWin.PreviewCompletionBubble();
+        floatWin.SnapCompletionBubbleFullyVisibleForCapture();
+        var banner = floatWin.VerifyCelebrationBanner;
+        const int bubbleW = 324;
+        banner.Measure(new Size(bubbleW, double.PositiveInfinity));
+        double wantH = Math.Max(banner.DesiredSize.Height, banner.ActualHeight);
+        int bubbleH = Math.Max(116, (int)Math.Ceiling(wantH + 8));
+        var bubbleBmp = RenderVisualBrush(banner, bubbleW, bubbleH);
+
+        int pad = 18;
+        int gap = 2;
+        int totalW = Math.Max(bubbleW, collapsedW) + pad * 2;
+        int totalH = pad + collapsedH + gap + bubbleH + pad;
+        var rtb = new RenderTargetBitmap(totalW, totalH, 96, 96, PixelFormats.Pbgra32);
+        var dv = new DrawingVisual();
+        using (var dc = dv.RenderOpen())
+        {
+            dc.DrawRectangle(new SolidColorBrush(Color.FromRgb(0x0B, 0x12, 0x18)), null, new Rect(0, 0, totalW, totalH));
+            dc.DrawImage(capBmp, new Rect((totalW - collapsedW) / 2.0, pad, collapsedW, collapsedH));
+            dc.DrawImage(bubbleBmp, new Rect((totalW - bubbleW) / 2.0, pad + collapsedH + gap, bubbleW, bubbleH));
+        }
+        rtb.Render(dv);
+
+        var encoder = new PngBitmapEncoder();
+        encoder.Frames.Add(BitmapFrame.Create(rtb));
+        using var fs = File.Create(filePath);
+        encoder.Save(fs);
     }
 
     private static void CaptureElementPng(Window window, int width, int height, string filePath)

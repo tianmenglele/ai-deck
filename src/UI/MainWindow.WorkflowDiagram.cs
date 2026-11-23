@@ -19,7 +19,7 @@ public partial class MainWindow
     private DateTime _workflowDiagramDemoStartUtc;
     private const double WorkflowDiagramDemoStepSeconds = 1.5;
     private double _workflowDiagramDashOffset;
-    private double _workflowDiagramPulseT;
+    private double _workflowDiagramPulseT = 0.38;
     private string _workflowDiagramPhase = "idle";
     private int _workflowDiagramRound = 1;
     private int _workflowDiagramMaxRounds = 2;
@@ -1188,10 +1188,8 @@ public partial class MainWindow
         Panel.SetZIndex(tail2, 5);
         Panel.SetZIndex(tail1, 5);
         Panel.SetZIndex(core, 6);
-        Canvas.SetLeft(core, -20);
-        Canvas.SetTop(core, -20);
 
-        _workflowDiagramFlowTracks.Add(new MindMapFlowTrack
+        var track = new MindMapFlowTrack
         {
             Geometry = geo,
             Core = core,
@@ -1200,7 +1198,19 @@ public partial class MainWindow
             Reverse = reverse,
             PhaseOffset = phaseOffset,
             Speed = 0.36
-        });
+        };
+        _workflowDiagramFlowTracks.Add(track);
+        PlaceWorkflowDiagramComet(track);
+    }
+
+    private void PlaceWorkflowDiagramComet(MindMapFlowTrack track)
+    {
+        double t = ((_workflowDiagramPulseT * track.Speed) + track.PhaseOffset) % 1.0;
+        if (t < 0) t += 1.0;
+        if (track.Reverse) t = 1.0 - t;
+        PlaceCometDot(track.Geometry, track.Core, t, track.Core.Width);
+        PlaceCometDot(track.Geometry, track.Tail1, Wrap01(t - 0.055), track.Tail1.Width);
+        PlaceCometDot(track.Geometry, track.Tail2, Wrap01(t - 0.11), track.Tail2.Width);
     }
 
     private (string Bg, string Border, string Fg) PhaseBadgeColors(string phase) => phase switch
@@ -1342,13 +1352,7 @@ public partial class MainWindow
         }
 
         foreach (var track in _workflowDiagramFlowTracks)
-        {
-            double t = ((_workflowDiagramPulseT * track.Speed) + track.PhaseOffset) % 1.0;
-            if (track.Reverse) t = 1.0 - t;
-            PlaceCometDot(track.Geometry, track.Core, t, track.Core.Width);
-            PlaceCometDot(track.Geometry, track.Tail1, Wrap01(t - 0.055), track.Tail1.Width);
-            PlaceCometDot(track.Geometry, track.Tail2, Wrap01(t - 0.11), track.Tail2.Width);
-        }
+            PlaceWorkflowDiagramComet(track);
 
         if (_workflowDiagramDemoMode)
         {

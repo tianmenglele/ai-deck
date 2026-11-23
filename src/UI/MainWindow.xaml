@@ -1213,6 +1213,37 @@
                                                         <ComboBoxItem Content="1.5 秒" Tag="1500"/>
                                                         <ComboBoxItem Content="3 秒" Tag="3000"/>
                                                     </ComboBox>
+                                                    <Grid Margin="0,8,0,0">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*"/>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        <StackPanel Grid.Column="0" Margin="0,0,6,0">
+                                                            <TextBlock Text="完成提示时长" Foreground="{StaticResource FgSecondaryBrush}" FontSize="12" Margin="0,0,0,3"
+                                                                       ToolTip="悬浮窗完成气泡停留秒数"/>
+                                                            <ComboBox x:Name="ComboCompletionToastDuration" SelectionChanged="ComboCompletionToastDuration_SelectionChanged">
+                                                                <ComboBoxItem Content="4 秒" Tag="4"/>
+                                                                <ComboBoxItem Content="8 秒 · 默认" Tag="8"/>
+                                                                <ComboBoxItem Content="12 秒" Tag="12"/>
+                                                                <ComboBoxItem Content="20 秒" Tag="20"/>
+                                                                <ComboBoxItem Content="30 秒" Tag="30"/>
+                                                            </ComboBox>
+                                                        </StackPanel>
+                                                        <Button x:Name="BtnPreviewCompletionBubble"
+                                                                Grid.Column="1"
+                                                                Width="30"
+                                                                Height="26"
+                                                                Style="{StaticResource IconToolBtn}"
+                                                                VerticalAlignment="Bottom"
+                                                                ToolTip="预览悬浮窗完成气泡"
+                                                                AutomationProperties.Name="预览完成气泡"
+                                                                Click="BtnPreviewCompletionBubble_Click">
+                                                            <Path Width="14" Height="14" Stretch="Uniform" StrokeThickness="1.35"
+                                                                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                                                  Fill="Transparent"
+                                                                  Data="M4,6 H14 A2,2 0 0 1 16,8 V13 A2,2 0 0 1 14,15 H8 L5,18 V15 H4 A2,2 0 0 1 2,13 V8 A2,2 0 0 1 4,6 Z"/>
+                                                        </Button>
+                                                    </Grid>
                                                 </StackPanel>
                                             </Border>
                                         </Grid>
