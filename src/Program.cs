@@ -3233,7 +3233,12 @@ public static class Program
                 fxHost.SwitchToTabForTest(5);
                 fxHost.UpdateLayout();
                 var btnsHasUpd = CollectLogicalAndVisual<System.Windows.Controls.Button>(fxHost.DetectedAgentsList);
-                bool hasClickableUpdateBtn = btnsHasUpd.Any(b => b.IsEnabled && string.Equals(b.Content as string, "⬆ 更新 CLI", StringComparison.Ordinal));
+                bool hasClickableUpdateBtn = btnsHasUpd.Any(b =>
+                    b.IsEnabled &&
+                    b.Tag is LongActionTracker.LongActionTag updateTag &&
+                    updateTag.Key == LongActionTracker.CliUpdate("cursor") &&
+                    b.Content is System.Windows.Shapes.Path &&
+                    (b.ToolTip as string)?.Contains("新版本可用", StringComparison.Ordinal) == true);
 
                 AssertTrue(
                     !offerForFake && !hasClickableInstalledBtn && hasReadOnlyInstalledBadge && hasClickableUpdateBtn,
@@ -3287,16 +3292,24 @@ public static class Program
                 var busyCliBtns = CollectLogicalAndVisual<System.Windows.Controls.Button>(fxHost.DetectedAgentsList);
                 bool keptBusy = busyCliBtns.Any(b =>
                     !b.IsEnabled &&
-                    b.Content is string busyText &&
-                    busyText.Contains('⏳') &&
-                    busyText.Contains("更新中", StringComparison.Ordinal) &&
-                    Regex.IsMatch(busyText, @"\d+s"));
+                    b.Tag is LongActionTracker.LongActionTag busyTag &&
+                    busyTag.Key == LongActionTracker.CliUpdate("cursor") &&
+                    b.Content is System.Windows.Shapes.Path &&
+                    b.ToolTip is string busyTip &&
+                    busyTip.Contains('⏳') &&
+                    busyTip.Contains("更新中", StringComparison.Ordinal) &&
+                    Regex.IsMatch(busyTip, @"\d+s"));
                 AssertTrue(keptBusy, "CLI 更新进行中跨重绘仍保持禁用态并显示耗时文案");
                 LongActionTracker.End(LongActionTracker.CliUpdate("cursor"));
                 fxHost.SwitchToTabForTest(5);
                 fxHost.UpdateLayout();
                 var restoredCliBtns = CollectLogicalAndVisual<System.Windows.Controls.Button>(fxHost.DetectedAgentsList);
-                bool restoredUpdate = restoredCliBtns.Any(b => b.IsEnabled && string.Equals(b.Content as string, "⬆ 更新 CLI", StringComparison.Ordinal));
+                bool restoredUpdate = restoredCliBtns.Any(b =>
+                    b.IsEnabled &&
+                    b.Tag is LongActionTracker.LongActionTag restoredTag &&
+                    restoredTag.Key == LongActionTracker.CliUpdate("cursor") &&
+                    b.Content is System.Windows.Shapes.Path &&
+                    (b.ToolTip as string)?.Contains("新版本可用", StringComparison.Ordinal) == true);
                 AssertTrue(restoredUpdate, "CLI 更新锁释放后重绘恢复可点的更新按钮");
             }
             finally
