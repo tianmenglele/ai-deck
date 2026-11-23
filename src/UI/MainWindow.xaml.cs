@@ -47,8 +47,8 @@ public partial class MainWindow : Window
     private bool _lastKnownNetOnline = true;
     private volatile bool _isResumingCheckpointInBackground;
     private volatile bool _isRescanningAgents;
-    /// <summary>roster 筛选：all / enabled / disabled / catalog</summary>
-    private string _rosterFilterMode = "all";
+    /// <summary>roster 筛选：installed / all / enabled / disabled / catalog。默认只显示已装或已启用。</summary>
+    private string _rosterFilterMode = "installed";
 
     // 性能优化与防卡顿缓存（避免 UI 线程每 1.5s 重建卡片树、遍历全系统进程或同步扫 100+ 对话）
     private string _lastOverviewSignature = "";
@@ -121,6 +121,8 @@ public partial class MainWindow : Window
         Title = $"AIDeck · 多 AI 协同中心 {AppUpdateService.GetCurrentVersionDisplay()}";
 
         RightDataPathText.Text = $"个人配置目录：{AppPaths.UserDataDir}";
+        if (AppUserDataPathText != null)
+            AppUserDataPathText.Text = AppPaths.UserDataDir;
         AiChatRootBadge.Text = Directory.Exists(@"F:\AIChat")
             ? "✓ 已连接 F:\\AIChat 聊天库"
             : "● 使用系统默认聊天目录";
@@ -457,8 +459,9 @@ public partial class MainWindow : Window
         bool onlyRun = _reg.UserConfig.WorkflowOnlyWhenAppRunning;
         if (WorkflowSwitchBtn != null)
         {
-            WorkflowSwitchBtn.Content = wfOn ? "● 协同已开启" : "○ 独立模式";
+            WorkflowSwitchBtn.Content = "协同开关";
             WorkflowSwitchBtn.Style = (Style)FindResource(wfOn ? "SuccessBtn" : "ActionBtn");
+            WorkflowSwitchBtn.ToolTip = wfOn ? "协同已开启，点击关闭" : "协同已关闭，点击开启";
         }
         if (HeaderStatusDot != null)
         {
@@ -466,9 +469,10 @@ public partial class MainWindow : Window
         }
         if (SidebarWorkflowBadge != null)
         {
-            SidebarWorkflowBadge.Text = wfOn
-                ? (onlyRun ? "● 协同已启用 · 随软件启停" : "● 协同已启用 · 常驻生效")
-                : "○ 已停用 · 各AI独立模式";
+            SidebarWorkflowBadge.Text = wfOn ? "协同运行" : "独立模式";
+            SidebarWorkflowBadge.ToolTip = wfOn
+                ? (onlyRun ? "协同已启用，随软件启停" : "协同已启用，常驻生效")
+                : "协同已停用，各 AI 独立工作";
             SidebarWorkflowBadge.Foreground = wfOn ? Hex("#34D399") : Hex("#94A3B8");
         }
         _traySvc?.UpdateTooltip(wfOn
@@ -737,6 +741,8 @@ public partial class MainWindow : Window
 
     private void BtnReopenOnboarding_Click(object sender, RoutedEventArgs e) => OpenOnboardingWizard();
 
+    private void HeaderOnboardingBtn_Click(object sender, RoutedEventArgs e) => OpenOnboardingWizard();
+
     public void OpenOnboardingWizard()
     {
         var dlg = new OnboardingWizardDialog(_reg, _discovery, this);
@@ -783,7 +789,8 @@ public partial class MainWindow : Window
     public void UpdateFloatingButtonBadge()
     {
         bool enabled = _reg.UserConfig.FloatingWindowEnabled && (_floatingWindow?.IsVisible ?? _reg.UserConfig.FloatingWindowEnabled);
-        ToggleFloatingBtn.Content = enabled ? "悬浮窗: 开" : "悬浮窗: 关";
+        ToggleFloatingBtn.Content = "悬浮窗";
+        ToggleFloatingBtn.ToolTip = enabled ? "悬浮窗已开启，点击关闭" : "悬浮窗已关闭，点击开启";
         ToggleFloatingBtn.Style = (Style)FindResource("ActionBtn");
     }
 
@@ -945,6 +952,8 @@ public partial class MainWindow : Window
         NavOps.IsChecked = index == 4;
         NavSettings.IsChecked = index == 5;
         NavAppSettings.IsChecked = index == 6;
+        if (NavAdvancedExpander != null && (index == 3 || index == 4))
+            NavAdvancedExpander.IsExpanded = true;
         _suppressEvents = false;
 
         PageOverview.Visibility = index == 1 ? Visibility.Visible : Visibility.Collapsed;
@@ -972,7 +981,7 @@ public partial class MainWindow : Window
         LongActionTracker.Arm(SyncAnchorsOverviewBtn, LongActionTracker.RulesSync, "同步规则锚点");
         LongActionTracker.Arm(InitFoundationBtn, LongActionTracker.RulesInit, "初始化工程目录");
         LongActionTracker.Arm(RestoreSyncBackupBtn, LongActionTracker.RulesRestore, "恢复上次备份");
-        LongActionTracker.Arm(ExportShareZipBtn, LongActionTracker.ExportShare, "📤 一键导出便携分享包 (.zip)");
+        LongActionTracker.Arm(ExportShareZipBtn, LongActionTracker.ExportShare, "导出分享包");
         LongActionTracker.Arm(RunHeadlessDispatchBtn, LongActionTracker.HeadlessDispatch, "⚡ 分配任务并执行");
         LongActionTracker.Arm(BtnProbeNetworkNow, LongActionTracker.NetProbe, "检测网络");
         LongActionTracker.Arm(BtnDismissStuckModalsNow, LongActionTracker.DismissModals, "🧹 清理卡住弹窗");
@@ -1032,6 +1041,9 @@ public partial class MainWindow : Window
                 DiscardRosterSettingsChanges();
             }
         }
+
+        if (NavAdvancedExpander != null && (NavSync.IsChecked == true || NavOps.IsChecked == true))
+            NavAdvancedExpander.IsExpanded = true;
 
         PageOverview.Visibility = NavOverview.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
         PageDialogs.Visibility = NavDialogs.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
@@ -1281,8 +1293,11 @@ public partial class MainWindow : Window
             OverviewModeBadge.Background = wfOn ? Hex("#12352C") : Hex("#242E40");
             OverviewModeBadgeText.Text = wfOn ? "运行中" : "独立模式";
             OverviewMasterBrainText.Text = wfOn
-                ? $"主脑 AI：{masterAg?.Name ?? "Antigravity"}   ·   全入口接单分析、按工作定位路由并执行验收闭环"
-                : "协同工作流已停用：所有 AI 工具均恢复原生独立运行状态";
+                ? (masterAg?.Name ?? "未指定")
+                : "未开启";
+            OverviewMasterBrainText.ToolTip = wfOn
+                ? $"{masterAg?.Name ?? "未指定"} 负责接单、分工和验收"
+                : "协同已关闭，各 AI 独立工作";
         }
 
         if (InterruptedCheckpointBanner != null)
@@ -1309,7 +1324,6 @@ public partial class MainWindow : Window
             liveMap.TryGetValue(ag.Id, out var agLive);
 
             bool isWorking = agLive != null && agLive.Status == "working";
-            bool isDone = agLive != null && agLive.Status == "done";
 
             var rowBorder = new Border
             {
@@ -1317,8 +1331,8 @@ public partial class MainWindow : Window
                 BorderBrush = isWorking ? Hex("#B45309") : Hex("#222C3D"),
                 BorderThickness = new Thickness(1),
                 CornerRadius = new CornerRadius(7),
-                Padding = new Thickness(14, 10, 14, 10),
-                Margin = new Thickness(0, 0, 0, isLast ? 0 : 10)
+                Padding = new Thickness(16, 14, 16, 14),
+                Margin = new Thickness(0, 0, 0, isLast ? 0 : 12)
             };
 
             var stack = new StackPanel();
@@ -1345,7 +1359,7 @@ public partial class MainWindow : Window
             bool isMaster = masterAg != null && string.Equals(masterAg.Id, ag.Id, StringComparison.OrdinalIgnoreCase);
             var roleTag = isMaster
                 ? "主脑"
-                : (ag.Permissions.AllowDirectSourceWrite ? "可改工程" : "只读分析");
+                : (isWorking ? "执行中" : (agLive?.Status == "error" ? "异常" : "在岗"));
             titleWrap.Children.Add(new Border
             {
                 Background = Hex("#1E2736"),
@@ -1362,17 +1376,6 @@ public partial class MainWindow : Window
             });
 
             var cachedWin = GetCachedWindowState(ag);
-
-            if (AutoDispatchService.ResolveGuiExecutable(ag) != null)
-            {
-                titleWrap.Children.Add(new TextBlock
-                {
-                    Text = cachedWin.IsRunning ? "● 运行中" : "○ 未启动",
-                    FontSize = 11,
-                    Foreground = cachedWin.IsRunning ? Hex("#34D399") : Hex("#64748B"),
-                    VerticalAlignment = VerticalAlignment.Center
-                });
-            }
             Grid.SetColumn(titleWrap, 0);
 
             var actionWrap = new WrapPanel { VerticalAlignment = VerticalAlignment.Center };
@@ -1447,6 +1450,20 @@ public partial class MainWindow : Window
                     SetStatus(msg);
                 };
                 actionWrap.Children.Add(openWinBtn);
+            }
+            else
+            {
+                var cfgOverviewBtn = new Button
+                {
+                    Content = "配置",
+                    Style = (Style)FindResource("ActionBtn"),
+                    Padding = new Thickness(8, 3, 8, 3),
+                    FontSize = 12,
+                    ToolTip = "打开这个 AI 的模型和权限"
+                };
+                var cfgAgent = ag;
+                cfgOverviewBtn.Click += (_, _) => OpenRosterAgentConfig(cfgAgent);
+                actionWrap.Children.Add(cfgOverviewBtn);
             }
             Grid.SetColumn(actionWrap, 1);
             topGrid.Children.Add(titleWrap);
@@ -1532,13 +1549,24 @@ public partial class MainWindow : Window
                 summaryLine = $"空闲待命 · 定位：{FormatAgentRolesSummary(ag, " / ", 4)}   ·   {activeModelBrief}";
             }
 
+            string stateWord = agLive?.Status switch
+            {
+                "working" => "正在执行",
+                "error" => "待处理",
+                "done" => "刚完成",
+                _ => "空闲待命"
+            };
+            var modelShort = TruncateOneLine(activeModelBrief, 18);
+            summaryLine = $"{modelShort} · {stateWord}";
+            rowBorder.ToolTip ??= $"{ag.Name}\n{activeModelBrief}\n{stateWord}";
             stack.Children.Add(new TextBlock
             {
                 Text = summaryLine,
-                FontSize = 11.5,
+                FontSize = 12.5,
                 Foreground = summaryBrush,
-                Margin = new Thickness(0, 6, 0, 0),
-                TextTrimming = TextTrimming.CharacterEllipsis
+                Margin = new Thickness(0, 8, 0, 0),
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                ToolTip = rowBorder.ToolTip
             });
 
             rowBorder.Child = stack;
@@ -1580,7 +1608,7 @@ public partial class MainWindow : Window
             {
                 LatestDispatchHeaderText.Text = "尚无历史自动派单反馈记录";
                 LatestDispatchHeaderText.Foreground = Hex("#93C5FD");
-                LatestDispatchMetaText.Text = "当您在 Antigravity 对话框提出分析/设计/优化需求，或在「② 对话框与聊天记录」页手动测试派单后，结果会自动显示在此处。";
+                LatestDispatchMetaText.Text = "还没有派单回执";
                 LatestDispatchSnippetText.Text = "";
             }
 
@@ -1682,6 +1710,14 @@ public partial class MainWindow : Window
     private void JumpToSyncBtn_Click(object sender, RoutedEventArgs e) => NavSync.IsChecked = true;
     private void JumpToSettingsBtn_Click(object sender, RoutedEventArgs e) => NavSettings.IsChecked = true;
 
+    private void OpenRosterAgentConfig(AgentRosterEntry agent)
+    {
+        if (!Dialogs.ShowAgentConfigDialog(this, _reg, agent, _cloudRecSvc)) return;
+        _lastOverviewSignature = "";
+        RefreshAllViews();
+        _floatingWindow?.RefreshOverlayData(force: true);
+    }
+
     private void OverviewOpenLatestInboxBtn_Click(object sender, RoutedEventArgs e)
     {
         NavDialogs.IsChecked = true;
@@ -1760,8 +1796,8 @@ public partial class MainWindow : Window
 
         int renderLimit = _showAllDialogs ? filtered.Count : Math.Min(filtered.Count, 45);
         DialogBrowserCountTitle.Text = allSessions.Count == 0 && _isLoadingSessionsAsync
-            ? "◆ 项目对话框列表（正在后台检索 F:\\AIChat 对话库...）"
-            : $"◆ 项目对话框列表（共 {filtered.Count} / {allSessions.Count} 个）";
+            ? "正在读取对话"
+            : $"对话 {filtered.Count}/{allSessions.Count}";
         DialogCardsStack.Children.Clear();
         _dialogCardEntries.Clear();
 
@@ -1770,8 +1806,8 @@ public partial class MainWindow : Window
             DialogCardsStack.Children.Add(new TextBlock
             {
                 Text = _isLoadingSessionsAsync
-                    ? "正在后台无阻塞加载项目对话框记录，请稍候..."
-                    : "当前筛选条件下暂无匹配的对话框记录。\n可在右下角点击「⚡ 分配任务并启动窗口执行」自动新建专属对话框。",
+                    ? "正在读取对话"
+                    : "没有匹配的对话",
                 Foreground = Hex("#8C9BB3"),
                 FontSize = 12,
                 Margin = new Thickness(4, 12, 4, 0),
@@ -1792,77 +1828,30 @@ public partial class MainWindow : Window
                 BorderBrush = isSelected ? Hex("#38BDF8") : (matchedLive?.Status == "working" ? Hex("#F59E0B") : (matchedLive != null ? Hex("#10B981") : Hex("#243044"))),
                 BorderThickness = new Thickness(isSelected || matchedLive != null ? 1.5 : 1),
                 CornerRadius = new CornerRadius(6),
-                Padding = new Thickness(9, 7, 9, 7),
-                Margin = new Thickness(0, 0, 0, 6),
+                Padding = new Thickness(12, 10, 12, 10),
+                Margin = new Thickness(0, 0, 0, 8),
                 Cursor = System.Windows.Input.Cursors.Hand,
-                ToolTip = $"SessionId: {sess.SessionId}\n记录文件: {sess.FilePath}\n所属工程: {sess.ProjectDir}"
+                ToolTip = $"SessionId: {sess.SessionId}\n记录: {sess.FilePath}\n所属工程: {sess.ProjectDir}"
             };
 
+            string liveMark = matchedLive == null ? "" : (matchedLive.Status == "working" ? " · 执行中" : " · 已派单");
             var sp = new StackPanel();
-            var headerWrap = new WrapPanel { Margin = new Thickness(0, 0, 0, 3) };
-
-            var (badgeBg, badgeFg) = sess.AgentId switch
-            {
-                "antigravity" => ("#3B0764", "#E9D5FF"),
-                "codex_cli" => ("#064E3B", "#6EE7B7"),
-                "cursor" => ("#0C4A6E", "#7DD3FC"),
-                _ => ("#1E293B", "#CBD5E1")
-            };
-            headerWrap.Children.Add(new Border
-            {
-                Background = Hex(badgeBg),
-                CornerRadius = new CornerRadius(3),
-                Padding = new Thickness(6, 1, 6, 1),
-                Margin = new Thickness(0, 0, 6, 0),
-                Child = new TextBlock { Text = sess.AgentName, FontSize = 11, FontWeight = FontWeights.SemiBold, Foreground = Hex(badgeFg) }
-            });
-
-            if (matchedLive != null)
-            {
-                bool w = matchedLive.Status == "working";
-                headerWrap.Children.Add(new Border
-                {
-                    Background = Hex(w ? "#78350F" : "#065F46"),
-                    BorderBrush = Hex(w ? "#F59E0B" : "#10B981"),
-                    BorderThickness = new Thickness(1),
-                    CornerRadius = new CornerRadius(3),
-                    Padding = new Thickness(5, 1, 5, 1),
-                    Margin = new Thickness(0, 0, 6, 0),
-                    Child = new TextBlock
-                    {
-                        Text = w ? "⚡ 正在执行分配任务" : "✓ 已分配协同工作",
-                        FontSize = 10.5,
-                        FontWeight = FontWeights.Bold,
-                        Foreground = Hex(w ? "#FDE68A" : "#A7F3D0")
-                    }
-                });
-            }
-
-            headerWrap.Children.Add(new TextBlock
-            {
-                Text = $"{sess.UpdatedAt} · {sess.TurnCount} 轮",
-                FontSize = 11,
-                Foreground = Hex("#8C9BB3"),
-                VerticalAlignment = VerticalAlignment.Center
-            });
-            sp.Children.Add(headerWrap);
-
             sp.Children.Add(new TextBlock
             {
                 Text = sess.Title,
-                FontSize = 12.5,
+                FontSize = 13,
                 FontWeight = FontWeights.SemiBold,
                 Foreground = Hex("#E6EDF7"),
-                TextTrimming = TextTrimming.CharacterEllipsis,
-                Margin = new Thickness(0, 0, 0, 2)
+                TextTrimming = TextTrimming.CharacterEllipsis
             });
-
             sp.Children.Add(new TextBlock
             {
-                Text = $"记录：{sess.FilePath}",
-                FontSize = 10.5,
-                Foreground = Hex("#6D829E"),
-                TextTrimming = TextTrimming.CharacterEllipsis
+                Text = $"{sess.AgentName} · {sess.UpdatedAt} · {sess.TurnCount} 轮{liveMark}",
+                FontSize = 11.5,
+                Foreground = Hex("#8C9BB3"),
+                Margin = new Thickness(0, 4, 0, 0),
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                ToolTip = sess.FilePath
             });
 
             card.Child = sp;
@@ -1910,8 +1899,10 @@ public partial class MainWindow : Window
         _selectedDialogFilePath = sess.FilePath;
         _currentDisplayedSession = sess;
 
-        SelectedDialogTitleText.Text = $"◆ [{sess.AgentName}] {sess.Title}";
-        SelectedDialogPathText.Text = $"记录文件：{sess.FilePath}   |   SessionId：{sess.SessionId}";
+        SelectedDialogTitleText.Text = sess.Title;
+        SelectedDialogTitleText.ToolTip = $"{sess.AgentName}\n记录: {sess.FilePath}\nSessionId: {sess.SessionId}";
+        SelectedDialogPathText.Text = $"记录: {sess.FilePath}";
+        SelectedDialogPathText.ToolTip = sess.FilePath;
         if (refreshListHighlight)
             UpdateDialogCardSelection(previousId, sess.SessionId);
 
@@ -3317,10 +3308,6 @@ public partial class MainWindow : Window
 
         bool GetSnapEnabled(AgentRosterEntry a) =>
             snapMap.TryGetValue(a.Id, out var s) ? s.Enabled : a.Enabled;
-        string GetSnapTier(AgentRosterEntry a) =>
-            snapMap.TryGetValue(a.Id, out var s) && !string.IsNullOrWhiteSpace(s.PreferredEffortTier)
-                ? s.PreferredEffortTier
-                : (string.IsNullOrWhiteSpace(a.PreferredEffortTier) ? "auto" : a.PreferredEffortTier);
         List<ModelWorkProfile> GetSnapModelProfiles(AgentRosterEntry a)
         {
             var raw = snapMap.TryGetValue(a.Id, out var s) && s.ModelProfiles != null && s.ModelProfiles.Count > 0
@@ -3350,7 +3337,8 @@ public partial class MainWindow : Window
         int enabledCount = detectedBase.Count(GetSnapEnabled);
         int disabledCount = detectedBase.Count(a => !GetSnapEnabled(a));
 
-        RenderRosterFilterBar(detectedBase.Count, enabledCount, disabledCount, catalogCount);
+        int installedCount = detectedBase.Count(a => a.Detected || GetSnapEnabled(a) || string.IsNullOrEmpty(a.DetectorId));
+        RenderRosterFilterBar(detectedBase.Count, enabledCount, disabledCount, catalogCount, installedCount);
 
         List<AgentRosterEntry> visibleList;
         if (_rosterFilterMode == "catalog")
@@ -3377,6 +3365,7 @@ public partial class MainWindow : Window
             visibleList = detectedBase
                 .Where(a => _rosterFilterMode switch
                 {
+                    "installed" => a.Detected || GetSnapEnabled(a) || string.IsNullOrEmpty(a.DetectorId),
                     "enabled" => GetSnapEnabled(a),
                     "disabled" => !GetSnapEnabled(a),
                     _ => true
@@ -3423,7 +3412,6 @@ public partial class MainWindow : Window
             var dispPerms = GetSnapPerms(agent);
             var dispRoles = GetSnapRoles(agent);
             var dispNote = GetSnapNote(agent);
-            var dispTier = GetSnapTier(agent);
             var dispModels = GetSnapModelProfiles(agent).Where(m => m.Enabled).ToList();
 
             var rowBorder = new Border
@@ -3432,7 +3420,7 @@ public partial class MainWindow : Window
                 BorderBrush = Hex(dispEnabled ? "#1E293B" : "#18202E"),
                 BorderThickness = new Thickness(1),
                 CornerRadius = new CornerRadius(7),
-                Padding = new Thickness(14, dispEnabled ? 11 : 8, 14, dispEnabled ? 11 : 8),
+                Padding = new Thickness(16, 12, 16, 12),
                 Margin = new Thickness(0, 0, 0, isLast ? 0 : 8)
             };
 
@@ -3445,212 +3433,103 @@ public partial class MainWindow : Window
             var rosterAvatar = OfficialBrandIconService.CreateCircularAvatarVisual(
                 agent.Id, dispEnabled ? 26 : 22, agent, isMaster && dispEnabled ? "#8B5CF6" : (dispEnabled ? "#3B82F6" : "#475569"), 1.2);
             rosterAvatar.Margin = new Thickness(0, 1, 12, 0);
-            rosterAvatar.VerticalAlignment = dispEnabled ? VerticalAlignment.Top : VerticalAlignment.Center;
+            rosterAvatar.VerticalAlignment = VerticalAlignment.Center;
             Grid.SetColumn(rosterAvatar, 0);
 
-            var infoStack = new StackPanel { Margin = new Thickness(0, 0, 14, 0), VerticalAlignment = VerticalAlignment.Center };
-
-            if (!dispEnabled)
+            var infoStack = new StackPanel { Margin = new Thickness(0, 0, 12, 0), VerticalAlignment = VerticalAlignment.Center };
+            var titleLine = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+            titleLine.Children.Add(new TextBlock
             {
-                // 未启用 AI：极简单行灰态，零配置噪音
-                var mutedLine = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
-                mutedLine.Children.Add(new TextBlock
-                {
-                    Text = agent.Name,
-                    FontSize = 12.8,
-                    FontWeight = FontWeights.SemiBold,
-                    Foreground = Hex("#64748B"),
-                    VerticalAlignment = VerticalAlignment.Center,
-                    Margin = new Thickness(0, 0, 8, 0)
-                });
-                mutedLine.Children.Add(new TextBlock
-                {
-                    Text = $"{MapCategoryLabel(agent.Category)} · 未启用",
-                    FontSize = 11.2,
-                    Foreground = Hex("#475569"),
-                    VerticalAlignment = VerticalAlignment.Center
-                });
-                infoStack.Children.Add(mutedLine);
+                Text = agent.Name,
+                FontSize = 14,
+                FontWeight = FontWeights.SemiBold,
+                Foreground = Hex(dispEnabled ? "#F8FAFC" : "#94A3B8"),
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 8, 0)
+            });
+
+            var badgeItems = new List<(string Text, string Bg, string Fg)>();
+            if (isMaster) badgeItems.Add(("主脑", "#241B3A", "#C4B5FD"));
+            else if (isFallback) badgeItems.Add(("替补", "#15253B", "#93C5FD"));
+            else badgeItems.Add((dispEnabled ? "在岗" : "未启用", "#1E2736", "#94A3B8"));
+
+            var normalizedRoles = (dispRoles ?? new List<string>())
+                .Where(rk => !string.IsNullOrWhiteSpace(rk))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Select(rk => WorkSpecialtyCatalog.Items.TryGetValue(rk, out var rn) ? rn : rk)
+                .ToList();
+            if (badgeItems.Count < 3 && normalizedRoles.Count > 0)
+            {
+                var roleBadge = normalizedRoles[0];
+                if (roleBadge.Length > 6) roleBadge = roleBadge[..6];
+                badgeItems.Add((roleBadge, "#1E2736", "#CBD5E1"));
             }
-            else
+            var winStForBadge = GetCachedWindowState(agent);
+            if (badgeItems.Count < 3 && AutoDispatchService.ResolveGuiExecutable(agent) != null && winStForBadge.IsRunning)
+                badgeItems.Add(("运行中", "#12352C", "#A7F3D0"));
+
+            foreach (var b in badgeItems.Take(3))
             {
-                // 第 1 行：名称 + 克制的身份标（仅主脑/替补）+ 淡灰元数据（去掉满屏彩色胶囊）
-                var titleLine = new WrapPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
-                titleLine.Children.Add(new TextBlock
+                titleLine.Children.Add(new Border
                 {
-                    Text = agent.Name,
-                    FontSize = 13.5,
-                    FontWeight = FontWeights.SemiBold,
-                    Foreground = Hex("#F1F5F9"),
+                    Background = Hex(b.Bg),
+                    CornerRadius = new CornerRadius(4),
+                    Padding = new Thickness(6, 1, 6, 1),
+                    Margin = new Thickness(0, 0, 6, 0),
                     VerticalAlignment = VerticalAlignment.Center,
-                    Margin = new Thickness(0, 0, 8, 0)
+                    Child = new TextBlock { Text = b.Text, FontSize = 10.5, FontWeight = FontWeights.SemiBold, Foreground = Hex(b.Fg) }
                 });
+            }
+            infoStack.Children.Add(titleLine);
 
-                if (isMaster)
-                {
-                    titleLine.Children.Add(new Border
-                    {
-                        Background = Hex("#241B3A"),
-                        CornerRadius = new CornerRadius(4),
-                        Padding = new Thickness(6, 1, 6, 1),
-                        Margin = new Thickness(0, 0, 6, 0),
-                        VerticalAlignment = VerticalAlignment.Center,
-                        Child = new TextBlock { Text = "主脑", FontSize = 10.5, FontWeight = FontWeights.SemiBold, Foreground = Hex("#C4B5FD") }
-                    });
-                }
-                if (isFallback)
-                {
-                    titleLine.Children.Add(new Border
-                    {
-                        Background = Hex("#15253B"),
-                        CornerRadius = new CornerRadius(4),
-                        Padding = new Thickness(6, 1, 6, 1),
-                        Margin = new Thickness(0, 0, 6, 0),
-                        VerticalAlignment = VerticalAlignment.Center,
-                        Child = new TextBlock { Text = "替补", FontSize = 10.5, FontWeight = FontWeights.SemiBold, Foreground = Hex("#93C5FD") }
-                    });
-                }
-
-                int nativeCnt = dispModels.Count(m => LocalModelCatalogService.ClassifyModelOwnership(agent.Id, m.ModelName, m.OwnershipKind, m.VendorName, agent.Category).IsNativeOwn);
-                int thirdCnt = dispModels.Count - nativeCnt;
-                string modelCountMeta = !LocalModelCatalogService.SupportsModelSelection(agent.Id)
-                    ? "官方托管"
-                    : $"{dispModels.Count} 个模型（自有 {nativeCnt} · 第三方 {thirdCnt}）";
-
-                titleLine.Children.Add(new TextBlock
-                {
-                    Text = $"{MapCategoryLabel(agent.Category)}  ·  {modelCountMeta}",
-                    FontSize = 11.2,
-                    Foreground = Hex("#64748B"),
-                    VerticalAlignment = VerticalAlignment.Center
-                });
-                infoStack.Children.Add(titleLine);
-
-                // 第 2 行：柔和扁平模型列表（无刺眼亮色边框）
-                var modelsLine = new WrapPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 6, 0, 0), VerticalAlignment = VerticalAlignment.Center };
-                if (dispModels.Count == 0)
-                {
-                    modelsLine.Children.Add(new TextBlock
-                    {
-                        Text = "尚未配置模型（点右上角「配置方案」添加）",
-                        FontSize = 11.2,
-                        Foreground = Hex("#94A3B8")
-                    });
-                }
+            string modelShown = "未选模型";
+            if (dispModels.Count > 0)
+            {
+                var rawName = dispModels[0].ModelName ?? "";
+                if (rawName == LocalModelCatalogService.ManagedDefaultModelDisplay) modelShown = "默认托管";
                 else
                 {
-                    string ShortModel(string m)
-                    {
-                        if (string.IsNullOrWhiteSpace(m)) return "自动";
-                        if (m == LocalModelCatalogService.ManagedDefaultModelDisplay) return "默认托管";
-                        int pIdx = m.IndexOf('(');
-                        var clean = pIdx > 1 ? m[..pIdx].Trim() : m.Trim();
-                        return TruncateOneLine(clean, 22);
-                    }
-                    foreach (var m in dispModels.Take(4))
-                    {
-                        var own = LocalModelCatalogService.ClassifyModelOwnership(agent.Id, m.ModelName, m.OwnershipKind, m.VendorName, agent.Category);
-                        var polShort = ModelRuleCatalog.ShortUsagePolicyLabel(m.UsagePolicy);
-                        var topCaps = WorkSpecialtyCatalog.OrderedItems
-                            .Select(w => (w.Label, Score: m.GetCapabilityScore(w.Id)))
-                            .Where(x => x.Score > 0)
-                            .OrderByDescending(x => x.Score)
-                            .Take(2)
-                            .ToList();
-                        string capText = topCaps.Count > 0
-                            ? " · " + string.Join(" / ", topCaps.Select(c => $"{c.Label} {c.Score}★"))
-                            : "";
-                        var allCapsTip = string.Join("\n", WorkSpecialtyCatalog.OrderedItems
-                            .Select(w => (w.Label, Score: m.GetCapabilityScore(w.Id)))
-                            .Where(x => x.Score > 0)
-                            .OrderByDescending(x => x.Score)
-                            .Select(x => $"  • {x.Label}：{ModelRuleCatalog.StrengthLevelText(x.Score)}"));
-                        var tip = $"{m.ModelName}\n归属：{own.BadgeText}\n规则：{polShort} · {ModelRuleCatalog.ShortDifficultyLabel(m.TaskDifficultyRule)}" +
-                                  (string.IsNullOrWhiteSpace(allCapsTip) ? "" : $"\n能力强度：\n{allCapsTip}");
-
-                        var chipRow = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
-                        chipRow.Children.Add(new TextBlock
-                        {
-                            Text = own.IsNativeOwn ? "自有" : "三方",
-                            FontSize = 10,
-                            FontWeight = FontWeights.SemiBold,
-                            Foreground = own.IsNativeOwn ? Hex("#34D399") : Hex("#D97706"),
-                            VerticalAlignment = VerticalAlignment.Center,
-                            Margin = new Thickness(0, 0, 5, 0)
-                        });
-                        chipRow.Children.Add(new TextBlock
-                        {
-                            Text = ShortModel(m.ModelName),
-                            FontSize = 11.2,
-                            FontWeight = FontWeights.Medium,
-                            Foreground = Hex("#E2E8F0"),
-                            VerticalAlignment = VerticalAlignment.Center
-                        });
-                        if (!string.IsNullOrEmpty(capText))
-                        {
-                            chipRow.Children.Add(new TextBlock
-                            {
-                                Text = capText,
-                                FontSize = 10.6,
-                                Foreground = Hex("#94A3B8"),
-                                VerticalAlignment = VerticalAlignment.Center
-                            });
-                        }
-
-                        modelsLine.Children.Add(new Border
-                        {
-                            Background = Hex("#17202E"),
-                            CornerRadius = new CornerRadius(4),
-                            Padding = new Thickness(7, 3, 8, 3),
-                            Margin = new Thickness(0, 0, 6, 4),
-                            ToolTip = tip,
-                            Child = chipRow
-                        });
-                    }
-                    if (dispModels.Count > 4)
-                    {
-                        modelsLine.Children.Add(new TextBlock
-                        {
-                            Text = $"+{dispModels.Count - 4} 个模型",
-                            FontSize = 10.8,
-                            Foreground = Hex("#64748B"),
-                            VerticalAlignment = VerticalAlignment.Center,
-                            Margin = new Thickness(2, 0, 0, 4)
-                        });
-                    }
+                    int parenIdx = rawName.IndexOf('(');
+                    var clean = parenIdx > 1 ? rawName[..parenIdx].Trim() : rawName.Trim();
+                    modelShown = string.IsNullOrWhiteSpace(clean) ? "自动" : TruncateOneLine(clean, 16);
                 }
-                infoStack.Children.Add(modelsLine);
-
-                // 第 3 行：极简纯文字元数据行（职责 + 权限，彻底消除五颜六色小方块）
-                var normalizedRoles = (dispRoles ?? new List<string>())
-                    .Where(rk => !string.IsNullOrWhiteSpace(rk))
-                    .Distinct(StringComparer.OrdinalIgnoreCase)
-                    .Select(rk => WorkSpecialtyCatalog.Items.TryGetValue(rk, out var rn) ? rn : rk)
-                    .ToList();
-                string rolesSummary = normalizedRoles.Count == 0
-                    ? "未分配专项职责"
-                    : normalizedRoles.Count <= 4
-                        ? string.Join(" · ", normalizedRoles)
-                        : $"{string.Join(" · ", normalizedRoles.Take(4))} 等 {normalizedRoles.Count} 项";
-
-                var permParts = new List<string>();
-                permParts.Add(dispPerms.AllowDirectSourceWrite ? "改工程" : "只读");
-                if (dispPerms.AllowMultiDir) permParts.Add("跨目录");
-                if (dispPerms.AllowShellBuild) permParts.Add("终端");
-                if (dispPerms.HasPreviewMcp) permParts.Add("MCP截图");
-
-                var metaText = new TextBlock
-                {
-                    Text = $"职责：{rolesSummary}    |    权限：{string.Join(" · ", permParts)}",
-                    FontSize = 11,
-                    Foreground = Hex("#64748B"),
-                    Margin = new Thickness(0, 2, 0, 0),
-                    TextTrimming = TextTrimming.CharacterEllipsis,
-                    ToolTip = normalizedRoles.Count > 0 ? $"全部职责：{string.Join("、", normalizedRoles)}" : null
-                };
-                infoStack.Children.Add(metaText);
             }
+            string posRaw = !string.IsNullOrWhiteSpace(dispNote) ? dispNote.Trim() : (normalizedRoles.FirstOrDefault() ?? "待分工");
+            if (posRaw.Length > 18) posRaw = posRaw[..18];
+            infoStack.Children.Add(new TextBlock
+            {
+                Text = $"{modelShown} · {posRaw}",
+                FontSize = 12.5,
+                Foreground = Hex("#94A3B8"),
+                Margin = new Thickness(0, 6, 0, 0),
+                TextTrimming = TextTrimming.CharacterEllipsis
+            });
 
+            var tipSb = new StringBuilder();
+            tipSb.AppendLine(agent.Name);
+            if (dispModels.Count == 0) tipSb.AppendLine("模型：尚未配置");
+            else
+            {
+                tipSb.AppendLine("模型：");
+                foreach (var modelRow in dispModels)
+                {
+                    var own = LocalModelCatalogService.ClassifyModelOwnership(agent.Id, modelRow.ModelName, modelRow.OwnershipKind, modelRow.VendorName, agent.Category);
+                    var caps = string.Join(" ", WorkSpecialtyCatalog.OrderedItems
+                        .Select(w => (w.Label, Score: modelRow.GetCapabilityScore(w.Id)))
+                        .Where(x => x.Score > 0)
+                        .OrderByDescending(x => x.Score)
+                        .Take(3)
+                        .Select(c => $"{c.Label}{c.Score}★"));
+                    tipSb.AppendLine("  " + modelRow.ModelName + " · " + own.BadgeText + (string.IsNullOrWhiteSpace(caps) ? "" : " · " + caps));
+                }
+            }
+            tipSb.AppendLine("职责：" + (normalizedRoles.Count == 0 ? "未分配" : string.Join("、", normalizedRoles)));
+            var permParts = new List<string> { dispPerms.AllowDirectSourceWrite ? "改工程" : "只读" };
+            if (dispPerms.AllowMultiDir) permParts.Add("跨目录");
+            if (dispPerms.AllowShellBuild) permParts.Add("终端");
+            if (dispPerms.HasPreviewMcp) permParts.Add("MCP截图");
+            tipSb.Append("权限：" + string.Join(" · ", permParts));
+            rowBorder.ToolTip = tipSb.ToString().Trim();
             Grid.SetColumn(infoStack, 1);
 
             // Col 2: 工作流胶囊开关 + 非配置运维功能
@@ -3679,19 +3558,24 @@ public partial class MainWindow : Window
                 };
             }
             rightWrap.Children.Add(workflowToggle);
+            var cfgBtn = new Button
+            {
+                Margin = new Thickness(0, 0, 8, 0),
+                Padding = new Thickness(12, 4, 12, 4),
+                Style = (Style)FindResource("ActionBtn"),
+                ToolTip = "查看模型、星级与权限",
+                Content = new TextBlock
+                {
+                    Text = "配置",
+                    FontSize = 13,
+                    FontWeight = FontWeights.SemiBold
+                }
+            };
+            var cfgAgent = agent;
+            cfgBtn.Click += (_, _) => OpenRosterAgentConfig(cfgAgent);
+            rightWrap.Children.Add(cfgBtn);
 
             var winSt = GetCachedWindowState(agent);
-            if (AutoDispatchService.ResolveGuiExecutable(agent) != null)
-            {
-                rightWrap.Children.Add(new TextBlock
-                {
-                    Text = winSt.IsRunning ? "● 运行中" : "○ 未启动",
-                    FontSize = 11,
-                    Foreground = winSt.IsRunning ? Hex("#34D399") : Hex("#64748B"),
-                    VerticalAlignment = VerticalAlignment.Center,
-                    Margin = new Thickness(0, 0, 10, 0)
-                });
-            }
 
             bool offerCli = CliInstallService.ShouldOfferCliControl(agent);
             var cliSrc = offerCli ? CliInstallService.FindSource(agent.Id) : null;
@@ -3708,19 +3592,19 @@ public partial class MainWindow : Window
 
                 if (cliSt.IsInstalled && !cliSt.HasUpdate && !cliBusy)
                 {
-                    // 已安装且无更新：严格不可点击的清晰绿色状态徽章（禁止继续点击重装）
                     var verTag = !string.IsNullOrWhiteSpace(cliSt.LocalVersion) ? $" (v{cliSt.LocalVersion})" : "";
+                    if (rowBorder.ToolTip is string tip0)
+                        rowBorder.ToolTip = tip0 + $"\nCLI 已安装{verTag}：{cliSt.InstalledPath}";
                     rightWrap.Children.Add(new Border
                     {
                         Background = Hex("#064E3B"),
                         BorderBrush = Hex("#10B981"),
                         BorderThickness = new Thickness(1),
                         CornerRadius = new CornerRadius(5),
-                        Padding = new Thickness(9, 3, 9, 3),
+                        Padding = new Thickness(8, 3, 8, 3),
                         Margin = new Thickness(0, 0, 6, 0),
                         VerticalAlignment = VerticalAlignment.Center,
-                        Cursor = System.Windows.Input.Cursors.Arrow,
-                        ToolTip = $"已安装 {cliSrc.DisplayName}{verTag}\n可执行路径：{cliSt.InstalledPath}\n当前已是最新版本，无需重新安装",
+                        ToolTip = $"已安装 {cliSrc.DisplayName}{verTag}",
                         Child = new TextBlock
                         {
                             Text = "✓ CLI已装",
@@ -3945,7 +3829,7 @@ public partial class MainWindow : Window
         _ => "扩展工具"
     };
 
-    private void RenderRosterFilterBar(int detectedN, int enabledN, int disabledN, int catalogN)
+    private void RenderRosterFilterBar(int detectedN, int enabledN, int disabledN, int catalogN, int installedN)
     {
         if (RosterFilterBar == null) return;
         RosterFilterBar.Children.Clear();
@@ -3973,6 +3857,7 @@ public partial class MainWindow : Window
             };
             RosterFilterBar.Children.Add(btn);
         }
+        AddChip("installed", $"已装可用 ({installedN})");
         AddChip("all", $"全部已检出 ({detectedN})");
         AddChip("enabled", $"工作流已开启 ({enabledN})");
         AddChip("disabled", $"未加入工作流 ({disabledN})");
@@ -6023,15 +5908,21 @@ public partial class MainWindow : Window
     {
         if (regSt.IsRegistered)
         {
-            StartupRegStatusTitle.Text = "✓ 当前 Windows 开机自启动状态：已启用（登录系统自动运行）";
+            StartupRegStatusTitle.Text = "开机自启已开";
+            StartupRegStatusTitle.ToolTip = "登录系统后自动运行";
             StartupRegStatusTitle.Foreground = Hex("#34D399");
-            StartupRegCommandText.Text = $"注册表命令：{regSt.CommandLine}";
+            StartupRegCommandText.Text = regSt.CommandLine;
+            StartupRegCommandText.ToolTip = regSt.CommandLine;
         }
         else
         {
-            StartupRegStatusTitle.Text = "○ 当前 Windows 开机自启动状态：未开启（勾选上方第一项即可开启）";
+            StartupRegStatusTitle.Text = "开机自启未开";
+            StartupRegStatusTitle.ToolTip = "勾选「开机自动启动」后写入当前用户启动项";
             StartupRegStatusTitle.Foreground = Hex("#93C5FD");
-            StartupRegCommandText.Text = $"注册表位置：HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run\\AICollabHub ({regSt.CommandLine})";
+            StartupRegCommandText.Text = "HKCU\\...\\Run\\AICollabHub";
+            StartupRegCommandText.ToolTip = string.IsNullOrWhiteSpace(regSt.CommandLine)
+                ? "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run\\AICollabHub"
+                : regSt.CommandLine;
         }
     }
 
@@ -6266,17 +6157,15 @@ public partial class MainWindow : Window
 
         if (NetworkHealthBadge != null)
         {
-            NetworkHealthBadge.Text = online
-                ? $"🌐 网络在线 · {retrySummary}"
-                : "🔌 本机断网 · 自动挂起保护中";
+            NetworkHealthBadge.Text = online ? "网络在线" : "网络中断";
+            NetworkHealthBadge.ToolTip = online ? retrySummary : "本机断网，任务会挂起等待恢复";
             NetworkHealthBadge.Foreground = online ? Hex("#34D399") : Hex("#FB923C");
         }
 
         if (TextNetDiagStatus != null)
         {
-            TextNetDiagStatus.Text = online
-                ? $"● 网络实时诊断：本机外网连通正常（{detail} · {retrySummary}）"
-                : $"⚠️ 网络实时诊断：本机网络掉线（{detail}）· 任务将自动保护挂起等待恢复";
+            TextNetDiagStatus.Text = online ? "网络正常" : "网络中断";
+            TextNetDiagStatus.ToolTip = online ? $"{detail} · {retrySummary}" : detail;
             TextNetDiagStatus.Foreground = online ? Hex("#34D399") : Hex("#FB923C");
         }
     }

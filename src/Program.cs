@@ -780,6 +780,8 @@ public static class Program
             ShowActivated = false
         };
         win.Show();
+        var navAdv = win.FindName("NavAdvancedExpander") as Expander;
+        AssertTrue(navAdv != null && navAdv.IsExpanded == false, "MainWindow 初始化时 NavAdvancedExpander 默认收起");
         win.PreloadCachesForLiveCapture();
 
         var tabNames = new[] { "01_overview", "02_dialogs", "03_sync", "04_ops", "05_settings" };
@@ -908,6 +910,7 @@ public static class Program
         var versionBlock = win.FindName("HeaderVersionText") as TextBlock;
         var headerGrid = win.FindName("HeaderBarGrid") as Grid;
         var headerBadge = win.FindName("HeaderUpdateBadgeBtn") as Button;
+        var onboardBtn = win.FindName("HeaderOnboardingBtn") as Button;
         object? badgeContent = headerBadge?.Content;
         var badgeVisibility = headerBadge?.Visibility ?? Visibility.Collapsed;
         if (headerBadge != null)
@@ -940,6 +943,12 @@ public static class Program
             versionBlock.ActualWidth + versionBlock.Margin.Left + versionBlock.Margin.Right + 0.5 >= versionBlock.DesiredSize.Width;
         bool badgeFits = headerBadge != null &&
             headerBadge.ActualWidth + headerBadge.Margin.Left + headerBadge.Margin.Right + 0.5 >= headerBadge.DesiredSize.Width;
+        bool onboardOk = onboardBtn != null &&
+            onboardBtn.Visibility == Visibility.Visible &&
+            (onboardBtn.Content as string ?? "").Contains("新手向导", StringComparison.Ordinal) &&
+            onboardBtn.ActualWidth > 20;
+        bool onboardFits = onboardBtn != null &&
+            onboardBtn.ActualWidth + onboardBtn.Margin.Left + onboardBtn.Margin.Right + 0.5 >= onboardBtn.DesiredSize.Width;
         double brandW = brandBlock?.ActualWidth ?? 0;
         double verW = versionBlock?.ActualWidth ?? 0;
         double badgeW = headerBadge?.ActualWidth ?? 0;
@@ -952,8 +961,15 @@ public static class Program
             brandTitle.Contains("AIDeck", StringComparison.Ordinal) &&
             brandTitle.Contains("v1.9.14", StringComparison.Ordinal) &&
             headerBrandOk && headerVersionOk && headerBadgeOk && headerFits &&
-            brandFits && versionFits && badgeFits,
-            $"主窗口标题包含 AIDeck 且 HeaderVersionText 仍为 v1.9.14，顶栏不截断 (Title={brandTitle}, Ver={versionBlock?.Text}, BrandW={brandW:0}, VerW={verW:0}, BadgeW={badgeW:0}, HeaderUsed={headerUsed:0}, HeaderW={headerGrid?.ActualWidth:0}, brandFits={brandFits}, versionFits={versionFits}, badgeFits={badgeFits}, headerFits={headerFits})");
+            brandFits && versionFits && badgeFits && onboardOk && onboardFits,
+            $"主窗口标题包含 AIDeck 且 HeaderVersionText 仍为 v1.9.14，顶栏不截断 (Title={brandTitle}, Ver={versionBlock?.Text}, BrandW={brandW:0}, VerW={verW:0}, BadgeW={badgeW:0}, OnboardW={onboardBtn?.ActualWidth:0}, HeaderUsed={headerUsed:0}, HeaderW={headerGrid?.ActualWidth:0}, brandFits={brandFits}, versionFits={versionFits}, badgeFits={badgeFits}, onboardFits={onboardFits}, headerFits={headerFits})");
+
+        navAdv!.IsExpanded = false;
+        win.SwitchToTabForTest(3);
+        AssertTrue(navAdv.IsExpanded, "SwitchToTabForTest(3) 后 NavAdvancedExpander 自动展开");
+        navAdv.IsExpanded = false;
+        win.SwitchToTabForTest(4);
+        AssertTrue(navAdv.IsExpanded, "SwitchToTabForTest(4) 后 NavAdvancedExpander 自动展开");
 
         win.Close();
         AssertTrue(Directory.GetFiles(shotsDir, "*.png").Length == 7, "已离屏渲染生成标准尺寸与最小尺寸共 7 张功能页高清截图");
@@ -4475,6 +4491,89 @@ public static class Program
                 "AppUpdate 互斥：结束后可再次开始");
         }
 
+        var freshOnboardLate = new UserHubConfig();
+        AssertTrue(
+            OnboardingWizardDialog.ShouldAutoShowOnboarding(freshOnboardLate, configFileExistedBeforeLoad: false, isIsolatedTest: false),
+            "全新启动 ShouldAutoShowOnboarding 返回 true");
+        freshOnboardLate.HasCompletedOnboarding = true;
+        AssertTrue(
+            !OnboardingWizardDialog.ShouldAutoShowOnboarding(freshOnboardLate, configFileExistedBeforeLoad: false, isIsolatedTest: false),
+            "已完成引导后 ShouldAutoShowOnboarding 返回 false");
+        var legacyOnboard = new UserHubConfig
+        {
+            Agents = new List<AgentRosterEntry>
+            {
+                new() { Id = "cursor", Name = "Cursor", Enabled = true, Detected = true }
+            }
+        };
+        AssertTrue(
+            !OnboardingWizardDialog.ShouldAutoShowOnboarding(legacyOnboard, configFileExistedBeforeLoad: true, isIsolatedTest: false),
+            "已有老配置且含启用 AI 时 ShouldAutoShowOnboarding 返回 false");
+        AssertTrue(
+            !OnboardingWizardDialog.ShouldAutoShowOnboarding(new UserHubConfig(), configFileExistedBeforeLoad: false, isIsolatedTest: true),
+            "隔离测试 ShouldAutoShowOnboarding 返回 false");
+
+        var wizReg = new RegistryService();
+        wizReg.LoadAll();
+        var wiz = new OnboardingWizardDialog(wizReg, new DiscoveryService())
+        {
+            WindowStartupLocation = WindowStartupLocation.Manual,
+            Left = -32000,
+            Top = -32000,
+            ShowActivated = false
+        };
+        wiz.Show();
+        wiz.SwitchStepForTest(1);
+        wiz.SwitchStepForTest(2);
+        wiz.SwitchStepForTest(3);
+        AssertTrue(wiz.GetCurrentStepForTest() == 3, "新手向导可切换到第 3 步");
+        wiz.CompleteForTest(skip: false);
+        AssertTrue(wizReg.UserConfig.HasCompletedOnboarding, "CompleteForTest(skip: false) 后 HasCompletedOnboarding 为 true");
+        wiz.Close();
+
+        var navProbe = new MainWindow(reg, suppressAutoShowFloating: true)
+        {
+            Width = 960,
+            Height = 640,
+            WindowStartupLocation = WindowStartupLocation.Manual,
+            Left = -32000,
+            Top = -32000,
+            ShowActivated = false
+        };
+        navProbe.Show();
+        navProbe.UpdateLayout();
+        var navExp = navProbe.FindName("NavAdvancedExpander") as Expander;
+        AssertTrue(navExp != null && navExp.IsExpanded == false, "新窗口初始化时 NavAdvancedExpander 收起");
+        navProbe.SwitchToTabForTest(3);
+        navProbe.UpdateLayout();
+        AssertTrue(navExp!.IsExpanded, "SwitchToTabForTest(3) 后高级分组展开");
+        navExp.IsExpanded = false;
+        navProbe.SwitchToTabForTest(4);
+        navProbe.UpdateLayout();
+        AssertTrue(navExp.IsExpanded, "SwitchToTabForTest(4) 后高级分组展开");
+        navProbe.Width = 960;
+        navProbe.UpdateLayout();
+        var probeBrand = navProbe.FindName("HeaderBrandText") as TextBlock;
+        var probeVer = navProbe.FindName("HeaderVersionText") as TextBlock;
+        var probeOnboard = navProbe.FindName("HeaderOnboardingBtn") as Button;
+        var probeHeader = navProbe.FindName("HeaderBarGrid") as Grid;
+        double probeUsed = 0;
+        if (probeHeader != null)
+        {
+            foreach (UIElement child in probeHeader.Children)
+            {
+                if (child is FrameworkElement fe && fe.Visibility == Visibility.Visible)
+                    probeUsed += fe.ActualWidth;
+            }
+        }
+        AssertTrue(
+            probeBrand != null && probeBrand.Text.Contains("AIDeck", StringComparison.Ordinal) && probeBrand.ActualWidth > 40 &&
+            probeVer != null && probeVer.Text == "v1.9.14" && probeVer.ActualWidth > 20 &&
+            probeOnboard != null && probeOnboard.IsVisible && (probeOnboard.Content as string ?? "").Contains("新手向导") &&
+            probeHeader != null && probeUsed <= probeHeader.ActualWidth + 1.0,
+            $"960 宽顶栏 AIDeck、v1.9.14、新手向导均可见且不截断 (Used={probeUsed:0}, HeaderW={probeHeader?.ActualWidth:0})");
+        navProbe.Close();
+
         var reportPath = Path.Combine(outDir, "self_test_report.txt");
         File.WriteAllLines(reportPath, log, new UTF8Encoding(false));
         foreach (var line in log) Console.WriteLine(line);
@@ -5056,6 +5155,25 @@ public static class Program
                 Path.Combine(outDir, "live_17_dialog_close_confirm.png"));
             closeLiveDlg.Close();
         }
+
+        var onboardLive = new OnboardingWizardDialog(reg, new DiscoveryService())
+        {
+            WindowStartupLocation = WindowStartupLocation.Manual,
+            Left = -32000,
+            Top = -32000,
+            ShowActivated = false
+        };
+        onboardLive.Show();
+        onboardLive.SwitchStepForTest(1);
+        onboardLive.UpdateLayout();
+        CaptureElementPng(onboardLive, 760, 560, Path.Combine(outDir, "live_18_onboarding_step1.png"));
+        onboardLive.SwitchStepForTest(2);
+        onboardLive.UpdateLayout();
+        CaptureElementPng(onboardLive, 760, 560, Path.Combine(outDir, "live_18b_onboarding_step2.png"));
+        onboardLive.SwitchStepForTest(3);
+        onboardLive.UpdateLayout();
+        CaptureElementPng(onboardLive, 760, 560, Path.Combine(outDir, "live_18c_onboarding_step3.png"));
+        onboardLive.Close();
 
         floatWin.Close();
         win.Close();

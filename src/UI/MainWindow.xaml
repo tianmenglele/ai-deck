@@ -80,26 +80,34 @@
 
                 <StackPanel Grid.Column="4" Orientation="Horizontal" VerticalAlignment="Center">
                     <Button x:Name="WorkflowSwitchBtn"
-                            Content="● 协同已开启"
+                            Content="协同开关"
                             Style="{StaticResource SuccessBtn}"
                             Padding="10,4"
                             Margin="0,0,6,0"
-                            ToolTip="一键开启或关闭多 AI 协同工作流。关闭后所有 AI 恢复原生独立工作模式"
+                            ToolTip="开启或关闭多 AI 协同。关闭后各 AI 恢复独立工作。"
                             Click="WorkflowSwitchBtn_Click"/>
                     <Button x:Name="ToggleFloatingBtn"
-                            Content="悬浮窗: 开"
+                            Content="悬浮窗"
                             Style="{StaticResource ActionBtn}"
                             Padding="9,4"
                             Margin="0,0,6,0"
-                            ToolTip="开启或关闭常驻桌面的置顶多 AI 实时监控悬浮窗"
+                            ToolTip="开启或关闭桌面置顶悬浮窗"
                             Click="ToggleFloatingBtn_Click"/>
                     <Button x:Name="CloudRecTopBtn"
                             Content="云端推荐"
+                            Visibility="Collapsed"
                             Style="{StaticResource ActionBtn}"
                             Padding="9,4"
                             Margin="0,0,6,0"
                             ToolTip="从云端拉取各 AI 模型最新能力评分并一键应用推荐配置"
                             Click="CloudRecTopBtn_Click"/>
+                    <Button x:Name="HeaderOnboardingBtn"
+                            Content="新手向导"
+                            Style="{StaticResource PrimaryBtn}"
+                            Padding="10,4"
+                            Margin="0,0,6,0"
+                            ToolTip="打开 3 步新手向导：认领本机 AI、选定主脑、开启悬浮窗"
+                            Click="HeaderOnboardingBtn_Click"/>
                     <Button x:Name="TopOpenSettingsBtn"
                             Content="设置"
                             Style="{StaticResource ActionBtn}"
@@ -140,24 +148,62 @@
             <Border Grid.Column="0" Background="{DynamicResource BgSidebarBrush}" BorderBrush="{DynamicResource BorderSectionBrush}" BorderThickness="0,0,1,0" Padding="10,14">
                 <DockPanel>
                     <StackPanel DockPanel.Dock="Top">
-                        <TextBlock Text="监控与协作" Foreground="{StaticResource FgMutedBrush}" FontSize="11" Margin="10,0,0,6"/>
-                        <RadioButton x:Name="NavOverview" Content="协同工作台" Style="{StaticResource NavBtn}" GroupName="MainNav" IsChecked="True" Checked="Nav_Checked"/>
+                        <RadioButton x:Name="NavOverview" Content="工作台" Style="{StaticResource NavBtn}" GroupName="MainNav" IsChecked="True" Checked="Nav_Checked"/>
+                        <RadioButton x:Name="NavSettings" Content="AI 配置" Style="{StaticResource NavBtn}" GroupName="MainNav" Checked="Nav_Checked"/>
                         <RadioButton x:Name="NavDialogs" Content="对话与派单" Style="{StaticResource NavBtn}" GroupName="MainNav" Checked="Nav_Checked"/>
-                        <RadioButton x:Name="NavSync" Content="规则与技能" Style="{StaticResource NavBtn}" GroupName="MainNav" Checked="Nav_Checked"/>
-
-                        <Border Height="1" Background="{DynamicResource DividerRowBrush}" Margin="8,12"/>
-                        <TextBlock Text="配置与管理" Foreground="{StaticResource FgMutedBrush}" FontSize="11" Margin="10,0,0,6"/>
-                        <RadioButton x:Name="NavOps" Content="快照与任务单" Style="{StaticResource NavBtn}" GroupName="MainNav" Checked="Nav_Checked"/>
-                        <RadioButton x:Name="NavSettings" Content="AI 阵容与路由" Style="{StaticResource NavBtn}" GroupName="MainNav" Checked="Nav_Checked"/>
-                        <RadioButton x:Name="NavAppSettings" Content="软件设置" Style="{StaticResource NavBtn}" GroupName="MainNav" Checked="Nav_Checked"/>
+                        <RadioButton x:Name="NavAppSettings" Content="设置" Style="{StaticResource NavBtn}" GroupName="MainNav" Checked="Nav_Checked"/>
+                        <Expander x:Name="NavAdvancedExpander" IsExpanded="False" Margin="0,8,0,0" Focusable="False" Background="Transparent" Foreground="#94A3B8">
+                            <Expander.Header>
+                                <TextBlock Text="高级" FontSize="12" Foreground="#94A3B8"/>
+                            </Expander.Header>
+                            <Expander.Template>
+                                <ControlTemplate TargetType="Expander">
+                                    <StackPanel>
+                                        <ToggleButton Cursor="Hand" Focusable="False" Background="Transparent" BorderThickness="0"
+                                                      Padding="8,6" HorizontalContentAlignment="Left"
+                                                      Content="{TemplateBinding Header}"
+                                                      IsChecked="{Binding IsExpanded, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}">
+                                            <ToggleButton.Template>
+                                                <ControlTemplate TargetType="ToggleButton">
+                                                    <Border x:Name="hd" Background="Transparent" CornerRadius="6" Padding="{TemplateBinding Padding}">
+                                                        <StackPanel Orientation="Horizontal">
+                                                            <TextBlock x:Name="chev" Text="▸" FontSize="10" Foreground="#64748B" Margin="0,1,6,0" VerticalAlignment="Center"/>
+                                                            <ContentPresenter VerticalAlignment="Center"/>
+                                                        </StackPanel>
+                                                    </Border>
+                                                    <ControlTemplate.Triggers>
+                                                        <Trigger Property="IsChecked" Value="True">
+                                                            <Setter TargetName="chev" Property="Text" Value="▾"/>
+                                                        </Trigger>
+                                                        <Trigger Property="IsMouseOver" Value="True">
+                                                            <Setter TargetName="hd" Property="Background" Value="#1A2333"/>
+                                                        </Trigger>
+                                                    </ControlTemplate.Triggers>
+                                                </ControlTemplate>
+                                            </ToggleButton.Template>
+                                        </ToggleButton>
+                                        <ContentPresenter x:Name="ExpandSite" ContentSource="Content" Visibility="Collapsed" Margin="0,2,0,0"/>
+                                    </StackPanel>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsExpanded" Value="True">
+                                            <Setter TargetName="ExpandSite" Property="Visibility" Value="Visible"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Expander.Template>
+                            <StackPanel>
+                                <RadioButton x:Name="NavSync" Content="规则与技能" Style="{StaticResource NavBtn}" GroupName="MainNav" FontSize="12.5" Checked="Nav_Checked"/>
+                                <RadioButton x:Name="NavOps" Content="快照与任务单" Style="{StaticResource NavBtn}" GroupName="MainNav" FontSize="12.5" Checked="Nav_Checked"/>
+                            </StackPanel>
+                        </Expander>
                     </StackPanel>
 
                     <StackPanel DockPanel.Dock="Bottom" VerticalAlignment="Bottom">
                         <Border Background="{DynamicResource BgInputBrush}" BorderBrush="{DynamicResource BorderSectionBrush}" BorderThickness="1" CornerRadius="6" Padding="10,8" Margin="0">
                             <StackPanel>
-                                <TextBlock x:Name="SidebarWorkflowBadge" Text="● 协同运行中" Foreground="#34D399" FontSize="11.5" FontWeight="SemiBold" Margin="0,0,0,4" TextTrimming="CharacterEllipsis"/>
-                                <TextBlock x:Name="NetworkHealthBadge" Text="● 网络在线 · 自动重连" Foreground="#94A3B8" FontSize="11" Margin="0,0,0,4" TextTrimming="CharacterEllipsis"/>
-                                <TextBlock x:Name="McpBadgeText" Text="就绪" Foreground="#64748B" FontSize="11" TextTrimming="CharacterEllipsis"/>
+                                <TextBlock x:Name="SidebarWorkflowBadge" Text="协同运行" Foreground="#34D399" FontSize="12" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                                <TextBlock x:Name="NetworkHealthBadge" Text="网络在线" Foreground="#94A3B8" FontSize="11.5" Margin="0,4,0,0" TextTrimming="CharacterEllipsis"/>
+                                <TextBlock x:Name="McpBadgeText" Text="就绪" Visibility="Collapsed" Foreground="#64748B" FontSize="11"/>
                                 <TextBlock x:Name="AiChatRootBadge" Visibility="Collapsed"/>
                             </StackPanel>
                         </Border>
@@ -172,7 +218,7 @@
                 <ScrollViewer x:Name="PageOverview" Visibility="Visible" VerticalScrollBarVisibility="Auto">
                     <StackPanel>
                         <!-- 顶部：单行清爽主脑统筹条 -->
-                        <Border x:Name="OverviewTopBannerCard" Style="{StaticResource SectionCard}" Padding="16,11" Margin="0,0,0,14">
+                        <Border x:Name="OverviewTopBannerCard" Style="{StaticResource SectionCard}" Padding="16,12" Margin="0,0,0,14">
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
@@ -180,15 +226,17 @@
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,12,0">
                                     <Border x:Name="OverviewModeBadge" Background="#12352C" BorderBrush="#1D6B55" BorderThickness="1" CornerRadius="4" Padding="8,2" Margin="0,0,10,0" VerticalAlignment="Center">
-                                        <TextBlock x:Name="OverviewModeBadgeText" Text="运行中" FontSize="11.5" FontWeight="SemiBold" Foreground="#A7F3D0"/>
+                                        <TextBlock x:Name="OverviewModeBadgeText" Text="运行中" FontSize="12" FontWeight="SemiBold" Foreground="#A7F3D0"/>
                                     </Border>
+                                    <TextBlock Text="主脑" FontSize="12.5" Foreground="#94A3B8" VerticalAlignment="Center" Margin="0,0,8,0"/>
                                     <TextBlock x:Name="OverviewMasterBrainText"
-                                               Text="主脑 AI：Antigravity · 全入口接单分析、按工作定位路由并执行验收闭环"
-                                               FontSize="12.5" Foreground="#CBD5E1" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                                               Text="—"
+                                               FontSize="14" FontWeight="SemiBold" Foreground="#F8FAFC" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
                                 </StackPanel>
                                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                                    <Button Content="阵容与路由" Style="{StaticResource ActionBtn}" Padding="9,3" FontSize="12" Margin="0,0,6,0" Click="JumpToSettingsBtn_Click"/>
-                                    <Button x:Name="OverviewRefreshBtn" Content="刷新" Style="{StaticResource ActionBtn}" Padding="9,3" FontSize="12" Click="OverviewRefreshBtn_Click"/>
+                                    <Button x:Name="OverviewRefreshBtn" Visibility="Collapsed" Click="OverviewRefreshBtn_Click"/>
+                                    <Button Content="去配置 AI" Style="{StaticResource PrimaryBtn}" Padding="16,8" FontSize="14" Click="JumpToSettingsBtn_Click"
+                                            ToolTip="打开 AI 配置，编辑模型与分工"/>
                                 </StackPanel>
                             </Grid>
                         </Border>
@@ -227,7 +275,7 @@
                                     </Grid.ColumnDefinitions>
                                     <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,12,0">
                                         <Ellipse x:Name="WorkflowDiagramStatusDot" Width="9" Height="9" Fill="#34D399" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                                        <TextBlock Text="当前工作流动态运行图" FontSize="14" FontWeight="SemiBold" Foreground="#F8FAFC" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                        <TextBlock Text="动态工作流" FontSize="14" FontWeight="SemiBold" Foreground="#F8FAFC" VerticalAlignment="Center" Margin="0,0,10,0"/>
                                         <Border x:Name="WorkflowDiagramPhaseBadge" Background="#1E293B" BorderBrush="#334155" BorderThickness="1" CornerRadius="10" Padding="9,2" Margin="0,0,10,0" VerticalAlignment="Center">
                                             <TextBlock x:Name="WorkflowDiagramPhaseBadgeText" Text="空闲待命" FontSize="11" FontWeight="SemiBold" Foreground="#94A3B8"/>
                                         </Border>
@@ -257,17 +305,7 @@
                             <!-- 左栏：各 AI 实时状态 -->
                             <Border Grid.Column="0" Style="{StaticResource SectionCard}">
                                 <StackPanel>
-                                    <Grid Margin="0,0,0,10">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Grid.Column="0" Text="在岗 AI 成员" FontSize="14" FontWeight="SemiBold" Foreground="#F8FAFC" VerticalAlignment="Center"/>
-                                        <WrapPanel Grid.Column="1">
-                                            <Button Content="云端推荐" Style="{StaticResource ActionBtn}" Padding="8,2" FontSize="11.5" Margin="0,0,6,0" Click="CloudRecTopBtn_Click"/>
-                                            <Button Content="配置阵容" Style="{StaticResource ActionBtn}" Padding="8,2" FontSize="11.5" Click="JumpToSettingsBtn_Click"/>
-                                        </WrapPanel>
-                                    </Grid>
+                                    <TextBlock Text="在岗 AI 成员" FontSize="15" FontWeight="SemiBold" Foreground="#F8FAFC" Margin="0,0,0,12"/>
                                     <StackPanel x:Name="OverviewAgentsCards"/>
                                 </StackPanel>
                             </Border>
@@ -293,14 +331,18 @@
                                 </Border>
 
                                 <Border Style="{StaticResource SectionCard}">
-                                    <StackPanel>
-                                        <TextBlock Text="当前工程概况" FontSize="14" FontWeight="SemiBold" Foreground="#F8FAFC" Margin="0,0,0,8"/>
-                                        <TextBlock x:Name="OverviewProjectSummaryText" Foreground="#94A3B8" FontSize="12" LineHeight="20" TextWrapping="Wrap" Margin="0,0,0,10"/>
-                                        <WrapPanel>
-                                            <Button x:Name="SyncAnchorsOverviewBtn" Content="同步规则锚点" Style="{StaticResource ActionBtn}" Padding="10,4" Margin="0,0,6,0" Click="SyncAllNowBtn_Click"/>
-                                            <Button Content="规则与技能" Style="{StaticResource ActionBtn}" Padding="10,4" Click="JumpToSyncBtn_Click"/>
-                                        </WrapPanel>
-                                    </StackPanel>
+                                    <Expander IsExpanded="False" Foreground="#E6EDF7" Background="Transparent">
+                                        <Expander.Header>
+                                            <TextBlock Text="当前工程概况" FontSize="14" FontWeight="SemiBold" Foreground="#F8FAFC"/>
+                                        </Expander.Header>
+                                        <StackPanel Margin="0,10,0,0">
+                                            <TextBlock x:Name="OverviewProjectSummaryText" Foreground="#94A3B8" FontSize="12" LineHeight="20" TextWrapping="Wrap" Margin="0,0,0,10"/>
+                                            <WrapPanel>
+                                                <Button x:Name="SyncAnchorsOverviewBtn" Content="同步规则锚点" Style="{StaticResource ActionBtn}" Padding="10,4" Margin="0,0,6,0" Click="SyncAllNowBtn_Click"/>
+                                                <Button Content="规则与技能" Style="{StaticResource ActionBtn}" Padding="10,4" Click="JumpToSyncBtn_Click"/>
+                                            </WrapPanel>
+                                        </StackPanel>
+                                    </Expander>
                                 </Border>
                             </StackPanel>
                         </Grid>
@@ -324,7 +366,7 @@
                                         <ColumnDefinition Width="*"/>
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
-                                    <TextBlock x:Name="DialogBrowserCountTitle" Grid.Column="0" Text="◆ 项目对话框列表 (F:\AIChat)" FontSize="13.5" FontWeight="SemiBold" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                                    <TextBlock x:Name="DialogBrowserCountTitle" Grid.Column="0" Text="对话" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
                                     <Button x:Name="RefreshDialogsListBtn" Grid.Column="1" Content="🔄 刷新" Style="{StaticResource ActionBtn}" Padding="8,2" Click="RefreshDialogsListBtn_Click"/>
                                 </Grid>
 
@@ -374,8 +416,8 @@
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
                                     <StackPanel Grid.Column="0" Margin="0,0,8,0">
-                                        <TextBlock x:Name="SelectedDialogTitleText" Text="◆ 请在左侧点选要查看的项目对话框" FontSize="13.5" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
-                                        <TextBlock x:Name="SelectedDialogPathText" Text="记录存储位置：F:\AIChat" FontSize="11.5" Foreground="#38BDF8" Margin="0,2,0,0" TextTrimming="CharacterEllipsis"/>
+                                        <TextBlock x:Name="SelectedDialogTitleText" Text="点左侧对话" FontSize="14" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                                        <TextBlock x:Name="SelectedDialogPathText" Visibility="Collapsed" Text="" FontSize="11.5" Foreground="#38BDF8"/>
                                     </StackPanel>
                                     <WrapPanel Grid.Column="1" VerticalAlignment="Center">
                                         <Button x:Name="ToggleDialogViewModeBtn" Content="📄 原始记录" Style="{StaticResource ActionBtn}" Padding="8,3" Margin="0,0,6,0" ToolTip="在「结构化气泡对话视图」与「原始 Markdown 记录」间切换" Click="ToggleDialogViewModeBtn_Click"/>
@@ -399,8 +441,9 @@
                         <!-- 下部：向外部 AI 分配工作 -->
                         <Border Grid.Row="1" Style="{StaticResource SectionCard}" Background="#151F2E" BorderBrush="#2C4866" Padding="12,9">
                             <StackPanel>
-                                <TextBlock Text="◆ 跨工具分配任务（由主脑按能力智能挑选 AI，或手动指定 AI 直接修改代码/设置/预制体）"
-                                           FontSize="12" FontWeight="SemiBold" Foreground="#7DD3FC" Margin="0,0,0,6" TextWrapping="Wrap"/>
+                                <TextBlock Text="分配任务"
+                                           FontSize="13" FontWeight="SemiBold" Foreground="#7DD3FC" Margin="0,0,0,6"
+                                           ToolTip="由主脑按能力挑选 AI，或手动指定 AI 直接改工程"/>
                                 <Grid Margin="0,0,0,6">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto"/>
@@ -444,7 +487,8 @@
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" Text="共享技能 (Skills) 与协同规则锚点管理（开启工作流时自动挂载，停用或退出时自动剥离恢复原样）" FontSize="13.5" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,12,0" TextWrapping="Wrap"/>
+                                <TextBlock Grid.Column="0" Text="协同开启时自动挂载规则与技能" FontSize="13.5" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,12,0" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"
+                                           ToolTip="开启工作流时自动挂载共享技能与规则锚点，停用或退出时自动剥离并恢复原样"/>
                                 <WrapPanel Grid.Column="1" VerticalAlignment="Center">
                                     <Button x:Name="InitFoundationBtn" Content="初始化工程目录" Style="{StaticResource ActionBtn}" Margin="0,0,6,0" Click="InitFoundationBtn_Click"/>
                                     <Button x:Name="RestoreSyncBackupBtn" Content="恢复上次备份" Style="{StaticResource ActionBtn}" Margin="0,0,6,0" Click="RestoreSyncBackupBtn_Click"/>
@@ -527,7 +571,8 @@
                                             <ColumnDefinition Width="*"/>
                                             <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
-                                        <TextBlock Grid.Column="0" Text="◆ 代码快照保护与改动对比" FontSize="13.5" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                        <TextBlock Grid.Column="0" Text="快照与改动对比" FontSize="13.5" FontWeight="SemiBold" VerticalAlignment="Center"
+                                                   ToolTip="为当前工程建立基准快照，查看最近代码改动，或一键回滚。"/>
                                         <TextBlock x:Name="VcsModeBadge" Grid.Column="1" Foreground="#38BDF8" FontSize="11.5" VerticalAlignment="Center"/>
                                     </Grid>
                                     <TextBlock x:Name="EditorConflictText" Foreground="{StaticResource FgSecondaryBrush}" FontSize="12" TextWrapping="Wrap" Margin="0,0,0,8"/>
@@ -545,8 +590,9 @@
                                         <TextBlock Text="📦 跨机器离线脱敏包与手动粘贴回收（备用）" FontSize="12.5" FontWeight="SemiBold" Foreground="#9AA8BE"/>
                                     </Expander.Header>
                                     <StackPanel Margin="0,8,0,0">
-                                        <TextBlock Text="本机 AI 工具均已自动直连。仅当您想把项目发给外部网页 AI 时使用："
-                                                   Foreground="{StaticResource FgMutedBrush}" FontSize="11.5" TextWrapping="Wrap" Margin="0,0,0,6"/>
+                                        <TextBlock Text="仅在发给外部网页 AI 时使用"
+                                                   Foreground="{StaticResource FgMutedBrush}" FontSize="12" Margin="0,0,0,6"
+                                                   ToolTip="本机 AI 已自动直连。只有要把项目发给外部网页 AI 时，才需要脱敏包或手动粘贴回收。"/>
                                         <CheckBox x:Name="PackIncRules" Content="附带项目规范与避坑经验" IsChecked="True" Margin="0,0,0,3"/>
                                         <CheckBox x:Name="PackIncSchema" Content="附带字段速查摘要" IsChecked="True" Margin="0,0,0,3"/>
                                         <CheckBox x:Name="PackIncTaskDiff" Content="附带当前任务单与代码对比" IsChecked="True" Margin="0,0,0,6"/>
@@ -583,8 +629,9 @@
                             </Grid>
 
                             <StackPanel DockPanel.Dock="Bottom" Margin="0,10,0,0">
-                                <TextBlock Text="任务完成后归档：可顺手记 1 条本轮踩坑经验（自动写入全员共读经验库）："
-                                           Foreground="{StaticResource FgSecondaryBrush}" FontSize="12" Margin="0,0,0,4" TextWrapping="Wrap"/>
+                                <TextBlock Text="归档时可记一条经验"
+                                           Foreground="{StaticResource FgSecondaryBrush}" FontSize="12" Margin="0,0,0,4"
+                                           ToolTip="任务完成后归档，可顺手记 1 条本轮踩坑经验，自动写入全员共读经验库"/>
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*"/>
@@ -612,23 +659,23 @@
                                 <Grid Margin="0,0,0,8">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="*" MaxWidth="360"/>
-                                        <ColumnDefinition Width="8"/>
+                                        <ColumnDefinition Width="*" MaxWidth="280"/>
+                                        <ColumnDefinition Width="10"/>
                                         <ColumnDefinition Width="Auto"/>
                                         <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
-                                    <TextBlock Grid.Column="0" Text="配置方案" Foreground="#94A3B8" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                    <TextBlock Grid.Column="0" Text="配置方案" Foreground="#94A3B8" FontSize="12.5" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,8,0"/>
                                     <ComboBox x:Name="TeamProfileCombo" Grid.Column="1" SelectionChanged="TeamProfileCombo_SelectionChanged"
                                               ToolTip="选择要预览的团队配置方案，点「切换启用」正式生效"/>
-                                    <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
-                                        <Button x:Name="BtnApplyTeamProfile" Content="当前使用中" Style="{StaticResource ActionBtn}" Padding="10,4" FontSize="11.5" Margin="0,0,6,0" IsEnabled="False"
+                                    <WrapPanel Grid.Column="3" VerticalAlignment="Center">
+                                        <Button x:Name="BtnApplyTeamProfile" Content="当前使用中" Style="{StaticResource ActionBtn}" Padding="10,6" FontSize="12" Margin="0,0,8,0" IsEnabled="False"
                                                 ToolTip="将左侧选中的配置方案正式切换启用" Click="BtnApplyTeamProfile_Click"/>
-                                        <Button x:Name="BtnManageTeamProfiles" Content="配置方案" Style="{StaticResource PrimaryBtn}" Padding="12,4" FontSize="11.5"
+                                        <Button x:Name="BtnManageTeamProfiles" Content="编辑模型与分工" Style="{StaticResource PrimaryBtn}" Padding="16,8" FontSize="14" Margin="0,0,8,0"
                                                 ToolTip="打开配置方案中心：调整 AI 模型、能力强度、规则与路由"
                                                 Click="BtnManageTeamProfiles_Click"/>
-                                    </StackPanel>
-                                    <TextBlock Grid.Column="5" Text="本页可一键启停工作流 · 调模型/路由请点「配置方案」" FontSize="11" Foreground="#64748B" VerticalAlignment="Center" TextWrapping="Wrap" MaxWidth="420"/>
+                                        <Button x:Name="RescanBtn" Content="扫描本机" Style="{StaticResource ActionBtn}" Padding="12,8" FontSize="13" Margin="0,0,8,0" ToolTip="重新扫描本机已安装的 AI 客户端、扩展与 CLI" Click="RescanBtn_Click"/>
+                                        <Button Content="云端推荐" Style="{StaticResource AmberBtn}" Padding="12,8" FontSize="13" ToolTip="从云端拉取各 AI 模型最新能力评分并应用推荐" Click="CloudRecTopBtn_Click"/>
+                                    </WrapPanel>
                                 </Grid>
 
                                 <!-- 第 2 行：无边框分割线 + 素雅单行方案摘要 -->
@@ -720,7 +767,6 @@
                                     </StackPanel>
 
                                     <StackPanel x:Name="AgentViewToolbar" Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
-                                        <Button x:Name="RescanBtn" Content="扫描本机" Style="{StaticResource ActionBtn}" Padding="9,4" Margin="0,0,6,0" ToolTip="重新彻底扫描本机已安装的 AI 客户端、扩展与 CLI" Click="RescanBtn_Click"/>
                                         <Button x:Name="WorkflowSwitchManagerBtn" Content="工作流开关" Style="{StaticResource PrimaryBtn}" Padding="9,4" Margin="0,0,6,0" ToolTip="集中批量启停各 AI 工具是否参与工作流" Click="WorkflowSwitchManagerBtn_Click"/>
                                         <Button x:Name="AddCustomAiBtn" Content="＋ 外部 AI" Style="{StaticResource ActionBtn}" Padding="9,4" ToolTip="接入并纳管额外的外部 AI 工具节点" Click="AddCustomAiBtn_Click"/>
                                     </StackPanel>
@@ -736,8 +782,9 @@
                                 <StackPanel x:Name="PanelViewByWorkRoute" Visibility="Collapsed">
                                     <DockPanel Margin="0,0,0,8">
                                         <Button DockPanel.Dock="Right" Content="⚙ 在配置方案中调整路由" Style="{StaticResource PrimaryBtn}" Padding="10,3" FontSize="11.5" Click="BtnManageTeamProfiles_Click"/>
-                                        <TextBlock Text="📌 以下为当前预览/激活方案下 12 类工作内容的只读路由映射；右侧展示全部已启用且具备能力的 AI 候选（图标+星级色点+档位阶梯，悬停看详情）。修改请点右侧「⚙ 配置方案」。"
-                                                   Foreground="#94A3B8" FontSize="12" TextWrapping="Wrap" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                        <TextBlock Text="12 类工作的分工，悬停看详情"
+                                                   Foreground="#94A3B8" FontSize="12" VerticalAlignment="Center" Margin="0,0,10,0"
+                                                   ToolTip="当前方案下 12 类工作内容的只读路由。右侧是已启用且具备能力的 AI。要改分工，点「编辑模型与分工」。"/>
                                     </DockPanel>
                                     <WrapPanel x:Name="RouteOverviewLegendPanel" Margin="0,0,0,10"/>
                                     <StackPanel x:Name="MagpieWorkRoutesPanel"/>
@@ -761,10 +808,7 @@
                                             <ColumnDefinition Width="*"/>
                                             <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
-                                        <TextBlock x:Name="ExtDetectorsSummary" Grid.Column="0" Foreground="#64748B" FontSize="11.5" VerticalAlignment="Center" TextWrapping="Wrap" Margin="0,0,12,0"/>
-                                        <WrapPanel Grid.Column="1">
-                                            <Button x:Name="OpenRegistryDirBtn" Content="📂 打开配置目录" Style="{StaticResource ActionBtn}" Click="OpenRegistryDirBtn_Click"/>
-                                        </WrapPanel>
+                                        <TextBlock x:Name="ExtDetectorsSummary" Grid.Column="0" Foreground="#64748B" FontSize="11.5" VerticalAlignment="Center" TextWrapping="Wrap"/>
                                     </Grid>
 
                                     <!-- 隐藏保留旧高级子控件引用防止事件/方法缺损 -->
@@ -794,6 +838,21 @@
                 <ScrollViewer x:Name="PageAppSettings" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
                     <StackPanel>
 
+                        <Border Style="{StaticResource SectionCard}" Padding="16,14" Margin="0,0,0,12">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,16,0">
+                                    <TextBlock Text="新手引导" FontSize="16" FontWeight="SemiBold" Foreground="#F8FAFC"/>
+                                    <TextBlock Text="3 步认领本机 AI" FontSize="12.5" Foreground="#94A3B8" Margin="0,4,0,0"
+                                               ToolTip="扫描本机 AI、选定主脑和成员、开启悬浮窗。可随时重开。"/>
+                                </StackPanel>
+                                <Button x:Name="BtnReopenOnboarding" Grid.Column="1" Content="重开向导" Style="{StaticResource PrimaryBtn}" Padding="16,8" FontSize="14" VerticalAlignment="Center" Click="BtnReopenOnboarding_Click" ToolTip="再看一遍 3 步新手向导"/>
+                            </Grid>
+                        </Border>
+
                         <!-- 软件版本与检查更新 -->
                         <Border Style="{StaticResource SectionCard}" Padding="14,10" Margin="0,0,0,9">
                             <StackPanel>
@@ -803,9 +862,9 @@
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
                                     <StackPanel Grid.Column="0" Margin="0,0,12,0">
-                                        <TextBlock Text="软件版本与检查更新" FontSize="14" FontWeight="SemiBold" Foreground="#F8FAFC"/>
-                                        <TextBlock Text="AIDeck 顶栏版本号可随时检查。启动约 4 秒后会在后台静默检查一次，只有发现新版本才提示。"
-                                                   Foreground="#94A3B8" FontSize="12" Margin="0,2,0,0" TextWrapping="Wrap"/>
+                                        <TextBlock Text="检查更新" FontSize="14" FontWeight="SemiBold" Foreground="#F8FAFC"
+                                                   ToolTip="顶栏版本号可随时检查。启动约 4 秒后后台静默检查一次，只有发现新版本才提示。"/>
+                                        <TextBlock Text="有新版才提示" Foreground="#94A3B8" FontSize="12" Margin="0,2,0,0"/>
                                     </StackPanel>
                                     <Button x:Name="BtnCheckAppUpdate"
                                             Grid.Column="1"
@@ -818,12 +877,15 @@
                                 <Border Background="{DynamicResource BgInputBrush}" BorderBrush="{DynamicResource BorderSectionBrush}" BorderThickness="1" CornerRadius="6" Padding="12,9">
                                     <StackPanel>
                                         <TextBlock x:Name="TextAboutCurrentVersion" Text="AIDeck · 多 AI 协同中心 v1.9.14" FontSize="13" FontWeight="SemiBold" Foreground="#E0F2FE" Margin="0,0,0,4"/>
-                                        <TextBlock x:Name="TextAppUpdateStatus" Text="AIDeck 尚未检查。可手动检查，或等待启动后的后台静默检查。" FontSize="12" Foreground="#94A3B8" TextWrapping="Wrap" Margin="0,0,0,8"/>
-                                        <TextBlock Text="更新源（GitHub / Gitee 仓库、SSH、owner/repo，或自定义 JSON；留空则读取本地 Git origin）" Foreground="#CBD5E1" FontSize="12" Margin="0,0,0,4"/>
+                                        <TextBlock x:Name="TextAppUpdateStatus" Text="尚未检查更新" FontSize="12" Foreground="#94A3B8" TextWrapping="Wrap" Margin="0,0,0,8"
+                                                   ToolTip="可手动检查，或等待启动后的后台静默检查。只有发现新版本才提示。"/>
+                                        <TextBlock Text="更新源" Foreground="#CBD5E1" FontSize="12" Margin="0,0,0,4"
+                                                   ToolTip="GitHub / Gitee 仓库、SSH、owner/repo，或自定义 JSON。留空则读取本地 Git origin。"/>
                                         <TextBox x:Name="TextUpdateRepoUrl" Height="28" FontSize="12" Padding="8,4" Margin="0,0,0,8" LostFocus="TextUpdateRepoUrl_LostFocus"
                                                  ToolTip="例如 https://github.com/owner/repo 、git@gitee.com:owner/repo.git 或 https://example.com/latest.json"/>
                                         <CheckBox x:Name="ChkAutoCheckAppUpdate"
-                                                  Content="启动后自动检查软件更新（后台执行，不阻塞界面）"
+                                                  Content="启动后查更新"
+                                                  ToolTip="启动后自动检查软件更新（后台执行，不阻塞界面）"
                                                   Foreground="#7DD3FC" FontSize="12"
                                                   Checked="AppSettingCheckBox_Changed" Unchecked="AppSettingCheckBox_Changed"/>
                                     </StackPanel>
@@ -840,12 +902,11 @@
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
                                     <StackPanel Grid.Column="0" Margin="0,0,12,0">
-                                        <TextBlock Text="一、协同工作流总开关与运行生命周期" FontSize="14" FontWeight="SemiBold" Foreground="#F8FAFC"/>
-                                        <TextBlock Text="控制多 AI 协同流程是否启用。停用开关或关闭本软件时，各 AI 自动恢复原生独立状态。"
-                                                   Foreground="#94A3B8" FontSize="12" Margin="0,2,0,0" TextWrapping="Wrap"/>
+                                        <TextBlock Text="协同开关" FontSize="14" FontWeight="SemiBold" Foreground="#F8FAFC"
+                                                   ToolTip="控制多 AI 协同是否启用。停用或关闭本软件时，各 AI 自动恢复独立状态。"/>
+                                        <TextBlock Text="停用即各自独立" Foreground="#94A3B8" FontSize="12" Margin="0,2,0,0"/>
                                     </StackPanel>
                                     <WrapPanel Grid.Column="1" VerticalAlignment="Center">
-                                        <Button x:Name="BtnReopenOnboarding" Content="新手引导" Style="{StaticResource ActionBtn}" Margin="0,0,6,0" Click="BtnReopenOnboarding_Click" ToolTip="再看一遍 3 步新手引导"/>
                                         <Button x:Name="BtnCreateDesktopShortcuts" Content="生成桌面图标" Style="{StaticResource ActionBtn}" Margin="0,0,6,0" Click="BtnCreateDesktopShortcuts_Click"/>
                                         <Button x:Name="BtnForceQuitApp" Content="彻底退出软件" Style="{StaticResource AmberBtn}" ToolTip="彻底退出本软件（若勾选了仅软件运行时生效，退出时将自动卸载协同锚点）" Click="BtnForceQuitApp_Click"/>
                                     </WrapPanel>
@@ -854,30 +915,35 @@
                                 <Border Background="{DynamicResource BgInputBrush}" BorderBrush="{DynamicResource BorderSectionBrush}" BorderThickness="1" CornerRadius="6" Padding="12,9" Margin="0,0,0,8">
                                     <StackPanel>
                                         <CheckBox x:Name="ChkWorkflowEngineEnabled"
-                                                  Content="启用「多 AI 协同工作流」总开关（取消勾选后立即剥离协同锚点，恢复各自独立对话）"
+                                                  Content="启用协同工作流"
+                                                  ToolTip="启用多 AI 协同总开关。取消勾选后立即剥离协同锚点，恢复各自独立对话。"
                                                   Foreground="#F1F5F9" FontSize="12.5" FontWeight="SemiBold" Margin="0,0,0,6"
                                                   Checked="WorkflowLifecycleCheckBox_Changed" Unchecked="WorkflowLifecycleCheckBox_Changed"/>
 
                                         <CheckBox x:Name="ChkWorkflowOnlyWhenRunning"
-                                                  Content="仅在本软件运行期间成立（软件退出时自动关闭工作流，下次启动自动恢复）"
+                                                  Content="仅软件运行时生效"
+                                                  ToolTip="软件退出时自动关闭工作流，下次启动自动恢复。"
                                                   Foreground="#CBD5E1" FontSize="12" Margin="0,0,0,6"
                                                   Checked="WorkflowLifecycleCheckBox_Changed" Unchecked="WorkflowLifecycleCheckBox_Changed"/>
 
                                         <Border Height="1" Background="{DynamicResource DividerRowBrush}" Margin="0,2,0,6"/>
 
                                         <CheckBox x:Name="ChkRunAtStartup"
-                                                  Content="开机时自动启动「多 AI 协同中心」（写入 Windows 当前用户 Run 启动项）"
+                                                  Content="开机自动启动"
+                                                  ToolTip="写入 Windows 当前用户 Run 启动项，登录后自动启动 AIDeck。"
                                                   Foreground="#CBD5E1" FontSize="12" Margin="0,0,0,5"
                                                   Checked="AppSettingCheckBox_Changed" Unchecked="AppSettingCheckBox_Changed"/>
 
                                         <CheckBox x:Name="ChkStartupDirectFloating"
-                                                  Content="开机自启时直接进入「桌面悬浮窗 + 系统托盘」静默常驻模式"
+                                                  Content="开机进悬浮窗"
+                                                  ToolTip="开机自启时直接进入桌面悬浮窗和系统托盘，不打开主窗口。"
                                                   Foreground="#94A3B8" FontSize="12" Margin="0,0,0,5"
                                                   Checked="AppSettingCheckBox_Changed" Unchecked="AppSettingCheckBox_Changed"/>
 
                                         <StackPanel Margin="0,2,0,0">
-                                            <TextBlock Text="点击主界面关闭按钮 (×) 时："
-                                                       Foreground="#CBD5E1" FontSize="12" Margin="0,0,0,4"/>
+                                            <TextBlock Text="点关闭按钮时"
+                                                       Foreground="#CBD5E1" FontSize="12" Margin="0,0,0,4"
+                                                       ToolTip="点击主界面关闭按钮时的行为。"/>
                                             <ComboBox x:Name="ComboCloseButtonAction"
                                                       Height="28" FontSize="12"
                                                       SelectionChanged="ComboCloseButtonAction_SelectionChanged">
@@ -885,29 +951,15 @@
                                                 <ComboBoxItem Content="最小化到系统托盘" Tag="minimize_to_tray"/>
                                                 <ComboBoxItem Content="直接关闭退出软件" Tag="exit"/>
                                             </ComboBox>
-                                            <TextBlock Text="勾选「记住此操作」后可随时在此改回「每次弹窗询问」。"
-                                                       Foreground="#64748B" FontSize="11" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                                            <TextBlock Text="可改回每次询问"
+                                                       Foreground="#64748B" FontSize="11" Margin="0,4,0,0"
+                                                       ToolTip="勾选「记住此操作」后，可随时在此改回「每次弹窗询问」。"/>
                                         </StackPanel>
 
                                         <!-- 隐藏保留旧版复选框引用，与 CloseButtonAction 双向同步 -->
                                         <CheckBox x:Name="ChkCloseToFloating" Visibility="Collapsed"
                                                   Checked="AppSettingCheckBox_Changed" Unchecked="AppSettingCheckBox_Changed"/>
                                     </StackPanel>
-                                </Border>
-
-                                <!-- 实时核验栏 -->
-                                <Border Background="{DynamicResource BgInputBrush}" BorderBrush="{DynamicResource BorderSectionBrush}" BorderThickness="1" CornerRadius="5" Padding="12,7">
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,10,0">
-                                            <TextBlock x:Name="StartupRegStatusTitle" Text="● 开机自启与工作流状态检测中..." FontSize="12" FontWeight="SemiBold" Foreground="#CBD5E1"/>
-                                            <TextBlock x:Name="StartupRegCommandText" Text="注册表键：HKCU\Software\Microsoft\Windows\CurrentVersion\Run\AICollabHub" FontSize="11" Foreground="#64748B" Margin="0,2,0,0" TextTrimming="CharacterEllipsis"/>
-                                        </StackPanel>
-                                        <Button x:Name="BtnVerifyStartupReg" Grid.Column="1" Content="核验注册表" Style="{StaticResource ActionBtn}" VerticalAlignment="Center" Click="BtnVerifyStartupReg_Click"/>
-                                    </Grid>
                                 </Border>
                             </StackPanel>
                         </Border>
@@ -921,9 +973,9 @@
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
                                     <StackPanel Grid.Column="0">
-                                        <TextBlock Text="二、桌面悬浮窗与外观设置" FontSize="14" FontWeight="SemiBold" Foreground="#F8FAFC"/>
-                                        <TextBlock Text="支持主题切换、展开/收起胶囊形态及纵向滑块透明度调节。"
-                                                   Foreground="#94A3B8" FontSize="12" Margin="0,3,0,0" TextWrapping="Wrap"/>
+                                        <TextBlock Text="悬浮窗与外观" FontSize="14" FontWeight="SemiBold" Foreground="#F8FAFC"
+                                                   ToolTip="支持主题切换、展开或收起胶囊，以及透明度调节。"/>
+                                        <TextBlock Text="主题、形态、透明度" Foreground="#94A3B8" FontSize="12" Margin="0,3,0,0"/>
                                     </StackPanel>
                                     <WrapPanel Grid.Column="1" VerticalAlignment="Center">
                                         <Button x:Name="BtnPreviewExpandFloating" Content="展开悬浮窗" Style="{StaticResource ActionBtn}" Margin="0,0,6,0" Click="BtnPreviewExpandFloating_Click"/>
@@ -943,29 +995,20 @@
                                     <Border Grid.Column="0" Background="{DynamicResource BgInputBrush}" BorderBrush="{DynamicResource BorderSectionBrush}" BorderThickness="1" CornerRadius="6" Padding="12,10">
                                         <StackPanel>
                                             <CheckBox x:Name="ChkFloatingEnabled"
-                                                      Content="开启桌面悬浮监控窗（常驻桌面实时显示各 AI 小头像与工作动态）"
+                                                      Content="开启桌面悬浮窗"
+                                                      ToolTip="常驻桌面，实时显示各 AI 头像与工作动态。"
                                                       Foreground="#F1F5F9" FontSize="12.5" FontWeight="SemiBold" Margin="0,0,0,8"
                                                       Checked="AppSettingCheckBox_Changed" Unchecked="AppSettingCheckBox_Changed"/>
 
                                             <CheckBox x:Name="ChkFloatingTopmost"
-                                                      Content="悬浮窗始终置顶 (Topmost，不被编辑器或游戏窗口遮挡)"
+                                                      Content="悬浮窗始终置顶"
+                                                      ToolTip="不被编辑器或游戏窗口遮挡。"
                                                       Foreground="#E2E8F0" FontSize="12" Margin="0,0,0,8"
                                                       Checked="AppSettingCheckBox_Changed" Unchecked="AppSettingCheckBox_Changed"/>
 
-                                            <CheckBox x:Name="ChkFloatingAutoExpand"
-                                                      Content="（已锁定停用）任务开始时自动展开 —— 形态仅由用户手动切换，状态变化绝不改形态"
-                                                      IsEnabled="False" IsChecked="False"
-                                                      Foreground="#64748B" FontSize="12" Margin="0,0,0,8"
-                                                      Checked="AppSettingCheckBox_Changed" Unchecked="AppSettingCheckBox_Changed"/>
-
-                                            <CheckBox x:Name="ChkFloatingAutoCollapse"
-                                                      Content="（已锁定停用）任务完成后自动收起 —— 原来啥样完成后仍保持啥样"
-                                                      IsEnabled="False" IsChecked="False"
-                                                      Foreground="#64748B" FontSize="12" Margin="0,0,0,8"
-                                                      Checked="AppSettingCheckBox_Changed" Unchecked="AppSettingCheckBox_Changed"/>
-
                                             <CheckBox x:Name="ChkAutoSyncCloudRec"
-                                                      Content="软件启动时自动从云端拉取更新各 AI 推荐能力评分"
+                                                      Content="启动同步云端评分"
+                                                      ToolTip="软件启动时自动从云端拉取并更新各 AI 推荐能力评分。"
                                                       Foreground="#7DD3FC" FontSize="12" Margin="0,0,0,8"
                                                       Checked="AppSettingCheckBox_Changed" Unchecked="AppSettingCheckBox_Changed"/>
 
@@ -975,14 +1018,16 @@
                                                       Checked="AppSettingCheckBox_Changed" Unchecked="AppSettingCheckBox_Changed"/>
 
                                             <CheckBox x:Name="ChkSoundLightweight"
-                                                      Content="音效轻量化（仅保留任务完成提示音）"
+                                                      Content="只留完成提示音"
+                                                      ToolTip="音效轻量化，仅保留任务完成提示音。"
                                                       Foreground="#94A3B8" FontSize="12"
                                                       Checked="AppSettingCheckBox_Changed" Unchecked="AppSettingCheckBox_Changed"/>
 
                                             <StackPanel Orientation="Horizontal" Margin="0,6,0,0" VerticalAlignment="Center">
-                                                <TextBlock Text="仍听到 Cursor 自带提示音时："
+                                                <TextBlock Text="关掉 Cursor 铃声"
                                                            Foreground="#64748B" FontSize="11"
-                                                           VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                                           VerticalAlignment="Center" Margin="0,0,8,0"
+                                                           ToolTip="仍听到 Cursor 自带提示音时，用右侧按钮关掉。"/>
                                                 <Button x:Name="MuteCursorChimeBtn"
                                                         Content="🔇 关闭 Cursor 内置提示音"
                                                         Style="{StaticResource ActionBtn}"
@@ -1031,7 +1076,8 @@
                                                     <ColumnDefinition Width="*"/>
                                                     <ColumnDefinition Width="Auto"/>
                                                 </Grid.ColumnDefinitions>
-                                                <TextBlock Grid.Column="0" Text="悬浮窗透明度 (也可直接在悬浮窗点 ◐ 按钮弹出调节)：" Foreground="{StaticResource FgSecondaryBrush}" FontSize="12" VerticalAlignment="Center"/>
+                                                <TextBlock Grid.Column="0" Text="悬浮窗透明度" Foreground="{StaticResource FgSecondaryBrush}" FontSize="12" VerticalAlignment="Center"
+                                                           ToolTip="也可直接在悬浮窗点 ◐ 按钮调节。"/>
                                                 <TextBlock x:Name="TextFloatingOpacityPct" Grid.Column="1" Text="95%" FontSize="12.5" FontWeight="Bold" Foreground="#38BDF8" VerticalAlignment="Center"/>
                                             </Grid>
                                             <Grid Margin="0,0,0,8">
@@ -1056,9 +1102,9 @@
 
                                             <TextBlock Text="实时状态刷新频率：" Foreground="{StaticResource FgSecondaryBrush}" FontSize="12" Margin="0,0,0,3"/>
                                             <ComboBox x:Name="ComboFloatingRefresh" SelectionChanged="ComboFloatingRefresh_SelectionChanged">
-                                                <ComboBoxItem Content="1.0 秒 / 次 · 极速流式刷新" Tag="1000"/>
-                                                <ComboBoxItem Content="1.5 秒 / 次 · 标准实时刷新（推荐）" Tag="1500"/>
-                                                <ComboBoxItem Content="3.0 秒 / 次 · 低频静默刷新" Tag="3000"/>
+                                                <ComboBoxItem Content="1 秒 · 极速" Tag="1000"/>
+                                                <ComboBoxItem Content="1.5 秒 · 标准" Tag="1500"/>
+                                                <ComboBoxItem Content="3 秒 · 低频" Tag="3000"/>
                                             </ComboBox>
                                         </StackPanel>
                                     </Border>
@@ -1075,9 +1121,9 @@
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
                                     <StackPanel Grid.Column="0" Margin="0,0,12,0">
-                                        <TextBlock Text="三、后台无感容灾、防卡死自愈与断点保护" FontSize="14" FontWeight="SemiBold" Foreground="#F8FAFC"/>
-                                        <TextBlock Text="默认纯后台 CLI / 零焦点投递（不抢鼠标键盘），遇到弹窗卡住或断线支持自动拆弹重试、跨 AI 接力或由您选择解决方式。"
-                                                   Foreground="#94A3B8" FontSize="12" Margin="0,3,0,0" TextWrapping="Wrap"/>
+                                        <TextBlock Text="断线与续跑" FontSize="14" FontWeight="SemiBold" Foreground="#F8FAFC"
+                                                   ToolTip="默认不抢鼠标键盘。弹窗卡住或断线时，可自动重试、换 AI 接力，或由你选择处理方式。"/>
+                                        <TextBlock Text="断线可重试或换人" Foreground="#94A3B8" FontSize="12" Margin="0,3,0,0"/>
                                     </StackPanel>
                                     <WrapPanel Grid.Column="1" VerticalAlignment="Center">
                                         <Button x:Name="BtnDismissStuckModalsNow" Content="🧹 清理卡住弹窗" Style="{StaticResource ActionBtn}" Margin="0,0,6,0" ToolTip="在后台静默关闭外部 AI 客户端残留的阻塞模态窗（不抢鼠标键盘）" Click="BtnDismissStuckModalsNow_Click"/>
@@ -1096,29 +1142,29 @@
                                     <Border Grid.Column="0" Background="{DynamicResource BgInputBrush}" BorderBrush="{DynamicResource BorderSectionBrush}" BorderThickness="1" CornerRadius="6" Padding="14,12">
                                         <StackPanel>
                                             <CheckBox x:Name="ChkEnableNetRetry"
-                                                      Content="开启断线自动重连与消息未送达重发（指数退避重试）"
+                                                      Content="断线自动重连"
+                                                      ToolTip="断线或消息未送达时按指数退避重试。"
                                                       Foreground="#F1F5F9" FontSize="12.5" FontWeight="SemiBold" Margin="0,0,0,8"
                                                       Checked="NetworkResilienceSetting_Changed" Unchecked="NetworkResilienceSetting_Changed"/>
 
                                             <CheckBox x:Name="ChkWaitLocalNetRecover"
-                                                      Content="本机网络掉线时自动挂起等待网络恢复后再重发"
+                                                      Content="断网等待恢复"
+                                                      ToolTip="本机网络掉线时自动挂起，网络恢复后再重发。"
                                                       Foreground="#CBD5E1" FontSize="12" Margin="0,0,0,8"
                                                       Checked="NetworkResilienceSetting_Changed" Unchecked="NetworkResilienceSetting_Changed"/>
 
                                             <CheckBox x:Name="ChkEnableAgentFailover"
-                                                      Content="单个 AI 服务器持续故障时自动切换其他已启用 AI 接力"
+                                                      Content="故障自动换 AI"
+                                                      ToolTip="单个 AI 服务器持续故障时，自动切换其他已启用 AI 接力。"
                                                       Foreground="#CBD5E1" FontSize="12" Margin="0,0,0,8"
                                                       Checked="NetworkResilienceSetting_Changed" Unchecked="NetworkResilienceSetting_Changed"/>
 
                                             <CheckBox x:Name="ChkAutoResumeOnNetRecover"
-                                                      Content="长时间断网中断后，检测到网络重新连通时自动后台续跑"
+                                                      Content="联网后自动续跑"
+                                                      ToolTip="长时间断网中断后，检测到网络重新连通时自动后台续跑。"
                                                       Foreground="#94A3B8" FontSize="12" Margin="0,0,0,8"
                                                       Checked="NetworkResilienceSetting_Changed" Unchecked="NetworkResilienceSetting_Changed"/>
 
-                                            <CheckBox x:Name="ChkAutoTrustWorkspaces"
-                                                      Content="自动信任已纳管工程目录并免除后台 CLI 交互拦截（自动附加 --trust / -f / --approve-mcps）"
-                                                      Foreground="#7DD3FC" FontSize="12"
-                                                      Checked="NetworkResilienceSetting_Changed" Unchecked="NetworkResilienceSetting_Changed"/>
                                         </StackPanel>
                                     </Border>
 
@@ -1126,49 +1172,79 @@
                                         <StackPanel>
                                             <TextBlock Text="单轮最大自动重连尝试次数：" Foreground="{StaticResource FgSecondaryBrush}" FontSize="12" Margin="0,0,0,3"/>
                                             <ComboBox x:Name="ComboMaxNetRetries" Margin="0,0,0,8" SelectionChanged="ComboNetworkResilience_SelectionChanged">
-                                                <ComboBoxItem Content="2 次 · 快速重试" Tag="2"/>
-                                                <ComboBoxItem Content="3 次 · 标准指数退避重连（推荐）" Tag="3"/>
-                                                <ComboBoxItem Content="5 次 · 弱网高容错重连" Tag="5"/>
-                                                <ComboBoxItem Content="8 次 · 极限抗抖动重试" Tag="8"/>
+                                                <ComboBoxItem Content="2 次 · 快速" Tag="2"/>
+                                                <ComboBoxItem Content="3 次 · 标准" Tag="3"/>
+                                                <ComboBoxItem Content="5 次 · 弱网" Tag="5"/>
+                                                <ComboBoxItem Content="8 次 · 抗抖动" Tag="8"/>
                                             </ComboBox>
 
                                             <TextBlock Text="单次执行无响应超时阈值：" Foreground="{StaticResource FgSecondaryBrush}" FontSize="12" Margin="0,0,0,3"/>
                                             <ComboBox x:Name="ComboSingleTimeout" Margin="0,0,0,8" SelectionChanged="ComboNetworkResilience_SelectionChanged">
-                                                <ComboBoxItem Content="120 秒 · 快速响应检测" Tag="120"/>
-                                                <ComboBoxItem Content="180 秒 · 标准实操超时（推荐）" Tag="180"/>
-                                                <ComboBoxItem Content="300 秒 · 复杂大文件重构超时" Tag="300"/>
+                                                <ComboBoxItem Content="120 秒 · 快速" Tag="120"/>
+                                                <ComboBoxItem Content="180 秒 · 标准" Tag="180"/>
+                                                <ComboBoxItem Content="300 秒 · 大改" Tag="300"/>
                                             </ComboBox>
 
                                             <TextBlock Text="任务卡住 / 外部弹窗阻塞时的处理方式：" Foreground="{StaticResource FgSecondaryBrush}" FontSize="12" Margin="0,0,0,3"/>
                                             <ComboBox x:Name="ComboStallRecoveryPolicy" Margin="0,0,0,8" SelectionChanged="ComboNetworkResilience_SelectionChanged">
-                                                <ComboBoxItem Content="先后台自动拆弹重试，仍卡住则让我选择（推荐）" Tag="auto_then_ask"/>
-                                                <ComboBoxItem Content="一旦卡住立即提醒并由我选择解决方式" Tag="ask_user_immediately"/>
-                                                <ComboBoxItem Content="全自动静默自愈（重试 ➔ 换 AI ➔ 交回主脑）" Tag="auto_self_heal"/>
+                                                <ComboBoxItem Content="先重试，再问我" Tag="auto_then_ask"/>
+                                                <ComboBoxItem Content="卡住立刻问我" Tag="ask_user_immediately"/>
+                                                <ComboBoxItem Content="全自动自愈" Tag="auto_self_heal"/>
                                             </ComboBox>
 
                                             <TextBlock x:Name="TextNetDiagStatus"
-                                                       Text="● 网络实时诊断：本机外网连通正常 · 自动容灾保护已就绪"
-                                                       FontSize="11.5" Foreground="#34D399" TextWrapping="Wrap"/>
+                                                       Text="网络正常"
+                                                       FontSize="12" Foreground="#34D399" TextWrapping="Wrap"
+                                                       ToolTip="网络实时诊断"/>
                                         </StackPanel>
                                     </Border>
                                 </Grid>
                             </StackPanel>
                         </Border>
 
-                        <!-- 4. 默认折叠的目录管理与便携分享说明 -->
-                        <Border Style="{StaticResource SectionCard}">
-                            <Expander IsExpanded="False" Foreground="#E6EDF7">
+                        <Border Style="{StaticResource SectionCard}" Padding="14,10">
+                            <Expander IsExpanded="False" Foreground="#E6EDF7" Background="Transparent">
                                 <Expander.Header>
-                                    <TextBlock Text="📂 展开查看本机数据目录与绿色便携包分享说明" FontSize="13" FontWeight="SemiBold" Foreground="#9AA8BE" Margin="4,0,0,0"/>
+                                    <TextBlock Text="高级与开发者选项" FontSize="13.5" FontWeight="SemiBold" Foreground="#9AA8BE" Margin="4,0,0,0"/>
                                 </Expander.Header>
-                                <StackPanel Margin="0,8,0,0">
-                                    <TextBlock Text="• 独立绿色分享：点击顶部「📤 分享软件 (.zip)」即可生成不含任何个人路径或聊天记录的纯净压缩包，发给他人解压双击即可在对方电脑上自动扫描配置。&#x0a;• 三处同步常驻：本软件在主界面、桌面置顶悬浮窗、任务栏与右下角系统托盘图标三处同步显示，右键点击托盘图标可随时启停工作流或彻底退出。"
-                                               Foreground="#A5B4CB" FontSize="12" LineHeight="20" TextWrapping="Wrap" Margin="0,0,0,8"/>
-                                    <WrapPanel>
-                                        <Button Content="📂 打开个人配置目录 (%LOCALAPPDATA%\AICollabHub)" Style="{StaticResource ActionBtn}" Margin="0,0,8,0" Click="BtnOpenUserDataDir_Click"/>
-                                        <Button Content="📂 打开 F:\AIChat 跨工具聊天记录库" Style="{StaticResource ActionBtn}" Margin="0,0,8,0" Click="BtnOpenAiChatDir_Click"/>
-                                        <Button x:Name="ExportShareZipBtn" Content="📤 一键导出便携分享包 (.zip)" Style="{StaticResource AmberBtn}" Click="ExportShareZipBtn_Click"/>
+                                <StackPanel Margin="0,10,0,0">
+                                    <TextBlock x:Name="AppUserDataPathText" Foreground="#94A3B8" FontSize="12" TextWrapping="Wrap" Margin="0,0,0,8"/>
+                                    <WrapPanel Margin="0,0,0,10">
+                                        <Button Content="打开配置目录" Style="{StaticResource ActionBtn}" Margin="0,0,8,6" Click="BtnOpenUserDataDir_Click" ToolTip="打开个人数据目录"/>
+                                        <Button x:Name="OpenRegistryDirBtn" Content="打开注册表目录" Style="{StaticResource ActionBtn}" Margin="0,0,8,6" Click="OpenRegistryDirBtn_Click" ToolTip="打开规则与检测器配置目录"/>
+                                        <Button Content="打开聊天库" Style="{StaticResource ActionBtn}" Margin="0,0,8,6" Click="BtnOpenAiChatDir_Click" ToolTip="打开 F:\AIChat 跨工具聊天记录库"/>
+                                        <Button x:Name="ExportShareZipBtn" Content="导出分享包" Style="{StaticResource AmberBtn}" Margin="0,0,8,6" Click="ExportShareZipBtn_Click" ToolTip="生成不含个人路径或聊天记录的绿色压缩包"/>
                                     </WrapPanel>
+                                    <Border Background="{DynamicResource BgInputBrush}" BorderBrush="{DynamicResource BorderSectionBrush}" BorderThickness="1" CornerRadius="5" Padding="12,8" Margin="0,0,0,8">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,10,0">
+                                                <TextBlock x:Name="StartupRegStatusTitle" Text="正在检查开机自启" FontSize="12" FontWeight="SemiBold" Foreground="#CBD5E1"/>
+                                                <TextBlock x:Name="StartupRegCommandText" Text="" FontSize="11" Foreground="#64748B" Margin="0,2,0,0" TextTrimming="CharacterEllipsis"/>
+                                            </StackPanel>
+                                            <Button x:Name="BtnVerifyStartupReg" Grid.Column="1" Content="核验注册表" Style="{StaticResource ActionBtn}" VerticalAlignment="Center" Click="BtnVerifyStartupReg_Click"/>
+                                        </Grid>
+                                    </Border>
+                                    <CheckBox x:Name="ChkAutoTrustWorkspaces"
+                                              Content="自动信任工程"
+                                              ToolTip="自动信任已纳管工程目录，并为后台 CLI 附加 --trust / -f / --approve-mcps，避免交互拦截。"
+                                              Foreground="#7DD3FC" FontSize="12" Margin="0,0,0,8"
+                                              Checked="NetworkResilienceSetting_Changed" Unchecked="NetworkResilienceSetting_Changed"/>
+                                    <CheckBox x:Name="ChkFloatingAutoExpand"
+                                              Content="自动展开已锁定"
+                                              IsEnabled="False" IsChecked="False"
+                                              Foreground="#64748B" FontSize="12" Margin="0,0,0,6"
+                                              ToolTip="形态只由手动切换，任务开始不会自动展开。"
+                                              Checked="AppSettingCheckBox_Changed" Unchecked="AppSettingCheckBox_Changed"/>
+                                    <CheckBox x:Name="ChkFloatingAutoCollapse"
+                                              Content="自动收起已锁定"
+                                              IsEnabled="False" IsChecked="False"
+                                              Foreground="#64748B" FontSize="12"
+                                              ToolTip="任务完成后保持当前形态，不会自动收起。"
+                                              Checked="AppSettingCheckBox_Changed" Unchecked="AppSettingCheckBox_Changed"/>
                                 </StackPanel>
                             </Expander>
                         </Border>
@@ -1187,7 +1263,7 @@
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <TextBlock x:Name="StatusText" Grid.Column="0" Text="就绪 · 多 AI 协同工作流运行中" Foreground="#94A3B8" FontSize="11.5" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="0,0,16,0"/>
-                <TextBlock x:Name="RightDataPathText" Grid.Column="1" Foreground="#64748B" FontSize="11" VerticalAlignment="Center" HorizontalAlignment="Right"/>
+                <TextBlock x:Name="RightDataPathText" Grid.Column="1" Visibility="Collapsed" Foreground="#64748B" FontSize="11" VerticalAlignment="Center" HorizontalAlignment="Right"/>
             </Grid>
         </Border>
     </Grid>

@@ -286,19 +286,19 @@ public partial class MainWindow
             _ => "空闲待命"
         };
 
-        string brief = AutoDispatchService.ExtractCleanTaskBrief(taskSummary ?? "", 42);
+        string brief = AutoDispatchService.ExtractCleanTaskBrief(taskSummary ?? "", 18);
         _workflowDiagramSubFull = _workflowDiagramPhase switch
         {
-            "paused" => "全局协同总开关已关闭 · 各 AI 恢复独立运行",
-            "idle" => string.IsNullOrWhiteSpace(brief) ? "等待全入口接单" : brief,
-            "master_analyzing" => string.IsNullOrWhiteSpace(brief) ? "主脑正在深度分析与模型档位匹配" : brief,
-            "dispatching" => string.IsNullOrWhiteSpace(brief) ? "主脑正在派发实操执行" : brief,
-            "executing" => string.IsNullOrWhiteSpace(brief) ? "执行 AI 正在改工程" : brief,
-            "master_verifying" => string.IsNullOrWhiteSpace(brief) ? "主脑正在 Diff / 编译 / 实测验收" : brief,
+            "paused" => "协同已关闭",
+            "idle" => string.IsNullOrWhiteSpace(brief) ? "等待接单" : brief,
+            "master_analyzing" => string.IsNullOrWhiteSpace(brief) ? "主脑分析中" : brief,
+            "dispatching" => string.IsNullOrWhiteSpace(brief) ? "正在派发" : brief,
+            "executing" => string.IsNullOrWhiteSpace(brief) ? "正在改工程" : brief,
+            "master_verifying" => string.IsNullOrWhiteSpace(brief) ? "主脑验收中" : brief,
             "reworking" => string.IsNullOrWhiteSpace(brief)
-                ? $"验收未通过 · 打回精修 R{_workflowDiagramRound}/{_workflowDiagramMaxRounds}"
-                : $"{brief} · R{_workflowDiagramRound}/{_workflowDiagramMaxRounds}",
-            "verified_delivered" => string.IsNullOrWhiteSpace(brief) ? "终验通过，已向用户交付" : $"已交付：{brief}",
+                ? $"打回精修 R{_workflowDiagramRound}/{_workflowDiagramMaxRounds}"
+                : $"{brief} · R{_workflowDiagramRound}",
+            "verified_delivered" => string.IsNullOrWhiteSpace(brief) ? "已交付" : brief,
             _ => brief
         };
     }
