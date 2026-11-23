@@ -32,17 +32,22 @@ public static class LongActionTracker
     public static string CloudSyncAgent(string agentId) =>
         "cloud_sync:" + (agentId ?? "").Trim().ToLowerInvariant();
 
-    /// <summary>挂在按钮 Tag 上，重绘或心跳时据此恢复空闲文案。</summary>
+    /// <summary>挂在按钮 Tag 上。纯文字按钮恢复 IdleContent；矢量图标 / StackPanel 保留原 Content 对象，忙时只改 ToolTip 与 IsEnabled。</summary>
     public sealed class LongActionTag
     {
-        public LongActionTag(string key, string idleContent)
+        public LongActionTag(string key, string idleContent, object? preservedContent, object? originalToolTip)
         {
             Key = key ?? "";
             IdleContent = idleContent ?? "";
+            PreservedContent = preservedContent;
+            OriginalToolTip = originalToolTip;
         }
 
         public string Key { get; }
         public string IdleContent { get; }
+        public object? PreservedContent { get; }
+        public object? OriginalToolTip { get; }
+        public bool KeepVisual => PreservedContent != null;
     }
 
     private sealed class Entry
@@ -114,8 +119,10 @@ public static class LongActionTracker
     public static void Arm(Button? btn, string key, string? idleContent = null)
     {
         if (btn == null || string.IsNullOrWhiteSpace(key)) return;
-        var idle = idleContent ?? (btn.Content as string ?? "");
-        btn.Tag = new LongActionTag(key.Trim(), idle);
+        object? content = btn.Content;
+        bool visual = content != null && content is not string;
+        var idle = idleContent ?? (content as string ?? "");
+        btn.Tag = new LongActionTag(key.Trim(), idle, visual ? content : null, btn.ToolTip);
     }
 
     public static void ShowBusy(Button? btn)
@@ -123,7 +130,13 @@ public static class LongActionTracker
         if (btn?.Tag is not LongActionTag tag || !IsBusy(tag.Key)) return;
         btn.IsEnabled = false;
         var label = FormatBusyLabel(tag.Key);
-        if (!string.IsNullOrEmpty(label)) btn.Content = label;
+        if (string.IsNullOrEmpty(label)) return;
+        if (tag.KeepVisual)
+        {
+            btn.ToolTip = label;
+            return;
+        }
+        btn.Content = label;
     }
 
     public static void ApplyBusyIfNeeded(Button? btn, string key, string idleContent)
@@ -140,7 +153,13 @@ public static class LongActionTracker
             if (btn.Tag is not LongActionTag tag || !IsBusy(tag.Key)) return;
             btn.IsEnabled = false;
             var label = FormatBusyLabel(tag.Key);
-            if (!string.IsNullOrEmpty(label) && !string.Equals(btn.Content as string, label, StringComparison.Ordinal))
+            if (string.IsNullOrEmpty(label)) return;
+            if (tag.KeepVisual)
+            {
+                if (!Equals(btn.ToolTip, label)) btn.ToolTip = label;
+                return;
+            }
+            if (!string.Equals(btn.Content as string, label, StringComparison.Ordinal))
                 btn.Content = label;
         });
     }
@@ -154,6 +173,13 @@ public static class LongActionTracker
             if (btn.Tag is not LongActionTag tag) return;
             if (!tag.Key.Equals(wanted, StringComparison.OrdinalIgnoreCase)) return;
             btn.IsEnabled = true;
+            if (tag.KeepVisual)
+            {
+                if (!ReferenceEquals(btn.Content, tag.PreservedContent))
+                    btn.Content = tag.PreservedContent;
+                btn.ToolTip = tag.OriginalToolTip;
+                return;
+            }
             btn.Content = tag.IdleContent;
         });
     }

@@ -27,6 +27,10 @@ public partial class MainWindow : Window
     private TrayIconService? _traySvc;
 
     private bool _suppressEvents;
+    private int _lastMainTabIndex = 1;
+    private const string GeoSliders = "M3,6 H21 M3,12 H21 M3,18 H21 M9,4 V8 M16,10 V14 M7,16 V20";
+    private const string GeoWindow = "M4,5 H20 V19 H4 Z M4,9 H20";
+    private const string GeoPlay = "M8,6 L17,12 L8,18 Z";
     private bool _allowFullExit;
     private bool _suppressMinimizeToTray;
     private bool _sessionEnding;
@@ -459,7 +463,10 @@ public partial class MainWindow : Window
         bool onlyRun = _reg.UserConfig.WorkflowOnlyWhenAppRunning;
         if (WorkflowSwitchBtn != null)
         {
-            WorkflowSwitchBtn.Content = "协同开关";
+            if (WorkflowSwitchLabel != null)
+                WorkflowSwitchLabel.Text = wfOn ? "开" : "关";
+            if (WorkflowSwitchIcon != null)
+                WorkflowSwitchIcon.Fill = wfOn ? Hex("#A7F3D0") : Hex("#E6EDF7");
             WorkflowSwitchBtn.Style = (Style)FindResource(wfOn ? "SuccessBtn" : "ActionBtn");
             WorkflowSwitchBtn.ToolTip = wfOn ? "协同已开启，点击关闭" : "协同已关闭，点击开启";
         }
@@ -789,9 +796,11 @@ public partial class MainWindow : Window
     public void UpdateFloatingButtonBadge()
     {
         bool enabled = _reg.UserConfig.FloatingWindowEnabled && (_floatingWindow?.IsVisible ?? _reg.UserConfig.FloatingWindowEnabled);
-        ToggleFloatingBtn.Content = "悬浮窗";
+        if (ToggleFloatingBtn == null) return;
         ToggleFloatingBtn.ToolTip = enabled ? "悬浮窗已开启，点击关闭" : "悬浮窗已关闭，点击开启";
-        ToggleFloatingBtn.Style = (Style)FindResource("ActionBtn");
+        ToggleFloatingBtn.Style = (Style)FindResource(enabled ? "IconToolBtnActive" : "IconToolBtn");
+        if (ToggleFloatingIcon != null)
+            ToggleFloatingIcon.Stroke = enabled ? Hex("#E0F2FE") : Hex("#C5D2E4");
     }
 
     private void ToggleFloatingBtn_Click(object sender, RoutedEventArgs e)
@@ -915,8 +924,7 @@ public partial class MainWindow : Window
     public void ActivateAndShowAppSettings()
     {
         RestoreAndActivateMainWindow();
-        NavAppSettings.IsChecked = true;
-        RefreshAllViews();
+        OpenSettingsPage();
     }
 
     private void ComboCloseButtonAction_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -939,12 +947,147 @@ public partial class MainWindow : Window
 
     private void TopOpenSettingsBtn_Click(object sender, RoutedEventArgs e)
     {
+        if (PageAppSettings.Visibility == Visibility.Visible)
+        {
+            BackFromSettings();
+            return;
+        }
+        OpenSettingsPage();
+    }
+
+    private void BtnSettingsBack_Click(object sender, RoutedEventArgs e) => BackFromSettings();
+
+    private void OpenSettingsPage()
+    {
+        if (PageAppSettings.Visibility != Visibility.Visible)
+            _lastMainTabIndex = CurrentMainNavIndex();
+        _suppressEvents = true;
+        NavOverview.IsChecked = false;
+        NavDialogs.IsChecked = false;
+        NavSync.IsChecked = false;
+        NavOps.IsChecked = false;
+        NavSettings.IsChecked = false;
         NavAppSettings.IsChecked = true;
-        RefreshAllViews();
+        _suppressEvents = false;
+        ApplyMainPageVisibility(6);
+        SetSettingsHeaderActive(true);
+        RefreshCurrentVisiblePage();
+    }
+
+    private void BackFromSettings()
+    {
+        int idx = _lastMainTabIndex is >= 1 and <= 5 ? _lastMainTabIndex : 1;
+        SwitchToTabForTest(idx);
+    }
+
+    private int CurrentMainNavIndex()
+    {
+        if (NavDialogs?.IsChecked == true) return 2;
+        if (NavSync?.IsChecked == true) return 3;
+        if (NavOps?.IsChecked == true) return 4;
+        if (NavSettings?.IsChecked == true) return 5;
+        if (NavOverview?.IsChecked == true) return 1;
+        return _lastMainTabIndex is >= 1 and <= 5 ? _lastMainTabIndex : 1;
+    }
+
+    private void ApplyMainPageVisibility(int index)
+    {
+        PageOverview.Visibility = index == 1 ? Visibility.Visible : Visibility.Collapsed;
+        PageDialogs.Visibility = index == 2 ? Visibility.Visible : Visibility.Collapsed;
+        PageSync.Visibility = index == 3 ? Visibility.Visible : Visibility.Collapsed;
+        PageOps.Visibility = index == 4 ? Visibility.Visible : Visibility.Collapsed;
+        PageSettings.Visibility = index == 5 ? Visibility.Visible : Visibility.Collapsed;
+        PageAppSettings.Visibility = index == 6 ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private void SetSettingsHeaderActive(bool active)
+    {
+        if (TopOpenSettingsBtn == null) return;
+        TopOpenSettingsBtn.Style = (Style)FindResource(active ? "IconToolBtnActive" : "IconToolBtn");
+        TopOpenSettingsBtn.ToolTip = active ? "再次点击返回" : "打开软件设置";
+    }
+
+    private void SettingsSubTab_Checked(object sender, RoutedEventArgs e)
+    {
+        if (_suppressEvents) return;
+        if (sender is not RadioButton rb || rb.IsChecked != true || SettingsPanelGeneral == null) return;
+        ApplySettingsTabVisibility(NormalizeSettingsTab(rb.Tag as string));
+    }
+
+    public void SwitchSettingsTab(string tabKey)
+    {
+        string key = NormalizeSettingsTab(tabKey);
+        ApplySettingsTabVisibility(key);
+        _suppressEvents = true;
+        try
+        {
+            if (TabSettingsGeneral != null) TabSettingsGeneral.IsChecked = key == "general";
+            if (TabSettingsAppearance != null) TabSettingsAppearance.IsChecked = key == "appearance";
+            if (TabSettingsResilience != null) TabSettingsResilience.IsChecked = key == "resilience";
+            if (TabSettingsAbout != null) TabSettingsAbout.IsChecked = key == "about";
+        }
+        finally
+        {
+            _suppressEvents = false;
+        }
+    }
+
+    public void SwitchSettingsTabForTest(string tabKey) => SwitchSettingsTab(tabKey);
+
+    private static string NormalizeSettingsTab(string? tabKey)
+    {
+        var key = (tabKey ?? "").Trim().ToLowerInvariant();
+        return key is "appearance" or "resilience" or "about" or "general" ? key : "general";
+    }
+
+    private void ApplySettingsTabVisibility(string key)
+    {
+        if (SettingsPanelGeneral == null || SettingsPanelAppearance == null ||
+            SettingsPanelResilience == null || SettingsPanelAbout == null) return;
+        SettingsPanelGeneral.Visibility = key == "general" ? Visibility.Visible : Visibility.Collapsed;
+        SettingsPanelAppearance.Visibility = key == "appearance" ? Visibility.Visible : Visibility.Collapsed;
+        SettingsPanelResilience.Visibility = key == "resilience" ? Visibility.Visible : Visibility.Collapsed;
+        SettingsPanelAbout.Visibility = key == "about" ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private static System.Windows.Shapes.Path MakeVectorIcon(string geometryData, double size, Brush stroke)
+    {
+        return new System.Windows.Shapes.Path
+        {
+            Data = Geometry.Parse(geometryData),
+            Width = size,
+            Height = size,
+            Stretch = Stretch.Uniform,
+            Stroke = stroke,
+            StrokeThickness = 1.5,
+            StrokeStartLineCap = PenLineCap.Round,
+            StrokeEndLineCap = PenLineCap.Round,
+            StrokeLineJoin = PenLineJoin.Round,
+            Fill = Brushes.Transparent,
+            SnapsToDevicePixels = true,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+    }
+
+    private Button MakeIconButton(string geometryData, string toolTip, Brush? stroke = null)
+    {
+        return new Button
+        {
+            Width = 30,
+            Height = 26,
+            Padding = new Thickness(0),
+            Margin = new Thickness(0, 0, 4, 0),
+            Style = (Style)FindResource("IconToolBtn"),
+            ToolTip = toolTip,
+            Content = MakeVectorIcon(geometryData, 14, stroke ?? Hex("#E6EDF7"))
+        };
     }
 
     public void SwitchToTabForTest(int index)
     {
+        if (index == 6 && PageAppSettings.Visibility != Visibility.Visible)
+            _lastMainTabIndex = CurrentMainNavIndex();
         _suppressEvents = true;
         NavOverview.IsChecked = index == 1;
         NavDialogs.IsChecked = index == 2;
@@ -956,12 +1099,10 @@ public partial class MainWindow : Window
             NavAdvancedExpander.IsExpanded = true;
         _suppressEvents = false;
 
-        PageOverview.Visibility = index == 1 ? Visibility.Visible : Visibility.Collapsed;
-        PageDialogs.Visibility = index == 2 ? Visibility.Visible : Visibility.Collapsed;
-        PageSync.Visibility = index == 3 ? Visibility.Visible : Visibility.Collapsed;
-        PageOps.Visibility = index == 4 ? Visibility.Visible : Visibility.Collapsed;
-        PageSettings.Visibility = index == 5 ? Visibility.Visible : Visibility.Collapsed;
-        PageAppSettings.Visibility = index == 6 ? Visibility.Visible : Visibility.Collapsed;
+        ApplyMainPageVisibility(index);
+        SetSettingsHeaderActive(index == 6);
+        if (index is >= 1 and <= 5)
+            _lastMainTabIndex = index;
         RefreshAllViews();
     }
 
@@ -976,18 +1117,18 @@ public partial class MainWindow : Window
 
     private void ArmStaticLongActionButtons()
     {
-        LongActionTracker.Arm(RescanBtn, LongActionTracker.ScanLocal, "扫描本机");
-        LongActionTracker.Arm(SyncAllNowBtn, LongActionTracker.RulesSync, "⚡ 立即挂载同步");
+        LongActionTracker.Arm(RescanBtn, LongActionTracker.ScanLocal, "扫描");
+        LongActionTracker.Arm(SyncAllNowBtn, LongActionTracker.RulesSync, "立即同步");
         LongActionTracker.Arm(SyncAnchorsOverviewBtn, LongActionTracker.RulesSync, "同步规则锚点");
         LongActionTracker.Arm(InitFoundationBtn, LongActionTracker.RulesInit, "初始化工程目录");
         LongActionTracker.Arm(RestoreSyncBackupBtn, LongActionTracker.RulesRestore, "恢复上次备份");
         LongActionTracker.Arm(ExportShareZipBtn, LongActionTracker.ExportShare, "导出分享包");
-        LongActionTracker.Arm(RunHeadlessDispatchBtn, LongActionTracker.HeadlessDispatch, "⚡ 分配任务并执行");
-        LongActionTracker.Arm(BtnProbeNetworkNow, LongActionTracker.NetProbe, "检测网络");
-        LongActionTracker.Arm(BtnDismissStuckModalsNow, LongActionTracker.DismissModals, "🧹 清理卡住弹窗");
+        LongActionTracker.Arm(RunHeadlessDispatchBtn, LongActionTracker.HeadlessDispatch, "派单执行");
+        LongActionTracker.Arm(BtnProbeNetworkNow, LongActionTracker.NetProbe, "检测");
+        LongActionTracker.Arm(BtnDismissStuckModalsNow, LongActionTracker.DismissModals, "清理");
         LongActionTracker.Arm(BtnResumeCheckpoint, LongActionTracker.ResumeCheckpoint, "断点续跑");
         LongActionTracker.Arm(CopyCapsuleBtn, LongActionTracker.CapsulePack, "复制脱敏上下文包");
-        LongActionTracker.ApplyBusyIfNeeded(BtnCheckAppUpdate, LongActionTracker.AppUpdate, "立即检查更新");
+        LongActionTracker.ApplyBusyIfNeeded(BtnCheckAppUpdate, LongActionTracker.AppUpdate, "检查");
     }
 
     private static void EndLongAction(string key) => LongActionTracker.EndAndRestore(key);
@@ -1051,6 +1192,13 @@ public partial class MainWindow : Window
         PageOps.Visibility = NavOps.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
         PageSettings.Visibility = NavSettings.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
         PageAppSettings.Visibility = NavAppSettings.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
+        if (NavAppSettings.IsChecked == true)
+            SetSettingsHeaderActive(true);
+        else
+        {
+            SetSettingsHeaderActive(false);
+            _lastMainTabIndex = CurrentMainNavIndex();
+        }
         RefreshCurrentVisiblePage();
         UpdateWorkflowDiagramAnimationGate();
         if (NavOverview.IsChecked == true) RefreshWorkflowDiagram();
@@ -1439,13 +1587,9 @@ public partial class MainWindow : Window
 
             if (AutoDispatchService.ResolveGuiExecutable(ag) != null)
             {
-                var openWinBtn = new Button
-                {
-                    Content = cachedWin.IsRunning ? "窗口" : "启动",
-                    Style = (Style)FindResource("ActionBtn"),
-                    Padding = new Thickness(8, 3, 8, 3),
-                    FontSize = 11.5
-                };
+                var openWinBtn = MakeIconButton(
+                    cachedWin.IsRunning ? GeoWindow : GeoPlay,
+                    cachedWin.IsRunning ? "打开这个 AI 已在运行的窗口" : "启动这个 AI 的桌面窗口");
                 openWinBtn.Click += (_, _) =>
                 {
                     var msg = _autoDispatch.EnsureOrActivateAgentWindow(ag, proj?.PrimaryRoot, activateIfRunning: true);
@@ -1456,14 +1600,7 @@ public partial class MainWindow : Window
             }
             else
             {
-                var cfgOverviewBtn = new Button
-                {
-                    Content = "配置",
-                    Style = (Style)FindResource("ActionBtn"),
-                    Padding = new Thickness(8, 3, 8, 3),
-                    FontSize = 12,
-                    ToolTip = "打开这个 AI 的模型和权限"
-                };
+                var cfgOverviewBtn = MakeIconButton(GeoSliders, "打开这个 AI 的模型和权限");
                 var cfgAgent = ag;
                 cfgOverviewBtn.Click += (_, _) => OpenRosterAgentConfig(cfgAgent);
                 actionWrap.Children.Add(cfgOverviewBtn);
@@ -3594,19 +3731,7 @@ public partial class MainWindow : Window
                 };
             }
             rightWrap.Children.Add(workflowToggle);
-            var cfgBtn = new Button
-            {
-                Margin = new Thickness(0, 0, 8, 0),
-                Padding = new Thickness(12, 4, 12, 4),
-                Style = (Style)FindResource("ActionBtn"),
-                ToolTip = "查看模型、星级与权限",
-                Content = new TextBlock
-                {
-                    Text = "配置",
-                    FontSize = 13,
-                    FontWeight = FontWeights.SemiBold
-                }
-            };
+            var cfgBtn = MakeIconButton(GeoSliders, "查看模型、星级与权限");
             var cfgAgent = agent;
             cfgBtn.Click += (_, _) => OpenRosterAgentConfig(cfgAgent);
             rightWrap.Children.Add(cfgBtn);
@@ -3636,15 +3761,15 @@ public partial class MainWindow : Window
                         Background = Hex("#064E3B"),
                         BorderBrush = Hex("#10B981"),
                         BorderThickness = new Thickness(1),
-                        CornerRadius = new CornerRadius(5),
-                        Padding = new Thickness(8, 3, 8, 3),
+                        CornerRadius = new CornerRadius(4),
+                        Padding = new Thickness(6, 2, 6, 2),
                         Margin = new Thickness(0, 0, 6, 0),
                         VerticalAlignment = VerticalAlignment.Center,
-                        ToolTip = $"已安装 {cliSrc.DisplayName}{verTag}",
+                        ToolTip = $"命令行工具已安装{verTag}：{cliSrc.DisplayName}",
                         Child = new TextBlock
                         {
-                            Text = "✓ CLI已装",
-                            FontSize = 11.5,
+                            Text = "CLI",
+                            FontSize = 11,
                             FontWeight = FontWeights.SemiBold,
                             Foreground = Hex("#A7F3D0")
                         }
@@ -3779,14 +3904,9 @@ public partial class MainWindow : Window
 
             if (AutoDispatchService.ResolveGuiExecutable(agent) != null)
             {
-                var winBtn = new Button
-                {
-                    Content = winSt.IsRunning ? "↗ 窗口" : "启动",
-                    Style = (Style)FindResource("ActionBtn"),
-                    Padding = new Thickness(7, 2, 7, 2),
-                    Margin = new Thickness(0, 0, 4, 2),
-                    FontSize = 11.5
-                };
+                var winBtn = MakeIconButton(
+                    winSt.IsRunning ? GeoWindow : GeoPlay,
+                    winSt.IsRunning ? "打开这个 AI 已在运行的窗口" : "启动这个 AI 的桌面窗口");
                 winBtn.Click += (_, _) =>
                 {
                     var curProj = _reg.GetActiveProject();
@@ -5581,7 +5701,7 @@ public partial class MainWindow : Window
             ChkAutoCheckAppUpdate.IsChecked = _reg.UserConfig.AutoCheckAppUpdateOnStartup;
         if (TextAppUpdateStatus != null && _lastAppUpdate != null && !string.IsNullOrWhiteSpace(_lastAppUpdate.Message))
             TextAppUpdateStatus.Text = _lastAppUpdate.Message;
-        LongActionTracker.ApplyBusyIfNeeded(BtnCheckAppUpdate, LongActionTracker.AppUpdate, "立即检查更新");
+        LongActionTracker.ApplyBusyIfNeeded(BtnCheckAppUpdate, LongActionTracker.AppUpdate, "检查");
     }
 
     private void ScheduleStartupAppUpdateCheck()
@@ -6343,7 +6463,7 @@ public partial class MainWindow : Window
         if (isLongRunning)
         {
             _isResumingCheckpointInBackground = true;
-            LongActionTracker.Arm(BtnChooseCheckpointResolution, LongActionTracker.StallResolve, "🛠 选择解决方式");
+            LongActionTracker.Arm(BtnChooseCheckpointResolution, LongActionTracker.StallResolve, "解决");
             LongActionTracker.ShowBusy(BtnChooseCheckpointResolution);
             if (InterruptedCheckpointBanner != null) InterruptedCheckpointBanner.Visibility = Visibility.Collapsed;
         }

@@ -95,6 +95,83 @@
         </Style.Triggers>
     </Style>
 
+    <!-- 紧凑纯图标按钮：32x28，浅边框，悬停亮蓝 -->
+    <Style x:Key="IconToolBtn" TargetType="Button">
+        <Setter Property="Width" Value="32"/>
+        <Setter Property="Height" Value="28"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderBrush" Value="#2A3A52"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="Foreground" Value="#C5D2E4"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="SnapsToDevicePixels" Value="True"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="bd" Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="6">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="bd" Property="Background" Value="#173252"/>
+                            <Setter TargetName="bd" Property="BorderBrush" Value="#38BDF8"/>
+                            <Setter Property="Foreground" Value="#7DD3FC"/>
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="bd" Property="Background" Value="#0E2944"/>
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="bd" Property="Opacity" Value="0.45"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="IconToolBtnActive" TargetType="Button" BasedOn="{StaticResource IconToolBtn}">
+        <Setter Property="Background" Value="#173252"/>
+        <Setter Property="BorderBrush" Value="#38BDF8"/>
+        <Setter Property="Foreground" Value="#E0F2FE"/>
+    </Style>
+
+    <!-- 设置二级页横向分段标签：图标 + 二字，选中底部亮蓝条 -->
+    <Style x:Key="SettingsSegTabBtn" TargetType="RadioButton">
+        <Setter Property="Foreground" Value="#6D7C94"/>
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="FontSize" Value="12.5"/>
+        <Setter Property="Padding" Value="12,7"/>
+        <Setter Property="Margin" Value="1,0"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="RadioButton">
+                    <Border x:Name="root" Background="{TemplateBinding Background}"
+                            BorderBrush="Transparent" BorderThickness="0,0,0,2"
+                            CornerRadius="6" Padding="{TemplateBinding Padding}">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter Property="Foreground" Value="#C5D4E8"/>
+                            <Setter TargetName="root" Property="Background" Value="#182232"/>
+                        </Trigger>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter Property="Foreground" Value="#F8FAFC"/>
+                            <Setter Property="FontWeight" Value="SemiBold"/>
+                            <Setter TargetName="root" Property="BorderBrush" Value="#38BDF8"/>
+                            <Setter TargetName="root" Property="Background" Value="#152033"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <!-- 右上角窗口控制按钮（最小化 / 最大化 / 关闭） -->
     <Style x:Key="WinCtrlBtn" TargetType="Button">
         <Setter Property="Background" Value="Transparent"/>

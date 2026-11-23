@@ -80,19 +80,29 @@
 
                 <StackPanel Grid.Column="4" Orientation="Horizontal" VerticalAlignment="Center">
                     <Button x:Name="WorkflowSwitchBtn"
-                            Content="协同开关"
                             Style="{StaticResource SuccessBtn}"
-                            Padding="10,4"
+                            Padding="8,3"
                             Margin="0,0,6,0"
-                            ToolTip="开启或关闭多 AI 协同。关闭后各 AI 恢复独立工作。"
-                            Click="WorkflowSwitchBtn_Click"/>
+                            AutomationProperties.Name="协同开关"
+                            ToolTip="协同已开启，点击关闭"
+                            Click="WorkflowSwitchBtn_Click">
+                        <StackPanel Orientation="Horizontal">
+                            <Path x:Name="WorkflowSwitchIcon" Width="13" Height="13" Stretch="Uniform"
+                                  Fill="#A7F3D0" VerticalAlignment="Center"
+                                  Data="M13,2 L4,14 H11 L8,22 L20,9 H12 Z"/>
+                            <TextBlock x:Name="WorkflowSwitchLabel" Text="开" Margin="5,0,0,0" VerticalAlignment="Center" FontWeight="SemiBold"/>
+                        </StackPanel>
+                    </Button>
                     <Button x:Name="ToggleFloatingBtn"
-                            Content="悬浮窗"
-                            Style="{StaticResource ActionBtn}"
-                            Padding="9,4"
+                            Style="{StaticResource IconToolBtn}"
                             Margin="0,0,6,0"
-                            ToolTip="开启或关闭桌面置顶悬浮窗"
-                            Click="ToggleFloatingBtn_Click"/>
+                            AutomationProperties.Name="悬浮窗"
+                            ToolTip="悬浮窗已关闭，点击开启"
+                            Click="ToggleFloatingBtn_Click">
+                        <Path x:Name="ToggleFloatingIcon" Width="15" Height="15" Stretch="Uniform"
+                              Stroke="#C5D2E4" StrokeThickness="1.4" Fill="Transparent"
+                              Data="M3,4 H21 V16 H3 Z M12,9 H20 V18 H12 Z"/>
+                    </Button>
                     <Button x:Name="CloudRecTopBtn"
                             Content="云端推荐"
                             Visibility="Collapsed"
@@ -102,19 +112,27 @@
                             ToolTip="从云端拉取各 AI 模型最新能力评分并一键应用推荐配置"
                             Click="CloudRecTopBtn_Click"/>
                     <Button x:Name="HeaderOnboardingBtn"
-                            Content="新手向导"
-                            Style="{StaticResource PrimaryBtn}"
-                            Padding="10,4"
+                            Style="{StaticResource IconToolBtn}"
                             Margin="0,0,6,0"
-                            ToolTip="打开 3 步新手向导：认领本机 AI、选定主脑、开启悬浮窗"
-                            Click="HeaderOnboardingBtn_Click"/>
+                            AutomationProperties.Name="新手向导"
+                            ToolTip="3 步新手向导"
+                            Click="HeaderOnboardingBtn_Click">
+                        <Path Width="15" Height="15" Stretch="Uniform"
+                              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                              StrokeThickness="1.4" Fill="Transparent"
+                              Data="M12,3 A9,9 0 1 0 12.01,3 M12,7 L15.5,15 L12,13 L8.5,15 Z"/>
+                    </Button>
                     <Button x:Name="TopOpenSettingsBtn"
-                            Content="设置"
-                            Style="{StaticResource ActionBtn}"
-                            Padding="9,4"
+                            Style="{StaticResource IconToolBtn}"
                             Margin="0,0,10,0"
-                            ToolTip="打开软件与个性化设置"
-                            Click="TopOpenSettingsBtn_Click"/>
+                            AutomationProperties.Name="设置"
+                            ToolTip="打开软件设置"
+                            Click="TopOpenSettingsBtn_Click">
+                        <Path Width="15" Height="15" Stretch="Uniform"
+                              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                              StrokeThickness="1.4" Fill="Transparent"
+                              Data="M12,8 A4,4 0 1 0 12.01,8 M12,3 V6 M12,18 V21 M4.5,12 H7.5 M16.5,12 H19.5 M6.4,6.4 L8.4,8.4 M15.6,15.6 L17.6,17.6 M17.6,6.4 L15.6,8.4 M8.4,15.6 L6.4,17.6"/>
+                    </Button>
 
                     <!-- 分隔竖线 + 右上角窗口控制按钮组（最小化 / 最大化 / 关闭） -->
                     <Border Width="1" Height="18" Background="#263348" Margin="0,0,6,0" VerticalAlignment="Center"/>
@@ -148,10 +166,31 @@
             <Border Grid.Column="0" Background="{DynamicResource BgSidebarBrush}" BorderBrush="{DynamicResource BorderSectionBrush}" BorderThickness="0,0,1,0" Padding="10,14">
                 <DockPanel>
                     <StackPanel DockPanel.Dock="Top">
-                        <RadioButton x:Name="NavOverview" Content="工作台" Style="{StaticResource NavBtn}" GroupName="MainNav" IsChecked="True" Checked="Nav_Checked"/>
-                        <RadioButton x:Name="NavSettings" Content="AI 配置" Style="{StaticResource NavBtn}" GroupName="MainNav" Checked="Nav_Checked"/>
-                        <RadioButton x:Name="NavDialogs" Content="对话与派单" Style="{StaticResource NavBtn}" GroupName="MainNav" Checked="Nav_Checked"/>
-                        <RadioButton x:Name="NavAppSettings" Content="设置" Style="{StaticResource NavBtn}" GroupName="MainNav" Checked="Nav_Checked"/>
+                        <RadioButton x:Name="NavOverview" Style="{StaticResource NavBtn}" GroupName="MainNav" IsChecked="True" Checked="Nav_Checked">
+                            <StackPanel Orientation="Horizontal">
+                                <Path Width="15" Height="15" Stretch="Uniform" StrokeThickness="1.4"
+                                      Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"
+                                      Data="M3,3 H10 V10 H3 Z M13,3 H20 V10 H13 Z M3,13 H10 V20 H3 Z M13,13 H20 V20 H13 Z"/>
+                                <TextBlock Text="工作台" Margin="8,0,0,0" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </RadioButton>
+                        <RadioButton x:Name="NavSettings" Style="{StaticResource NavBtn}" GroupName="MainNav" Checked="Nav_Checked">
+                            <StackPanel Orientation="Horizontal">
+                                <Path Width="15" Height="15" Stretch="Uniform" StrokeThickness="1.4"
+                                      Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"
+                                      Data="M4,6 H20 M4,12 H20 M4,18 H20 M9,4 V8 M15,10 V14 M8,16 V20"/>
+                                <TextBlock Text="AI 配置" Margin="8,0,0,0" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </RadioButton>
+                        <RadioButton x:Name="NavDialogs" Style="{StaticResource NavBtn}" GroupName="MainNav" Checked="Nav_Checked">
+                            <StackPanel Orientation="Horizontal">
+                                <Path Width="15" Height="15" Stretch="Uniform" StrokeThickness="1.4"
+                                      Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"
+                                      Data="M4,4 H20 V15 H12 L8,19 V15 H4 Z"/>
+                                <TextBlock Text="对话与派单" Margin="8,0,0,0" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </RadioButton>
+                        <RadioButton x:Name="NavAppSettings" Content="设置" Style="{StaticResource NavBtn}" GroupName="MainNav" Checked="Nav_Checked" Visibility="Collapsed"/>
                         <Expander x:Name="NavAdvancedExpander" IsExpanded="False" Margin="0,8,0,0" Focusable="False" Background="Transparent" Foreground="#94A3B8">
                             <Expander.Header>
                                 <TextBlock Text="高级" FontSize="12" Foreground="#94A3B8"/>
@@ -192,8 +231,22 @@
                                 </ControlTemplate>
                             </Expander.Template>
                             <StackPanel>
-                                <RadioButton x:Name="NavSync" Content="规则与技能" Style="{StaticResource NavBtn}" GroupName="MainNav" FontSize="12.5" Checked="Nav_Checked"/>
-                                <RadioButton x:Name="NavOps" Content="快照与任务单" Style="{StaticResource NavBtn}" GroupName="MainNav" FontSize="12.5" Checked="Nav_Checked"/>
+                                <RadioButton x:Name="NavSync" Style="{StaticResource NavBtn}" GroupName="MainNav" FontSize="12.5" Checked="Nav_Checked">
+                                    <StackPanel Orientation="Horizontal">
+                                        <Path Width="15" Height="15" Stretch="Uniform" StrokeThickness="1.3"
+                                              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"
+                                              Data="M5,4 H10 A2,2 0 0 1 12,6 V20 H7 A2,2 0 0 0 5,18 Z M19,4 H14 A2,2 0 0 0 12,6 V20 H17 A2,2 0 0 1 19,18 Z"/>
+                                        <TextBlock Text="规则与技能" Margin="8,0,0,0" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </RadioButton>
+                                <RadioButton x:Name="NavOps" Style="{StaticResource NavBtn}" GroupName="MainNav" FontSize="12.5" Checked="Nav_Checked">
+                                    <StackPanel Orientation="Horizontal">
+                                        <Path Width="15" Height="15" Stretch="Uniform" StrokeThickness="1.3"
+                                              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"
+                                              Data="M4,8 H8 L10,5 H14 L16,8 H20 V19 H4 Z M12,10 A3,3 0 1 0 12.01,10"/>
+                                        <TextBlock Text="快照与任务单" Margin="8,0,0,0" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </RadioButton>
                             </StackPanel>
                         </Expander>
                     </StackPanel>
@@ -258,7 +311,7 @@
                                                FontSize="11.5" Foreground="#CBD5E1" Margin="0,3,0,0" TextWrapping="Wrap"/>
                                 </StackPanel>
                                 <WrapPanel Grid.Column="1" VerticalAlignment="Center">
-                                    <Button x:Name="BtnChooseCheckpointResolution" Content="🛠 选择解决方式" Style="{StaticResource PrimaryBtn}" Margin="0,0,6,0" Click="BtnChooseCheckpointResolution_Click"/>
+                                    <Button x:Name="BtnChooseCheckpointResolution" Content="解决" Style="{StaticResource PrimaryBtn}" Margin="0,0,6,0" ToolTip="选择解决方式：清理弹窗重试、换通道或改派" Click="BtnChooseCheckpointResolution_Click"/>
                                     <Button x:Name="BtnResumeCheckpoint" Content="断点续跑" Style="{StaticResource AmberBtn}" Margin="0,0,6,0" Click="BtnResumeCheckpoint_Click"/>
                                     <Button x:Name="BtnDismissCheckpoint" Content="忽略" Style="{StaticResource ActionBtn}" Click="BtnDismissCheckpoint_Click"/>
                                 </WrapPanel>
@@ -285,9 +338,14 @@
                                         <Border Background="#111827" BorderBrush="#24324B" BorderThickness="1" CornerRadius="8" Padding="8,3" Margin="0,0,8,0" VerticalAlignment="Center">
                                             <TextBlock x:Name="WorkflowDiagramRosterSummary" Text="主脑 0 · 执行 0" FontSize="11" Foreground="#94A3B8"/>
                                         </Border>
-                                        <Button x:Name="WorkflowDiagramDemoBtn" Content="▶ 演示流转" Style="{StaticResource ActionBtn}" Padding="10,3" FontSize="11.5"
+                                        <Button x:Name="WorkflowDiagramDemoBtn" Style="{StaticResource IconToolBtn}"
+                                                AutomationProperties.Name="演示流转"
                                                 ToolTip="空闲态也可循环演示六阶段流光动画；再点一次停止并回到真实状态"
-                                                Click="WorkflowDiagramDemoBtn_Click"/>
+                                                Click="WorkflowDiagramDemoBtn_Click">
+                                            <Path x:Name="WorkflowDiagramDemoIcon" Width="13" Height="13" Stretch="Uniform"
+                                                  Stroke="#E6EDF7" StrokeThickness="1.6" StrokeLineJoin="Round" Fill="Transparent"
+                                                  Data="M8,5 L18,12 L8,19 Z"/>
+                                        </Button>
                                     </StackPanel>
                                 </Grid>
                                 <Canvas x:Name="WorkflowDiagramCanvas" Height="158" ClipToBounds="True" SizeChanged="WorkflowDiagramCanvas_SizeChanged"/>
@@ -325,7 +383,14 @@
                                         <WrapPanel>
                                             <Button Content="对话与派单" Style="{StaticResource PrimaryBtn}" Padding="10,4" Margin="0,0,6,0" Click="JumpToDialogsBtn_Click"/>
                                             <Button Content="查看全文" Style="{StaticResource ActionBtn}" Padding="10,4" Margin="0,0,6,0" Click="OverviewOpenLatestInboxBtn_Click"/>
-                                            <Button x:Name="ClearLiveStatusBtn" Content="清理状态" Style="{StaticResource ActionBtn}" Padding="10,4" ToolTip="清理历史已完成或异常残留的状态记录，归零工作台与悬浮窗面板" Click="ClearLiveStatusBtn_Click"/>
+                                            <Button x:Name="ClearLiveStatusBtn" Style="{StaticResource IconToolBtn}"
+                                                    AutomationProperties.Name="清理状态"
+                                                    ToolTip="清理历史已完成或异常残留的状态记录，归零工作台与悬浮窗面板"
+                                                    Click="ClearLiveStatusBtn_Click">
+                                                <Path Width="14" Height="14" Stretch="Uniform" StrokeThickness="1.4"
+                                                      Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                                      Data="M5,19 H19 M8,19 L10,7 H14 L16,19 M12,7 V4 M9,4 H15"/>
+                                            </Button>
                                         </WrapPanel>
                                     </StackPanel>
                                 </Border>
@@ -367,7 +432,12 @@
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
                                     <TextBlock x:Name="DialogBrowserCountTitle" Grid.Column="0" Text="对话" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
-                                    <Button x:Name="RefreshDialogsListBtn" Grid.Column="1" Content="🔄 刷新" Style="{StaticResource ActionBtn}" Padding="8,2" Click="RefreshDialogsListBtn_Click"/>
+                                    <Button x:Name="RefreshDialogsListBtn" Grid.Column="1" Style="{StaticResource IconToolBtn}"
+                                            AutomationProperties.Name="刷新" ToolTip="刷新对话列表" Click="RefreshDialogsListBtn_Click">
+                                        <Path Width="14" Height="14" Stretch="Uniform" StrokeThickness="1.5"
+                                              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                              Data="M16,5 V9 H12 M16,9 A6,6 0 1 1 14,5.2"/>
+                                    </Button>
                                 </Grid>
 
                                 <Grid>
@@ -377,15 +447,19 @@
                                         <ColumnDefinition Width="*"/>
                                     </Grid.ColumnDefinitions>
                                     <ComboBox x:Name="DialogAgentFilterCombo" Grid.Column="0" SelectionChanged="DialogFilter_Changed">
-                                        <ComboBoxItem Content="● 全部 AI 工具" Tag="all" IsSelected="True"/>
-                                        <ComboBoxItem Content="🟣 Antigravity" Tag="antigravity"/>
-                                        <ComboBoxItem Content="🟢 Codex / Grok" Tag="codex_cli"/>
-                                        <ComboBoxItem Content="🔵 Cursor IDE" Tag="cursor"/>
+                                        <ComboBoxItem Content="全部" Tag="all" IsSelected="True"/>
+                                        <ComboBoxItem Content="Antigravity" Tag="antigravity"/>
+                                        <ComboBoxItem Content="Codex" Tag="codex_cli"/>
+                                        <ComboBoxItem Content="Cursor" Tag="cursor"/>
                                     </ComboBox>
                                     <Grid Grid.Column="2">
                                         <TextBox x:Name="DialogSearchBox" Padding="9,5,26,5" ToolTip="输入关键词筛选对话标题或 SessionId" TextChanged="DialogSearchBox_TextChanged"/>
-                                        <TextBlock x:Name="DialogSearchPlaceholder" Text="🔍 搜索对话标题、AI 或 ID..." Foreground="#64748B" FontSize="11.5"
-                                                   Margin="11,0,26,0" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                                        <StackPanel x:Name="DialogSearchPlaceholder" Orientation="Horizontal" VerticalAlignment="Center"
+                                                    Margin="10,0,26,0" IsHitTestVisible="False">
+                                            <Path Width="13" Height="13" Stretch="Uniform" Stroke="#64748B" StrokeThickness="1.5"
+                                                  Data="M10,4 A5,5 0 1 0 10,14 A5,5 0 1 0 10,4 M14,14 L18,18" VerticalAlignment="Center"/>
+                                            <TextBlock Text="搜索" Foreground="#64748B" FontSize="12" Margin="6,0,0,0" VerticalAlignment="Center"/>
+                                        </StackPanel>
                                         <Button x:Name="ClearDialogSearchBtn" Content="✕" Width="22" Height="22" HorizontalAlignment="Right" VerticalAlignment="Center"
                                                 Margin="0,0,3,0" Visibility="Collapsed" Background="Transparent" BorderThickness="0" Foreground="#94A3B8"
                                                 Cursor="Hand" FontSize="11" ToolTip="清空搜索" Click="ClearDialogSearchBtn_Click"/>
@@ -465,7 +539,7 @@
                                     </Grid.ColumnDefinitions>
                                     <TextBox x:Name="QuickDispatchPromptBox" Grid.Column="0"
                                              Text="请结合当前项目规则与 TASK.md，检查最近改动的潜在风险并给出 3 条精简建议。"/>
-                                    <Button x:Name="RunHeadlessDispatchBtn" Grid.Column="2" Content="⚡ 分配任务并执行" Style="{StaticResource SuccessBtn}" Click="RunHeadlessDispatchBtn_Click"/>
+                                    <Button x:Name="RunHeadlessDispatchBtn" Grid.Column="2" Content="派单执行" Style="{StaticResource SuccessBtn}" ToolTip="分配任务并执行" Click="RunHeadlessDispatchBtn_Click"/>
                                 </Grid>
                             </StackPanel>
                         </Border>
@@ -492,7 +566,7 @@
                                 <WrapPanel Grid.Column="1" VerticalAlignment="Center">
                                     <Button x:Name="InitFoundationBtn" Content="初始化工程目录" Style="{StaticResource ActionBtn}" Margin="0,0,6,0" Click="InitFoundationBtn_Click"/>
                                     <Button x:Name="RestoreSyncBackupBtn" Content="恢复上次备份" Style="{StaticResource ActionBtn}" Margin="0,0,6,0" Click="RestoreSyncBackupBtn_Click"/>
-                                    <Button x:Name="SyncAllNowBtn" Content="⚡ 立即挂载同步" Style="{StaticResource SuccessBtn}" Click="SyncAllNowBtn_Click"/>
+                                    <Button x:Name="SyncAllNowBtn" Content="立即同步" Style="{StaticResource SuccessBtn}" ToolTip="立即挂载同步规则与技能" Click="SyncAllNowBtn_Click"/>
                                 </WrapPanel>
                             </Grid>
                             <Border Height="1" Background="{StaticResource DividerRowBrush}" Margin="0,6,0,5"/>
@@ -523,10 +597,10 @@
                                     </Grid.ColumnDefinitions>
                                     <TextBlock x:Name="RuleSkillListTitle" Grid.Column="0" Text="◆ 技能与规则明细" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="0,0,8,0"/>
                                     <ComboBox x:Name="RuleSkillFilterCombo" Grid.Column="1" Width="142" SelectionChanged="RuleSkillFilterCombo_SelectionChanged">
-                                        <ComboBoxItem Content="● 全部技能与规则" Tag="all" IsSelected="True"/>
-                                        <ComboBoxItem Content="⚡ 仅看技能 (Skills)" Tag="skill"/>
-                                        <ComboBoxItem Content="📜 仅看项目规则" Tag="rule"/>
-                                        <ComboBoxItem Content="🌐 全局规则与经验" Tag="global"/>
+                                        <ComboBoxItem Content="全部" Tag="all" IsSelected="True"/>
+                                        <ComboBoxItem Content="技能" Tag="skill"/>
+                                        <ComboBoxItem Content="项目规则" Tag="rule"/>
+                                        <ComboBoxItem Content="全局规则" Tag="global"/>
                                     </ComboBox>
                                 </Grid>
                                 <ScrollViewer VerticalScrollBarVisibility="Auto">
@@ -673,8 +747,20 @@
                                         <Button x:Name="BtnManageTeamProfiles" Content="编辑模型与分工" Style="{StaticResource PrimaryBtn}" Padding="16,8" FontSize="14" Margin="0,0,8,0"
                                                 ToolTip="打开配置方案中心：调整 AI 模型、能力强度、规则与路由"
                                                 Click="BtnManageTeamProfiles_Click"/>
-                                        <Button x:Name="RescanBtn" Content="扫描本机" Style="{StaticResource ActionBtn}" Padding="12,8" FontSize="13" Margin="0,0,8,0" ToolTip="重新扫描本机已安装的 AI 客户端、扩展与 CLI" Click="RescanBtn_Click"/>
-                                        <Button Content="云端推荐" Style="{StaticResource AmberBtn}" Padding="12,8" FontSize="13" ToolTip="从云端拉取各 AI 模型最新能力评分并应用推荐" Click="CloudRecTopBtn_Click"/>
+                                        <Button x:Name="RescanBtn" Style="{StaticResource ActionBtn}" Padding="8,4" Margin="0,0,6,0" ToolTip="重新扫描本机已安装的 AI 客户端、扩展与 CLI" Click="RescanBtn_Click">
+                                            <StackPanel Orientation="Horizontal">
+                                                <Path Width="14" Height="14" Stretch="Uniform" Stroke="#E6EDF7" StrokeThickness="1.5" VerticalAlignment="Center"
+                                                      Data="M16,5 V9 H12 M16,9 A6,6 0 1 1 14,5.2"/>
+                                                <TextBlock Text="扫描" Margin="5,0,0,0" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Button>
+                                        <Button Style="{StaticResource AmberBtn}" Padding="8,4" ToolTip="从云端拉取各 AI 模型最新能力评分并应用推荐" Click="CloudRecTopBtn_Click">
+                                            <StackPanel Orientation="Horizontal">
+                                                <Path Width="14" Height="14" Stretch="Uniform" Stroke="#FDE68A" StrokeThickness="1.4" VerticalAlignment="Center"
+                                                      Data="M12,3 L13.6,9 H20 L14.8,12.6 L16.6,19 L12,15.2 L7.4,19 L9.2,12.6 L4,9 H10.4 Z"/>
+                                                <TextBlock Text="推荐" Margin="5,0,0,0" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Button>
                                     </WrapPanel>
                                 </Grid>
 
@@ -768,7 +854,13 @@
 
                                     <StackPanel x:Name="AgentViewToolbar" Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
                                         <Button x:Name="WorkflowSwitchManagerBtn" Content="工作流开关" Style="{StaticResource PrimaryBtn}" Padding="9,4" Margin="0,0,6,0" ToolTip="集中批量启停各 AI 工具是否参与工作流" Click="WorkflowSwitchManagerBtn_Click"/>
-                                        <Button x:Name="AddCustomAiBtn" Content="＋ 外部 AI" Style="{StaticResource ActionBtn}" Padding="9,4" ToolTip="接入并纳管额外的外部 AI 工具节点" Click="AddCustomAiBtn_Click"/>
+                                        <Button x:Name="AddCustomAiBtn" Style="{StaticResource ActionBtn}" Padding="8,4" ToolTip="接入并纳管额外的外部 AI 工具节点" Click="AddCustomAiBtn_Click">
+                                            <StackPanel Orientation="Horizontal">
+                                                <Path Width="12" Height="12" Stretch="Uniform" Stroke="#E6EDF7" StrokeThickness="1.6" VerticalAlignment="Center"
+                                                      Data="M12,4 V20 M4,12 H20"/>
+                                                <TextBlock Text="AI" Margin="4,0,0,0" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Button>
                                     </StackPanel>
                                 </Grid>
 
@@ -834,423 +926,489 @@
                     </StackPanel>
                 </ScrollViewer>
 
-                <!-- ==================== PAGE 6: 软件与个性化设置（工作流启停总开关 / 仅软件运行时生效 / 开机自启 / 悬浮窗主题） ==================== -->
-                <ScrollViewer x:Name="PageAppSettings" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
-                    <StackPanel>
-
-                        <Border Style="{StaticResource SectionCard}" Padding="16,14" Margin="0,0,0,12">
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,16,0">
-                                    <TextBlock Text="新手引导" FontSize="16" FontWeight="SemiBold" Foreground="#F8FAFC"/>
-                                    <TextBlock Text="3 步认领本机 AI" FontSize="12.5" Foreground="#94A3B8" Margin="0,4,0,0"
-                                               ToolTip="扫描本机 AI、选定主脑和成员、开启悬浮窗。可随时重开。"/>
+                <!-- ==================== PAGE 6: 设置二级页（常规 / 外观 / 容灾 / 关于） ==================== -->
+                <DockPanel x:Name="PageAppSettings" Visibility="Collapsed" LastChildFill="True">
+                    <Border DockPanel.Dock="Top" BorderBrush="{DynamicResource BorderSectionBrush}" BorderThickness="0,0,0,1" Padding="0,0,0,8" Margin="0,0,0,12">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <Button x:Name="BtnSettingsBack" Style="{StaticResource ActionBtn}" Padding="8,4" Margin="0,0,12,0"
+                                        ToolTip="返回上一页" Click="BtnSettingsBack_Click">
+                                    <StackPanel Orientation="Horizontal">
+                                        <Path Width="14" Height="14" Stretch="Uniform" Stroke="#E6EDF7" StrokeThickness="1.6"
+                                              Data="M14,5 L7,12 L14,19 M7,12 H20" VerticalAlignment="Center"/>
+                                        <TextBlock Text="返回" Margin="6,0,0,0" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </Button>
+                                <TextBlock Text="设置" FontSize="22" FontWeight="SemiBold" Foreground="#F8FAFC" VerticalAlignment="Center"/>
+                            </StackPanel>
+                            <Border Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                    Background="#121924" BorderBrush="#232D3F" BorderThickness="1" CornerRadius="8" Padding="3,2">
+                                <StackPanel Orientation="Horizontal">
+                                    <RadioButton x:Name="TabSettingsGeneral" GroupName="SettingsSubTabs" Tag="general" IsChecked="True"
+                                                 Style="{StaticResource SettingsSegTabBtn}" Checked="SettingsSubTab_Checked"
+                                                 ToolTip="协同开关、开机与关闭行为">
+                                        <StackPanel Orientation="Horizontal">
+                                            <Path Width="15" Height="15" Stretch="Uniform" StrokeThickness="1.4"
+                                                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"
+                                                  Data="M12,8 A4,4 0 1 0 12.01,8 M12,3 V6 M12,18 V21 M5,12 H8 M16,12 H19 M7,7 L9,9 M15,15 L17,17 M17,7 L15,9 M9,15 L7,17"/>
+                                            <TextBlock Text="常规" Margin="6,0,0,0" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </RadioButton>
+                                    <RadioButton x:Name="TabSettingsAppearance" GroupName="SettingsSubTabs" Tag="appearance"
+                                                 Style="{StaticResource SettingsSegTabBtn}" Checked="SettingsSubTab_Checked"
+                                                 ToolTip="主题、形态与透明度">
+                                        <StackPanel Orientation="Horizontal">
+                                            <Path Width="15" Height="15" Stretch="Uniform" StrokeThickness="1.4"
+                                                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"
+                                                  Data="M3,4 H21 V16 H3 Z M3,8 H21 M6,12 H8 M11,12 H13 M16,12 H18"/>
+                                            <TextBlock Text="外观" Margin="6,0,0,0" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </RadioButton>
+                                    <RadioButton x:Name="TabSettingsResilience" GroupName="SettingsSubTabs" Tag="resilience"
+                                                 Style="{StaticResource SettingsSegTabBtn}" Checked="SettingsSubTab_Checked"
+                                                 ToolTip="断线可重试或换人">
+                                        <StackPanel Orientation="Horizontal">
+                                            <Path Width="15" Height="15" Stretch="Uniform" StrokeThickness="1.4"
+                                                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"
+                                                  Data="M12,3 L19,6 V12 C19,16 16,19 12,21 C8,19 5,16 5,12 V6 Z M8,13 H10.5 L12,9 L13.5,15 L15,12 H17"/>
+                                            <TextBlock Text="容灾" Margin="6,0,0,0" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </RadioButton>
+                                    <RadioButton x:Name="TabSettingsAbout" GroupName="SettingsSubTabs" Tag="about"
+                                                 Style="{StaticResource SettingsSegTabBtn}" Checked="SettingsSubTab_Checked"
+                                                 ToolTip="版本、更新与新手引导">
+                                        <StackPanel Orientation="Horizontal">
+                                            <Path Width="15" Height="15" Stretch="Uniform" StrokeThickness="1.4"
+                                                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"
+                                                  Data="M12,3 A8,8 0 1 0 12.01,3 M12,10 V16 M12,7.2 V7.6"/>
+                                            <TextBlock Text="关于" Margin="6,0,0,0" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </RadioButton>
                                 </StackPanel>
-                                <Button x:Name="BtnReopenOnboarding" Grid.Column="1" Content="重开向导" Style="{StaticResource PrimaryBtn}" Padding="16,8" FontSize="14" VerticalAlignment="Center" Click="BtnReopenOnboarding_Click" ToolTip="再看一遍 3 步新手向导"/>
-                            </Grid>
-                        </Border>
+                            </Border>
+                        </Grid>
+                    </Border>
 
-                        <!-- 软件版本与检查更新 -->
-                        <Border Style="{StaticResource SectionCard}" Padding="14,10" Margin="0,0,0,9">
-                            <StackPanel>
-                                <Grid Margin="0,0,0,8">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel Grid.Column="0" Margin="0,0,12,0">
-                                        <TextBlock Text="检查更新" FontSize="14" FontWeight="SemiBold" Foreground="#F8FAFC"
-                                                   ToolTip="顶栏版本号可随时检查。启动约 4 秒后后台静默检查一次，只有发现新版本才提示。"/>
-                                        <TextBlock Text="有新版才提示" Foreground="#94A3B8" FontSize="12" Margin="0,2,0,0"/>
-                                    </StackPanel>
-                                    <Button x:Name="BtnCheckAppUpdate"
-                                            Grid.Column="1"
-                                            Content="立即检查更新"
-                                            Style="{StaticResource PrimaryBtn}"
-                                            VerticalAlignment="Center"
-                                            ToolTip="从 AIDeck 官方 GitHub 发布源检查最新版本"
-                                            Click="BtnCheckAppUpdate_Click"/>
-                                </Grid>
-                                <Border Background="{DynamicResource BgInputBrush}" BorderBrush="{DynamicResource BorderSectionBrush}" BorderThickness="1" CornerRadius="6" Padding="12,9">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                        <Grid>
+                            <StackPanel x:Name="SettingsPanelGeneral">
+                                <Border Style="{StaticResource SectionCard}" Padding="14,12">
                                     <StackPanel>
-                                        <TextBlock x:Name="TextAboutCurrentVersion" Text="AIDeck · 多 AI 协同中心 v1.9.14" FontSize="13" FontWeight="SemiBold" Foreground="#E0F2FE" Margin="0,0,0,4"/>
-                                        <TextBlock x:Name="TextAppUpdateStatus" Text="尚未检查更新" FontSize="12" Foreground="#94A3B8" TextWrapping="Wrap" Margin="0,0,0,8"
-                                                   ToolTip="可手动检查，或等待启动后的后台静默检查。只有发现新版本才提示。"/>
-                                        <TextBlock x:Name="LblUpdateRepoUrl" Text="更新源" Foreground="#CBD5E1" FontSize="12" Margin="0,0,0,4" Visibility="Collapsed"
-                                                   ToolTip="GitHub / Gitee 仓库、SSH、owner/repo，或自定义 JSON。留空则读取本地 Git origin。"/>
-                                        <TextBox x:Name="TextUpdateRepoUrl" Height="28" FontSize="12" Padding="8,4" Margin="0,0,0,8" Visibility="Collapsed" LostFocus="TextUpdateRepoUrl_LostFocus"
-                                                 ToolTip="例如 https://github.com/owner/repo 、git@gitee.com:owner/repo.git 或 https://example.com/latest.json"/>
-                                        <CheckBox x:Name="ChkAutoCheckAppUpdate"
-                                                  Content="启动后查更新"
-                                                  ToolTip="启动后自动检查软件更新（后台执行，不阻塞界面）"
-                                                  Foreground="#7DD3FC" FontSize="12"
-                                                  Checked="AppSettingCheckBox_Changed" Unchecked="AppSettingCheckBox_Changed"/>
-                                    </StackPanel>
-                                </Border>
-                            </StackPanel>
-                        </Border>
-
-                        <!-- 1. 工作流全局启停与软件运行生命周期 -->
-                        <Border Style="{StaticResource SectionCard}" Padding="14,10" Margin="0,0,0,9">
-                            <StackPanel>
-                                <Grid Margin="0,0,0,8">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel Grid.Column="0" Margin="0,0,12,0">
-                                        <TextBlock Text="协同开关" FontSize="14" FontWeight="SemiBold" Foreground="#F8FAFC"
-                                                   ToolTip="控制多 AI 协同是否启用。停用或关闭本软件时，各 AI 自动恢复独立状态。"/>
-                                        <TextBlock Text="停用即各自独立" Foreground="#94A3B8" FontSize="12" Margin="0,2,0,0"/>
-                                    </StackPanel>
-                                    <WrapPanel Grid.Column="1" VerticalAlignment="Center">
-                                        <Button x:Name="BtnCreateDesktopShortcuts" Content="生成桌面图标" Style="{StaticResource ActionBtn}" Margin="0,0,6,0" Click="BtnCreateDesktopShortcuts_Click"/>
-                                        <Button x:Name="BtnForceQuitApp" Content="彻底退出软件" Style="{StaticResource AmberBtn}" ToolTip="彻底退出本软件（若勾选了仅软件运行时生效，退出时将自动卸载协同锚点）" Click="BtnForceQuitApp_Click"/>
-                                    </WrapPanel>
-                                </Grid>
-
-                                <Border Background="{DynamicResource BgInputBrush}" BorderBrush="{DynamicResource BorderSectionBrush}" BorderThickness="1" CornerRadius="6" Padding="12,9" Margin="0,0,0,8">
-                                    <StackPanel>
-                                        <CheckBox x:Name="ChkWorkflowEngineEnabled"
-                                                  Content="启用协同工作流"
-                                                  ToolTip="启用多 AI 协同总开关。取消勾选后立即剥离协同锚点，恢复各自独立对话。"
-                                                  Foreground="#F1F5F9" FontSize="12.5" FontWeight="SemiBold" Margin="0,0,0,6"
-                                                  Checked="WorkflowLifecycleCheckBox_Changed" Unchecked="WorkflowLifecycleCheckBox_Changed"/>
-
-                                        <CheckBox x:Name="ChkWorkflowOnlyWhenRunning"
-                                                  Content="仅软件运行时生效"
-                                                  ToolTip="软件退出时自动关闭工作流，下次启动自动恢复。"
-                                                  Foreground="#CBD5E1" FontSize="12" Margin="0,0,0,6"
-                                                  Checked="WorkflowLifecycleCheckBox_Changed" Unchecked="WorkflowLifecycleCheckBox_Changed"/>
-
-                                        <Border Height="1" Background="{DynamicResource DividerRowBrush}" Margin="0,2,0,6"/>
-
-                                        <CheckBox x:Name="ChkRunAtStartup"
-                                                  Content="开机自动启动"
-                                                  ToolTip="写入 Windows 当前用户 Run 启动项，登录后自动启动 AIDeck。"
-                                                  Foreground="#CBD5E1" FontSize="12" Margin="0,0,0,5"
-                                                  Checked="AppSettingCheckBox_Changed" Unchecked="AppSettingCheckBox_Changed"/>
-
-                                        <CheckBox x:Name="ChkStartupDirectFloating"
-                                                  Content="开机进悬浮窗"
-                                                  ToolTip="开机自启时直接进入桌面悬浮窗和系统托盘，不打开主窗口。"
-                                                  Foreground="#94A3B8" FontSize="12" Margin="0,0,0,5"
-                                                  Checked="AppSettingCheckBox_Changed" Unchecked="AppSettingCheckBox_Changed"/>
-
-                                        <StackPanel Margin="0,2,0,0">
-                                            <TextBlock Text="点关闭按钮时"
-                                                       Foreground="#CBD5E1" FontSize="12" Margin="0,0,0,4"
-                                                       ToolTip="点击主界面关闭按钮时的行为。"/>
-                                            <ComboBox x:Name="ComboCloseButtonAction"
-                                                      Height="28" FontSize="12"
-                                                      SelectionChanged="ComboCloseButtonAction_SelectionChanged">
-                                                <ComboBoxItem Content="每次弹窗询问（推荐）" Tag="ask"/>
-                                                <ComboBoxItem Content="最小化到系统托盘" Tag="minimize_to_tray"/>
-                                                <ComboBoxItem Content="直接关闭退出软件" Tag="exit"/>
-                                            </ComboBox>
-                                            <TextBlock Text="可改回每次询问"
-                                                       Foreground="#64748B" FontSize="11" Margin="0,4,0,0"
-                                                       ToolTip="勾选「记住此操作」后，可随时在此改回「每次弹窗询问」。"/>
-                                        </StackPanel>
-
-                                        <!-- 隐藏保留旧版复选框引用，与 CloseButtonAction 双向同步 -->
-                                        <CheckBox x:Name="ChkCloseToFloating" Visibility="Collapsed"
-                                                  Checked="AppSettingCheckBox_Changed" Unchecked="AppSettingCheckBox_Changed"/>
-                                    </StackPanel>
-                                </Border>
-                            </StackPanel>
-                        </Border>
-
-                        <!-- 2. 桌面悬浮窗、视觉主题与个性化设置 -->
-                        <Border Style="{StaticResource SectionCard}" Padding="14,10" Margin="0,0,0,9">
-                            <StackPanel>
-                                <Grid Margin="0,0,0,8">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel Grid.Column="0">
-                                        <TextBlock Text="悬浮窗与外观" FontSize="14" FontWeight="SemiBold" Foreground="#F8FAFC"
-                                                   ToolTip="支持主题切换、展开或收起胶囊，以及透明度调节。"/>
-                                        <TextBlock Text="主题、形态、透明度" Foreground="#94A3B8" FontSize="12" Margin="0,3,0,0"/>
-                                    </StackPanel>
-                                    <WrapPanel Grid.Column="1" VerticalAlignment="Center">
-                                        <Button x:Name="BtnPreviewExpandFloating" Content="展开悬浮窗" Style="{StaticResource ActionBtn}" Margin="0,0,6,0" Click="BtnPreviewExpandFloating_Click"/>
-                                        <Button x:Name="BtnPreviewCollapseFloating" Content="收起胶囊" Style="{StaticResource ActionBtn}" Margin="0,0,6,0" Click="BtnPreviewCollapseFloating_Click"/>
-                                        <Button x:Name="BtnResetFloatingPos" Content="复位右上角" Style="{StaticResource ActionBtn}" Click="BtnResetFloatingPos_Click"/>
-                                    </WrapPanel>
-                                </Grid>
-
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="1*"/>
-                                        <ColumnDefinition Width="12"/>
-                                        <ColumnDefinition Width="1*"/>
-                                    </Grid.ColumnDefinitions>
-
-                                    <!-- 左列：行为与智能联动开关 -->
-                                    <Border Grid.Column="0" Background="{DynamicResource BgInputBrush}" BorderBrush="{DynamicResource BorderSectionBrush}" BorderThickness="1" CornerRadius="6" Padding="12,10">
-                                        <StackPanel>
-                                            <CheckBox x:Name="ChkFloatingEnabled"
-                                                      Content="开启桌面悬浮窗"
-                                                      ToolTip="常驻桌面，实时显示各 AI 头像与工作动态。"
-                                                      Foreground="#F1F5F9" FontSize="12.5" FontWeight="SemiBold" Margin="0,0,0,8"
-                                                      Checked="AppSettingCheckBox_Changed" Unchecked="AppSettingCheckBox_Changed"/>
-
-                                            <CheckBox x:Name="ChkFloatingTopmost"
-                                                      Content="悬浮窗始终置顶"
-                                                      ToolTip="不被编辑器或游戏窗口遮挡。"
-                                                      Foreground="#E2E8F0" FontSize="12" Margin="0,0,0,8"
-                                                      Checked="AppSettingCheckBox_Changed" Unchecked="AppSettingCheckBox_Changed"/>
-
-                                            <CheckBox x:Name="ChkAutoSyncCloudRec"
-                                                      Content="启动同步云端评分"
-                                                      ToolTip="软件启动时自动从云端拉取并更新各 AI 推荐能力评分。"
-                                                      Foreground="#7DD3FC" FontSize="12" Margin="0,0,0,8"
-                                                      Checked="AppSettingCheckBox_Changed" Unchecked="AppSettingCheckBox_Changed"/>
-
-                                            <CheckBox x:Name="ChkEnableSoundEffects"
-                                                      Content="启用协同提示音效"
-                                                      Foreground="#E2E8F0" FontSize="12" Margin="0,0,0,8"
-                                                      Checked="AppSettingCheckBox_Changed" Unchecked="AppSettingCheckBox_Changed"/>
-
-                                            <CheckBox x:Name="ChkSoundLightweight"
-                                                      Content="只留完成提示音"
-                                                      ToolTip="音效轻量化，仅保留任务完成提示音。"
-                                                      Foreground="#94A3B8" FontSize="12"
-                                                      Checked="AppSettingCheckBox_Changed" Unchecked="AppSettingCheckBox_Changed"/>
-
-                                            <StackPanel Orientation="Horizontal" Margin="0,6,0,0" VerticalAlignment="Center">
-                                                <TextBlock Text="关掉 Cursor 铃声"
-                                                           Foreground="#64748B" FontSize="11"
-                                                           VerticalAlignment="Center" Margin="0,0,8,0"
-                                                           ToolTip="仍听到 Cursor 自带提示音时，用右侧按钮关掉。"/>
-                                                <Button x:Name="MuteCursorChimeBtn"
-                                                        Content="🔇 关闭 Cursor 内置提示音"
-                                                        Style="{StaticResource ActionBtn}"
-                                                        Padding="8,3" FontSize="11"
-                                                        ToolTip="安全写入 %APPDATA%\Cursor\User\settings.json：关闭对话完成铃声（cursor.composer.shouldChimeAfterChatFinishes / accessibility.signals.chatResponseReceived）。仅合并这两项，不会擅自改动其他键。"
-                                                        Click="MuteCursorChimeBtn_Click"/>
-                                            </StackPanel>
-
-                                            <!-- 隐藏保留旧版复选框引用 -->
-                                            <CheckBox x:Name="ChkFloatingShowWorkflows" Visibility="Collapsed"/>
-                                        </StackPanel>
-                                    </Border>
-
-                                    <!-- 右列：视觉主题 / 显示形态 / 透明度 / 刷新频率 -->
-                                    <Border Grid.Column="2" Background="{DynamicResource BgInputBrush}" BorderBrush="{DynamicResource BorderSectionBrush}" BorderThickness="1" CornerRadius="6" Padding="12,10">
-                                        <StackPanel>
-                                            <Grid Margin="0,0,0,6">
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="1.25*" MinWidth="160"/>
-                                                    <ColumnDefinition Width="10"/>
-                                                    <ColumnDefinition Width="1*" MinWidth="135"/>
-                                                </Grid.ColumnDefinitions>
-                                                <StackPanel Grid.Column="0">
-                                                    <TextBlock Text="全局界面与悬浮窗颜色主题：" Foreground="{StaticResource FgSecondaryBrush}" FontSize="12" Margin="0,0,0,3"/>
-                                                    <ComboBox x:Name="ComboFloatingTheme" SelectionChanged="ComboFloatingTheme_SelectionChanged">
-                                                        <ComboBoxItem Content="🌌 深空暗夜 (默认)" Tag="dark_slate"/>
-                                                        <ComboBoxItem Content="⚡ 赛博霓虹 (高对比蓝青)" Tag="cyber_neon"/>
-                                                        <ComboBoxItem Content="💎 翡翠微光 (护眼青绿)" Tag="emerald_glass"/>
-                                                        <ComboBoxItem Content="👑 黑曜流金 (暖金尊享)" Tag="obsidian_gold"/>
-                                                        <ComboBoxItem Content="❄ 极地冰川 (冷冽极光)" Tag="arctic_ocean"/>
-                                                        <ComboBoxItem Content="🔥 赤焰碳纤 (竞技暗红)" Tag="crimson_carbon"/>
-                                                    </ComboBox>
-                                                </StackPanel>
-                                                <StackPanel Grid.Column="2">
-                                                    <TextBlock Text="悬浮窗显示形态：" Foreground="{StaticResource FgSecondaryBrush}" FontSize="12" Margin="0,0,0,3"/>
-                                                    <ComboBox x:Name="ComboFloatingMode" SelectionChanged="ComboFloatingMode_SelectionChanged">
-                                                        <ComboBoxItem Content="▾ 展开完整监控面板" Tag="expanded"/>
-                                                        <ComboBoxItem Content="▲ 收起为单行头像胶囊" Tag="collapsed"/>
-                                                    </ComboBox>
-                                                </StackPanel>
-                                            </Grid>
-                                            <WrapPanel x:Name="ThemeSwatchesPanel" Margin="0,0,0,8"/>
-
-                                            <Grid Margin="0,0,0,3">
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="*"/>
-                                                    <ColumnDefinition Width="Auto"/>
-                                                </Grid.ColumnDefinitions>
-                                                <TextBlock Grid.Column="0" Text="悬浮窗透明度" Foreground="{StaticResource FgSecondaryBrush}" FontSize="12" VerticalAlignment="Center"
-                                                           ToolTip="也可直接在悬浮窗点 ◐ 按钮调节。"/>
-                                                <TextBlock x:Name="TextFloatingOpacityPct" Grid.Column="1" Text="95%" FontSize="12.5" FontWeight="Bold" Foreground="#38BDF8" VerticalAlignment="Center"/>
-                                            </Grid>
-                                            <Grid Margin="0,0,0,8">
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="*"/>
-                                                    <ColumnDefinition Width="Auto"/>
-                                                </Grid.ColumnDefinitions>
-                                                <Slider x:Name="SliderFloatingOpacity"
-                                                        Grid.Column="0"
-                                                        Minimum="25" Maximum="100"
-                                                        SmallChange="1" LargeChange="5"
-                                                        TickFrequency="1" IsSnapToTickEnabled="True"
-                                                        VerticalAlignment="Center"
-                                                        Margin="0,0,8,0"
-                                                        ValueChanged="SliderFloatingOpacity_ValueChanged"/>
-                                                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                                                    <Button Content="50%" Tag="50" Style="{StaticResource ActionBtn}" Padding="5,1" FontSize="10.5" Margin="0,0,3,0" Click="BtnOpacityPreset_Click"/>
-                                                    <Button Content="75%" Tag="75" Style="{StaticResource ActionBtn}" Padding="5,1" FontSize="10.5" Margin="0,0,3,0" Click="BtnOpacityPreset_Click"/>
-                                                    <Button Content="95%" Tag="95" Style="{StaticResource ActionBtn}" Padding="5,1" FontSize="10.5" Click="BtnOpacityPreset_Click"/>
-                                                </StackPanel>
-                                            </Grid>
-
-                                            <TextBlock Text="实时状态刷新频率：" Foreground="{StaticResource FgSecondaryBrush}" FontSize="12" Margin="0,0,0,3"/>
-                                            <ComboBox x:Name="ComboFloatingRefresh" SelectionChanged="ComboFloatingRefresh_SelectionChanged">
-                                                <ComboBoxItem Content="1 秒 · 极速" Tag="1000"/>
-                                                <ComboBoxItem Content="1.5 秒 · 标准" Tag="1500"/>
-                                                <ComboBoxItem Content="3 秒 · 低频" Tag="3000"/>
-                                            </ComboBox>
-                                        </StackPanel>
-                                    </Border>
-                                </Grid>
-                            </StackPanel>
-                        </Border>
-
-                        <!-- 3. 网络容灾、断线自动重连与任务链断点续跑设置 -->
-                        <Border Style="{StaticResource SectionCard}" Padding="14,10" Margin="0,0,0,9">
-                            <StackPanel>
-                                <Grid Margin="0,0,0,8">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel Grid.Column="0" Margin="0,0,12,0">
-                                        <TextBlock Text="断线与续跑" FontSize="14" FontWeight="SemiBold" Foreground="#F8FAFC"
-                                                   ToolTip="默认不抢鼠标键盘。弹窗卡住或断线时，可自动重试、换 AI 接力，或由你选择处理方式。"/>
-                                        <TextBlock Text="断线可重试或换人" Foreground="#94A3B8" FontSize="12" Margin="0,3,0,0"/>
-                                    </StackPanel>
-                                    <WrapPanel Grid.Column="1" VerticalAlignment="Center">
-                                        <Button x:Name="BtnDismissStuckModalsNow" Content="🧹 清理卡住弹窗" Style="{StaticResource ActionBtn}" Margin="0,0,6,0" ToolTip="在后台静默关闭外部 AI 客户端残留的阻塞模态窗（不抢鼠标键盘）" Click="BtnDismissStuckModalsNow_Click"/>
-                                        <Button x:Name="BtnProbeNetworkNow" Content="检测网络" Style="{StaticResource ActionBtn}" Margin="0,0,6,0" Click="BtnProbeNetworkNow_Click"/>
-                                        <Button x:Name="BtnManualResumeFromSettings" Content="断点续跑" Style="{StaticResource PrimaryBtn}" Click="BtnResumeCheckpoint_Click"/>
-                                    </WrapPanel>
-                                </Grid>
-
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="1.15*"/>
-                                        <ColumnDefinition Width="12"/>
-                                        <ColumnDefinition Width="0.85*"/>
-                                    </Grid.ColumnDefinitions>
-
-                                    <Border Grid.Column="0" Background="{DynamicResource BgInputBrush}" BorderBrush="{DynamicResource BorderSectionBrush}" BorderThickness="1" CornerRadius="6" Padding="14,12">
-                                        <StackPanel>
-                                            <CheckBox x:Name="ChkEnableNetRetry"
-                                                      Content="断线自动重连"
-                                                      ToolTip="断线或消息未送达时按指数退避重试。"
-                                                      Foreground="#F1F5F9" FontSize="12.5" FontWeight="SemiBold" Margin="0,0,0,8"
-                                                      Checked="NetworkResilienceSetting_Changed" Unchecked="NetworkResilienceSetting_Changed"/>
-
-                                            <CheckBox x:Name="ChkWaitLocalNetRecover"
-                                                      Content="断网等待恢复"
-                                                      ToolTip="本机网络掉线时自动挂起，网络恢复后再重发。"
-                                                      Foreground="#CBD5E1" FontSize="12" Margin="0,0,0,8"
-                                                      Checked="NetworkResilienceSetting_Changed" Unchecked="NetworkResilienceSetting_Changed"/>
-
-                                            <CheckBox x:Name="ChkEnableAgentFailover"
-                                                      Content="故障自动换 AI"
-                                                      ToolTip="单个 AI 服务器持续故障时，自动切换其他已启用 AI 接力。"
-                                                      Foreground="#CBD5E1" FontSize="12" Margin="0,0,0,8"
-                                                      Checked="NetworkResilienceSetting_Changed" Unchecked="NetworkResilienceSetting_Changed"/>
-
-                                            <CheckBox x:Name="ChkAutoResumeOnNetRecover"
-                                                      Content="联网后自动续跑"
-                                                      ToolTip="长时间断网中断后，检测到网络重新连通时自动后台续跑。"
-                                                      Foreground="#94A3B8" FontSize="12" Margin="0,0,0,8"
-                                                      Checked="NetworkResilienceSetting_Changed" Unchecked="NetworkResilienceSetting_Changed"/>
-
-                                        </StackPanel>
-                                    </Border>
-
-                                    <Border Grid.Column="2" Background="{DynamicResource BgInputBrush}" BorderBrush="{DynamicResource BorderSectionBrush}" BorderThickness="1" CornerRadius="6" Padding="14,12">
-                                        <StackPanel>
-                                            <TextBlock Text="单轮最大自动重连尝试次数：" Foreground="{StaticResource FgSecondaryBrush}" FontSize="12" Margin="0,0,0,3"/>
-                                            <ComboBox x:Name="ComboMaxNetRetries" Margin="0,0,0,8" SelectionChanged="ComboNetworkResilience_SelectionChanged">
-                                                <ComboBoxItem Content="2 次 · 快速" Tag="2"/>
-                                                <ComboBoxItem Content="3 次 · 标准" Tag="3"/>
-                                                <ComboBoxItem Content="5 次 · 弱网" Tag="5"/>
-                                                <ComboBoxItem Content="8 次 · 抗抖动" Tag="8"/>
-                                            </ComboBox>
-
-                                            <TextBlock Text="单次执行无响应超时阈值：" Foreground="{StaticResource FgSecondaryBrush}" FontSize="12" Margin="0,0,0,3"/>
-                                            <ComboBox x:Name="ComboSingleTimeout" Margin="0,0,0,8" SelectionChanged="ComboNetworkResilience_SelectionChanged">
-                                                <ComboBoxItem Content="120 秒 · 快速" Tag="120"/>
-                                                <ComboBoxItem Content="180 秒 · 标准" Tag="180"/>
-                                                <ComboBoxItem Content="300 秒 · 大改" Tag="300"/>
-                                            </ComboBox>
-
-                                            <TextBlock Text="任务卡住 / 外部弹窗阻塞时的处理方式：" Foreground="{StaticResource FgSecondaryBrush}" FontSize="12" Margin="0,0,0,3"/>
-                                            <ComboBox x:Name="ComboStallRecoveryPolicy" Margin="0,0,0,8" SelectionChanged="ComboNetworkResilience_SelectionChanged">
-                                                <ComboBoxItem Content="先重试，再问我" Tag="auto_then_ask"/>
-                                                <ComboBoxItem Content="卡住立刻问我" Tag="ask_user_immediately"/>
-                                                <ComboBoxItem Content="全自动自愈" Tag="auto_self_heal"/>
-                                            </ComboBox>
-
-                                            <TextBlock x:Name="TextNetDiagStatus"
-                                                       Text="网络正常"
-                                                       FontSize="12" Foreground="#34D399" TextWrapping="Wrap"
-                                                       ToolTip="网络实时诊断"/>
-                                        </StackPanel>
-                                    </Border>
-                                </Grid>
-                            </StackPanel>
-                        </Border>
-
-                        <Border Style="{StaticResource SectionCard}" Padding="14,10">
-                            <Expander IsExpanded="False" Foreground="#E6EDF7" Background="Transparent">
-                                <Expander.Header>
-                                    <TextBlock Text="高级与开发者选项" FontSize="13.5" FontWeight="SemiBold" Foreground="#9AA8BE" Margin="4,0,0,0"/>
-                                </Expander.Header>
-                                <StackPanel Margin="0,10,0,0">
-                                    <TextBlock x:Name="AppUserDataPathText" Foreground="#94A3B8" FontSize="12" TextWrapping="Wrap" Margin="0,0,0,8"/>
-                                    <WrapPanel Margin="0,0,0,10">
-                                        <Button Content="打开配置目录" Style="{StaticResource ActionBtn}" Margin="0,0,8,6" Click="BtnOpenUserDataDir_Click" ToolTip="打开个人数据目录"/>
-                                        <Button x:Name="OpenRegistryDirBtn" Content="打开注册表目录" Style="{StaticResource ActionBtn}" Margin="0,0,8,6" Click="OpenRegistryDirBtn_Click" ToolTip="打开规则与检测器配置目录"/>
-                                        <Button Content="打开聊天库" Style="{StaticResource ActionBtn}" Margin="0,0,8,6" Click="BtnOpenAiChatDir_Click" ToolTip="打开 F:\AIChat 跨工具聊天记录库"/>
-                                        <Button x:Name="ExportShareZipBtn" Content="导出分享包" Style="{StaticResource AmberBtn}" Margin="0,0,8,6" Click="ExportShareZipBtn_Click" ToolTip="生成不含个人路径或聊天记录的绿色压缩包"/>
-                                    </WrapPanel>
-                                    <Border Background="{DynamicResource BgInputBrush}" BorderBrush="{DynamicResource BorderSectionBrush}" BorderThickness="1" CornerRadius="5" Padding="12,8" Margin="0,0,0,8">
-                                        <Grid>
+                                        <Grid Margin="0,0,0,10">
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="*"/>
                                                 <ColumnDefinition Width="Auto"/>
                                             </Grid.ColumnDefinitions>
-                                            <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,10,0">
-                                                <TextBlock x:Name="StartupRegStatusTitle" Text="正在检查开机自启" FontSize="12" FontWeight="SemiBold" Foreground="#CBD5E1"/>
-                                                <TextBlock x:Name="StartupRegCommandText" Text="" FontSize="11" Foreground="#64748B" Margin="0,2,0,0" TextTrimming="CharacterEllipsis"/>
-                                            </StackPanel>
-                                            <Button x:Name="BtnVerifyStartupReg" Grid.Column="1" Content="核验注册表" Style="{StaticResource ActionBtn}" VerticalAlignment="Center" Click="BtnVerifyStartupReg_Click"/>
+                                            <TextBlock Grid.Column="0" Text="协同与运行" FontSize="15" FontWeight="SemiBold" Foreground="#F8FAFC" VerticalAlignment="Center"
+                                                       ToolTip="控制多 AI 协同是否启用。停用或关闭本软件时，各 AI 自动恢复独立状态。"/>
+                                            <WrapPanel Grid.Column="1" VerticalAlignment="Center">
+                                                <Button x:Name="BtnCreateDesktopShortcuts" Style="{StaticResource IconToolBtn}" Margin="0,0,6,0"
+                                                        AutomationProperties.Name="桌面图标" ToolTip="生成桌面图标" Click="BtnCreateDesktopShortcuts_Click">
+                                                    <Path Width="15" Height="15" Stretch="Uniform" StrokeThickness="1.4"
+                                                          Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                                          Data="M4,4 H20 V14 H4 Z M8,18 H16 M12,14 V18"/>
+                                                </Button>
+                                                <Button x:Name="BtnForceQuitApp" Style="{StaticResource AmberBtn}" Padding="8,4"
+                                                        ToolTip="彻底退出本软件（若勾选了仅软件运行时生效，退出时将自动卸载协同锚点）"
+                                                        Click="BtnForceQuitApp_Click">
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <Path Width="13" Height="13" Stretch="Uniform" Stroke="#FDE68A" StrokeThickness="1.6" VerticalAlignment="Center"
+                                                              Data="M12,3 V10 M7.2,6.2 A6,6 0 1 0 16.8,6.2"/>
+                                                        <TextBlock Text="退出" Margin="5,0,0,0" VerticalAlignment="Center"/>
+                                                    </StackPanel>
+                                                </Button>
+                                            </WrapPanel>
                                         </Grid>
-                                    </Border>
-                                    <CheckBox x:Name="ChkAutoTrustWorkspaces"
-                                              Content="自动信任工程"
-                                              ToolTip="自动信任已纳管工程目录，并为后台 CLI 附加 --trust / -f / --approve-mcps，避免交互拦截。"
-                                              Foreground="#7DD3FC" FontSize="12" Margin="0,0,0,8"
-                                              Checked="NetworkResilienceSetting_Changed" Unchecked="NetworkResilienceSetting_Changed"/>
-                                    <CheckBox x:Name="ChkFloatingAutoExpand"
-                                              Content="自动展开已锁定"
-                                              IsEnabled="False" IsChecked="False"
-                                              Foreground="#64748B" FontSize="12" Margin="0,0,0,6"
-                                              ToolTip="形态只由手动切换，任务开始不会自动展开。"
-                                              Checked="AppSettingCheckBox_Changed" Unchecked="AppSettingCheckBox_Changed"/>
-                                    <CheckBox x:Name="ChkFloatingAutoCollapse"
-                                              Content="自动收起已锁定"
-                                              IsEnabled="False" IsChecked="False"
-                                              Foreground="#64748B" FontSize="12"
-                                              ToolTip="任务完成后保持当前形态，不会自动收起。"
-                                              Checked="AppSettingCheckBox_Changed" Unchecked="AppSettingCheckBox_Changed"/>
-                                </StackPanel>
-                            </Expander>
-                        </Border>
+                                        <Border Background="{DynamicResource BgInputBrush}" BorderBrush="{DynamicResource BorderSectionBrush}" BorderThickness="1" CornerRadius="6" Padding="12,10">
+                                            <StackPanel>
+                                                <CheckBox x:Name="ChkWorkflowEngineEnabled"
+                                                          Content="启用协同工作流"
+                                                          ToolTip="启用多 AI 协同总开关。取消勾选后立即剥离协同锚点，恢复各自独立对话。"
+                                                          Foreground="#F1F5F9" FontSize="12.5" FontWeight="SemiBold" Margin="0,0,0,8"
+                                                          Checked="WorkflowLifecycleCheckBox_Changed" Unchecked="WorkflowLifecycleCheckBox_Changed"/>
+                                                <CheckBox x:Name="ChkWorkflowOnlyWhenRunning"
+                                                          Content="仅软件运行时生效"
+                                                          ToolTip="软件退出时自动关闭工作流，下次启动自动恢复。停用即各自独立。"
+                                                          Foreground="#CBD5E1" FontSize="12" Margin="0,0,0,8"
+                                                          Checked="WorkflowLifecycleCheckBox_Changed" Unchecked="WorkflowLifecycleCheckBox_Changed"/>
+                                                <Border Height="1" Background="{DynamicResource DividerRowBrush}" Margin="0,2,0,8"/>
+                                                <CheckBox x:Name="ChkRunAtStartup"
+                                                          Content="开机自动启动"
+                                                          ToolTip="写入 Windows 当前用户 Run 启动项，登录后自动启动 AIDeck。"
+                                                          Foreground="#CBD5E1" FontSize="12" Margin="0,0,0,8"
+                                                          Checked="AppSettingCheckBox_Changed" Unchecked="AppSettingCheckBox_Changed"/>
+                                                <CheckBox x:Name="ChkStartupDirectFloating"
+                                                          Content="开机进悬浮窗"
+                                                          ToolTip="开机自启时直接进入桌面悬浮窗和系统托盘，不打开主窗口。"
+                                                          Foreground="#94A3B8" FontSize="12" Margin="0,0,0,8"
+                                                          Checked="AppSettingCheckBox_Changed" Unchecked="AppSettingCheckBox_Changed"/>
+                                                <TextBlock Text="关闭按钮" Foreground="#CBD5E1" FontSize="12" Margin="0,0,0,4"
+                                                           ToolTip="点击主界面关闭按钮时的行为。可改回每次询问。"/>
+                                                <ComboBox x:Name="ComboCloseButtonAction"
+                                                          Height="28" FontSize="12"
+                                                          ToolTip="可改回每次询问。勾选记住此操作后，可随时在此改回每次弹窗询问。"
+                                                          SelectionChanged="ComboCloseButtonAction_SelectionChanged">
+                                                    <ComboBoxItem Content="每次询问" Tag="ask"/>
+                                                    <ComboBoxItem Content="最小化到托盘" Tag="minimize_to_tray"/>
+                                                    <ComboBoxItem Content="直接退出" Tag="exit"/>
+                                                </ComboBox>
+                                                <CheckBox x:Name="ChkCloseToFloating" Visibility="Collapsed"
+                                                          Checked="AppSettingCheckBox_Changed" Unchecked="AppSettingCheckBox_Changed"/>
+                                            </StackPanel>
+                                        </Border>
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
 
-                    </StackPanel>
-                </ScrollViewer>
+                            <StackPanel x:Name="SettingsPanelAppearance" Visibility="Collapsed">
+                                <Border Style="{StaticResource SectionCard}" Padding="14,12">
+                                    <StackPanel>
+                                        <Grid Margin="0,0,0,10">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" Text="悬浮窗与外观" FontSize="15" FontWeight="SemiBold" Foreground="#F8FAFC" VerticalAlignment="Center"
+                                                       ToolTip="主题、形态、透明度。支持展开、收起胶囊，以及复位位置。"/>
+                                            <WrapPanel Grid.Column="1" VerticalAlignment="Center">
+                                                <Button x:Name="BtnPreviewExpandFloating" Style="{StaticResource IconToolBtn}" Margin="0,0,6,0"
+                                                        AutomationProperties.Name="展开悬浮窗" ToolTip="展开悬浮窗" Click="BtnPreviewExpandFloating_Click">
+                                                    <Path Width="14" Height="14" Stretch="Uniform" StrokeThickness="1.4"
+                                                          Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                                          Data="M9,3 H3 V9 M15,3 H21 V9 M21,15 V21 H15 M3,15 V21 H9"/>
+                                                </Button>
+                                                <Button x:Name="BtnPreviewCollapseFloating" Style="{StaticResource IconToolBtn}" Margin="0,0,6,0"
+                                                        AutomationProperties.Name="收起胶囊" ToolTip="收起胶囊" Click="BtnPreviewCollapseFloating_Click">
+                                                    <Path Width="14" Height="14" Stretch="Uniform" StrokeThickness="1.4"
+                                                          Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                                          Data="M3,9 H9 V3 M15,3 V9 H21 M21,15 H15 V21 M9,21 V15 H3"/>
+                                                </Button>
+                                                <Button x:Name="BtnResetFloatingPos" Style="{StaticResource IconToolBtn}"
+                                                        AutomationProperties.Name="复位右上角" ToolTip="复位右上角" Click="BtnResetFloatingPos_Click">
+                                                    <Path Width="14" Height="14" Stretch="Uniform" StrokeThickness="1.4"
+                                                          Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                                          Data="M4,12 A8,8 0 1 0 6,6.5 M4,4 V9 H9"/>
+                                                </Button>
+                                            </WrapPanel>
+                                        </Grid>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="1*"/>
+                                                <ColumnDefinition Width="12"/>
+                                                <ColumnDefinition Width="1*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <Border Grid.Column="0" Background="{DynamicResource BgInputBrush}" BorderBrush="{DynamicResource BorderSectionBrush}" BorderThickness="1" CornerRadius="6" Padding="12,10">
+                                                <StackPanel>
+                                                    <CheckBox x:Name="ChkFloatingEnabled"
+                                                              Content="开启桌面悬浮窗"
+                                                              ToolTip="常驻桌面，实时显示各 AI 头像与工作动态。"
+                                                              Foreground="#F1F5F9" FontSize="12.5" FontWeight="SemiBold" Margin="0,0,0,8"
+                                                              Checked="AppSettingCheckBox_Changed" Unchecked="AppSettingCheckBox_Changed"/>
+                                                    <CheckBox x:Name="ChkFloatingTopmost"
+                                                              Content="悬浮窗始终置顶"
+                                                              ToolTip="不被编辑器或游戏窗口遮挡。"
+                                                              Foreground="#E2E8F0" FontSize="12" Margin="0,0,0,8"
+                                                              Checked="AppSettingCheckBox_Changed" Unchecked="AppSettingCheckBox_Changed"/>
+                                                    <CheckBox x:Name="ChkAutoSyncCloudRec"
+                                                              Content="启动同步云端评分"
+                                                              ToolTip="软件启动时自动从云端拉取并更新各 AI 推荐能力评分。"
+                                                              Foreground="#7DD3FC" FontSize="12" Margin="0,0,0,8"
+                                                              Checked="AppSettingCheckBox_Changed" Unchecked="AppSettingCheckBox_Changed"/>
+                                                    <CheckBox x:Name="ChkEnableSoundEffects"
+                                                              Content="启用协同提示音效"
+                                                              ToolTip="任务派发、完成时播放轻提示音。"
+                                                              Foreground="#E2E8F0" FontSize="12" Margin="0,0,0,8"
+                                                              Checked="AppSettingCheckBox_Changed" Unchecked="AppSettingCheckBox_Changed"/>
+                                                    <CheckBox x:Name="ChkSoundLightweight"
+                                                              Content="只留完成提示音"
+                                                              ToolTip="音效轻量化，仅保留任务完成提示音。"
+                                                              Foreground="#94A3B8" FontSize="12" Margin="0,0,0,8"
+                                                              Checked="AppSettingCheckBox_Changed" Unchecked="AppSettingCheckBox_Changed"/>
+                                                    <Button x:Name="MuteCursorChimeBtn" Style="{StaticResource IconToolBtn}" HorizontalAlignment="Left"
+                                                            AutomationProperties.Name="静音"
+                                                            ToolTip="关掉 Cursor 内置提示音。安全写入 %APPDATA%\Cursor\User\settings.json：关闭对话完成铃声。仅合并这两项，不会改动其他键。"
+                                                            Click="MuteCursorChimeBtn_Click">
+                                                        <Path Width="15" Height="15" Stretch="Uniform" StrokeThickness="1.4"
+                                                              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                                              Data="M4,9 H7 L12,5 V19 L7,15 H4 Z M16,9 L20,15 M20,9 L16,15"/>
+                                                    </Button>
+                                                    <CheckBox x:Name="ChkFloatingShowWorkflows" Visibility="Collapsed"/>
+                                                </StackPanel>
+                                            </Border>
+                                            <Border Grid.Column="2" Background="{DynamicResource BgInputBrush}" BorderBrush="{DynamicResource BorderSectionBrush}" BorderThickness="1" CornerRadius="6" Padding="12,10">
+                                                <StackPanel>
+                                                    <Grid Margin="0,0,0,8">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="1.25*" MinWidth="140"/>
+                                                            <ColumnDefinition Width="10"/>
+                                                            <ColumnDefinition Width="1*" MinWidth="120"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        <StackPanel Grid.Column="0">
+                                                            <TextBlock Text="主题" Foreground="{StaticResource FgSecondaryBrush}" FontSize="12" Margin="0,0,0,3"
+                                                                       ToolTip="全局界面与悬浮窗颜色主题"/>
+                                                            <ComboBox x:Name="ComboFloatingTheme" SelectionChanged="ComboFloatingTheme_SelectionChanged">
+                                                                <ComboBoxItem Content="深空暗夜" Tag="dark_slate"/>
+                                                                <ComboBoxItem Content="赛博霓虹" Tag="cyber_neon"/>
+                                                                <ComboBoxItem Content="翡翠微光" Tag="emerald_glass"/>
+                                                                <ComboBoxItem Content="黑曜流金" Tag="obsidian_gold"/>
+                                                                <ComboBoxItem Content="极地冰川" Tag="arctic_ocean"/>
+                                                                <ComboBoxItem Content="赤焰碳纤" Tag="crimson_carbon"/>
+                                                            </ComboBox>
+                                                        </StackPanel>
+                                                        <StackPanel Grid.Column="2">
+                                                            <TextBlock Text="形态" Foreground="{StaticResource FgSecondaryBrush}" FontSize="12" Margin="0,0,0,3"
+                                                                       ToolTip="悬浮窗显示形态"/>
+                                                            <ComboBox x:Name="ComboFloatingMode" SelectionChanged="ComboFloatingMode_SelectionChanged">
+                                                                <ComboBoxItem Content="展开面板" Tag="expanded"/>
+                                                                <ComboBoxItem Content="收起胶囊" Tag="collapsed"/>
+                                                            </ComboBox>
+                                                        </StackPanel>
+                                                    </Grid>
+                                                    <WrapPanel x:Name="ThemeSwatchesPanel" Margin="0,0,0,8"/>
+                                                    <Grid Margin="0,0,0,3">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*"/>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        <TextBlock Grid.Column="0" Text="透明度" Foreground="{StaticResource FgSecondaryBrush}" FontSize="12" VerticalAlignment="Center"
+                                                                   ToolTip="悬浮窗透明度。也可直接在悬浮窗点调节。"/>
+                                                        <TextBlock x:Name="TextFloatingOpacityPct" Grid.Column="1" Text="95%" FontSize="12.5" FontWeight="Bold" Foreground="#38BDF8" VerticalAlignment="Center"/>
+                                                    </Grid>
+                                                    <Grid Margin="0,0,0,8">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*"/>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        <Slider x:Name="SliderFloatingOpacity"
+                                                                Grid.Column="0"
+                                                                Minimum="25" Maximum="100"
+                                                                SmallChange="1" LargeChange="5"
+                                                                TickFrequency="1" IsSnapToTickEnabled="True"
+                                                                VerticalAlignment="Center"
+                                                                Margin="0,0,8,0"
+                                                                ValueChanged="SliderFloatingOpacity_ValueChanged"/>
+                                                        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                                            <Button Content="50%" Tag="50" Style="{StaticResource ActionBtn}" Padding="5,1" FontSize="10.5" Margin="0,0,3,0" Click="BtnOpacityPreset_Click"/>
+                                                            <Button Content="75%" Tag="75" Style="{StaticResource ActionBtn}" Padding="5,1" FontSize="10.5" Margin="0,0,3,0" Click="BtnOpacityPreset_Click"/>
+                                                            <Button Content="95%" Tag="95" Style="{StaticResource ActionBtn}" Padding="5,1" FontSize="10.5" Click="BtnOpacityPreset_Click"/>
+                                                        </StackPanel>
+                                                    </Grid>
+                                                    <TextBlock Text="刷新" Foreground="{StaticResource FgSecondaryBrush}" FontSize="12" Margin="0,0,0,3"
+                                                               ToolTip="实时状态刷新频率"/>
+                                                    <ComboBox x:Name="ComboFloatingRefresh" SelectionChanged="ComboFloatingRefresh_SelectionChanged">
+                                                        <ComboBoxItem Content="1 秒" Tag="1000"/>
+                                                        <ComboBoxItem Content="1.5 秒" Tag="1500"/>
+                                                        <ComboBoxItem Content="3 秒" Tag="3000"/>
+                                                    </ComboBox>
+                                                </StackPanel>
+                                            </Border>
+                                        </Grid>
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+
+                            <StackPanel x:Name="SettingsPanelResilience" Visibility="Collapsed">
+                                <Border Style="{StaticResource SectionCard}" Padding="14,12">
+                                    <StackPanel>
+                                        <Grid Margin="0,0,0,10">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" Text="断线与续跑" FontSize="15" FontWeight="SemiBold" Foreground="#F8FAFC" VerticalAlignment="Center"
+                                                       ToolTip="断线可重试或换人。默认不抢鼠标键盘。"/>
+                                            <WrapPanel Grid.Column="1" VerticalAlignment="Center">
+                                                <Button x:Name="BtnDismissStuckModalsNow" Style="{StaticResource IconToolBtn}" Margin="0,0,6,0"
+                                                        AutomationProperties.Name="清理卡住弹窗"
+                                                        ToolTip="在后台静默关闭外部 AI 客户端残留的阻塞模态窗（不抢鼠标键盘）"
+                                                        Click="BtnDismissStuckModalsNow_Click">
+                                                    <Path Width="14" Height="14" Stretch="Uniform" StrokeThickness="1.4"
+                                                          Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                                          Data="M5,19 H19 M8,19 L10,7 H14 L16,19 M12,7 V4 M9,4 H15"/>
+                                                </Button>
+                                                <Button x:Name="BtnProbeNetworkNow" Style="{StaticResource IconToolBtn}" Margin="0,0,6,0"
+                                                        AutomationProperties.Name="检测网络" ToolTip="检测网络" Click="BtnProbeNetworkNow_Click">
+                                                    <Path Width="14" Height="14" Stretch="Uniform" StrokeThickness="1.4" Fill="Transparent"
+                                                          Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                                          Data="M4,16 C7,12 17,12 20,16 M7,16 C9,14 15,14 17,16 M12,18.2 A1,1 0 1 0 12.01,18.2"/>
+                                                </Button>
+                                                <Button x:Name="BtnManualResumeFromSettings" Style="{StaticResource PrimaryBtn}" Padding="8,4"
+                                                        ToolTip="从最近断点继续执行" Click="BtnResumeCheckpoint_Click">
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <Path Width="12" Height="12" Stretch="Uniform" Stroke="#E0F2FE" StrokeThickness="1.5" VerticalAlignment="Center"
+                                                              Data="M8,4 L16,10 L8,16 Z"/>
+                                                        <TextBlock Text="续跑" Margin="5,0,0,0" VerticalAlignment="Center"/>
+                                                    </StackPanel>
+                                                </Button>
+                                            </WrapPanel>
+                                        </Grid>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="1.15*"/>
+                                                <ColumnDefinition Width="12"/>
+                                                <ColumnDefinition Width="0.85*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <Border Grid.Column="0" Background="{DynamicResource BgInputBrush}" BorderBrush="{DynamicResource BorderSectionBrush}" BorderThickness="1" CornerRadius="6" Padding="14,12">
+                                                <StackPanel>
+                                                    <CheckBox x:Name="ChkEnableNetRetry"
+                                                              Content="断线自动重连"
+                                                              ToolTip="断线或消息未送达时按指数退避重试。"
+                                                              Foreground="#F1F5F9" FontSize="12.5" FontWeight="SemiBold" Margin="0,0,0,8"
+                                                              Checked="NetworkResilienceSetting_Changed" Unchecked="NetworkResilienceSetting_Changed"/>
+                                                    <CheckBox x:Name="ChkWaitLocalNetRecover"
+                                                              Content="断网等待恢复"
+                                                              ToolTip="本机网络掉线时自动挂起，网络恢复后再重发。"
+                                                              Foreground="#CBD5E1" FontSize="12" Margin="0,0,0,8"
+                                                              Checked="NetworkResilienceSetting_Changed" Unchecked="NetworkResilienceSetting_Changed"/>
+                                                    <CheckBox x:Name="ChkEnableAgentFailover"
+                                                              Content="故障自动换 AI"
+                                                              ToolTip="单个 AI 服务器持续故障时，自动切换其他已启用 AI 接力。"
+                                                              Foreground="#CBD5E1" FontSize="12" Margin="0,0,0,8"
+                                                              Checked="NetworkResilienceSetting_Changed" Unchecked="NetworkResilienceSetting_Changed"/>
+                                                    <CheckBox x:Name="ChkAutoResumeOnNetRecover"
+                                                              Content="联网后自动续跑"
+                                                              ToolTip="长时间断网中断后，检测到网络重新连通时自动后台续跑。"
+                                                              Foreground="#94A3B8" FontSize="12"
+                                                              Checked="NetworkResilienceSetting_Changed" Unchecked="NetworkResilienceSetting_Changed"/>
+                                                </StackPanel>
+                                            </Border>
+                                            <Border Grid.Column="2" Background="{DynamicResource BgInputBrush}" BorderBrush="{DynamicResource BorderSectionBrush}" BorderThickness="1" CornerRadius="6" Padding="14,12">
+                                                <StackPanel>
+                                                    <TextBlock Text="重连次数" Foreground="{StaticResource FgSecondaryBrush}" FontSize="12" Margin="0,0,0,3"
+                                                               ToolTip="单轮最大自动重连尝试次数"/>
+                                                    <ComboBox x:Name="ComboMaxNetRetries" Margin="0,0,0,8" SelectionChanged="ComboNetworkResilience_SelectionChanged">
+                                                        <ComboBoxItem Content="2 次" Tag="2"/>
+                                                        <ComboBoxItem Content="3 次" Tag="3"/>
+                                                        <ComboBoxItem Content="5 次" Tag="5"/>
+                                                        <ComboBoxItem Content="8 次" Tag="8"/>
+                                                    </ComboBox>
+                                                    <TextBlock Text="超时" Foreground="{StaticResource FgSecondaryBrush}" FontSize="12" Margin="0,0,0,3"
+                                                               ToolTip="单次执行无响应超时阈值"/>
+                                                    <ComboBox x:Name="ComboSingleTimeout" Margin="0,0,0,8" SelectionChanged="ComboNetworkResilience_SelectionChanged">
+                                                        <ComboBoxItem Content="120 秒" Tag="120"/>
+                                                        <ComboBoxItem Content="180 秒" Tag="180"/>
+                                                        <ComboBoxItem Content="300 秒" Tag="300"/>
+                                                    </ComboBox>
+                                                    <TextBlock Text="卡住时" Foreground="{StaticResource FgSecondaryBrush}" FontSize="12" Margin="0,0,0,3"
+                                                               ToolTip="任务卡住或外部弹窗阻塞时的处理方式"/>
+                                                    <ComboBox x:Name="ComboStallRecoveryPolicy" Margin="0,0,0,8" SelectionChanged="ComboNetworkResilience_SelectionChanged">
+                                                        <ComboBoxItem Content="先重试，再问我" Tag="auto_then_ask"/>
+                                                        <ComboBoxItem Content="立刻问我" Tag="ask_user_immediately"/>
+                                                        <ComboBoxItem Content="全自动自愈" Tag="auto_self_heal"/>
+                                                    </ComboBox>
+                                                    <TextBlock x:Name="TextNetDiagStatus"
+                                                               Text="网络正常"
+                                                               FontSize="12" Foreground="#34D399" TextWrapping="Wrap"
+                                                               ToolTip="网络实时诊断"/>
+                                                </StackPanel>
+                                            </Border>
+                                        </Grid>
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+
+                            <StackPanel x:Name="SettingsPanelAbout" Visibility="Collapsed">
+                                <Border Style="{StaticResource SectionCard}" Padding="16,14" Margin="0,0,0,12">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="新手引导" FontSize="16" FontWeight="SemiBold" Foreground="#F8FAFC" VerticalAlignment="Center"
+                                                   ToolTip="3 步认领本机 AI：扫描本机 AI、选定主脑和成员、开启悬浮窗。可随时重开。"/>
+                                        <Button x:Name="BtnReopenOnboarding" Grid.Column="1" Content="重开向导" Style="{StaticResource PrimaryBtn}" Padding="14,7" FontSize="13" VerticalAlignment="Center" Click="BtnReopenOnboarding_Click" ToolTip="再看一遍 3 步新手向导"/>
+                                    </Grid>
+                                </Border>
+                                <Border Style="{StaticResource SectionCard}" Padding="14,12" Margin="0,0,0,12">
+                                    <StackPanel>
+                                        <Grid Margin="0,0,0,8">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" Text="版本与更新" FontSize="15" FontWeight="SemiBold" Foreground="#F8FAFC" VerticalAlignment="Center"
+                                                       ToolTip="顶栏版本号可随时检查。启动约 4 秒后后台静默检查一次，有新版才提示。"/>
+                                            <Button x:Name="BtnCheckAppUpdate"
+                                                    Grid.Column="1"
+                                                    Content="检查"
+                                                    Style="{StaticResource PrimaryBtn}"
+                                                    Padding="14,6"
+                                                    VerticalAlignment="Center"
+                                                    ToolTip="从 AIDeck 官方 GitHub 发布源立即检查更新"
+                                                    Click="BtnCheckAppUpdate_Click"/>
+                                        </Grid>
+                                        <Border Background="{DynamicResource BgInputBrush}" BorderBrush="{DynamicResource BorderSectionBrush}" BorderThickness="1" CornerRadius="6" Padding="12,9">
+                                            <StackPanel>
+                                                <TextBlock x:Name="TextAboutCurrentVersion" Text="AIDeck · 多 AI 协同中心 v1.9.14" FontSize="13" FontWeight="SemiBold" Foreground="#E0F2FE" Margin="0,0,0,4"/>
+                                                <TextBlock x:Name="TextAppUpdateStatus" Text="尚未检查更新" FontSize="12" Foreground="#94A3B8" TextWrapping="Wrap" Margin="0,0,0,8"
+                                                           ToolTip="可手动检查，或等待启动后的后台静默检查。只有发现新版本才提示。"/>
+                                                <TextBlock x:Name="LblUpdateRepoUrl" Text="更新源" Foreground="#CBD5E1" FontSize="12" Margin="0,0,0,4" Visibility="Collapsed"
+                                                           ToolTip="GitHub / Gitee 仓库、SSH、owner/repo，或自定义 JSON。留空则读取本地 Git origin。"/>
+                                                <TextBox x:Name="TextUpdateRepoUrl" Height="28" FontSize="12" Padding="8,4" Margin="0,0,0,8" Visibility="Collapsed" LostFocus="TextUpdateRepoUrl_LostFocus"
+                                                         ToolTip="例如 https://github.com/owner/repo 、git@gitee.com:owner/repo.git 或 https://example.com/latest.json"/>
+                                                <CheckBox x:Name="ChkAutoCheckAppUpdate"
+                                                          Content="启动后查更新"
+                                                          ToolTip="启动后自动检查软件更新（后台执行，不阻塞界面）。有新版才提示。"
+                                                          Foreground="#7DD3FC" FontSize="12"
+                                                          Checked="AppSettingCheckBox_Changed" Unchecked="AppSettingCheckBox_Changed"/>
+                                            </StackPanel>
+                                        </Border>
+                                    </StackPanel>
+                                </Border>
+                                <Border Style="{StaticResource SectionCard}" Padding="14,10">
+                                    <Expander IsExpanded="False" Foreground="#E6EDF7" Background="Transparent">
+                                        <Expander.Header>
+                                            <TextBlock Text="高级与开发者" FontSize="13.5" FontWeight="SemiBold" Foreground="#9AA8BE" Margin="4,0,0,0"/>
+                                        </Expander.Header>
+                                        <StackPanel Margin="0,10,0,0">
+                                            <TextBlock x:Name="AppUserDataPathText" Foreground="#94A3B8" FontSize="12" TextWrapping="Wrap" Margin="0,0,0,8"/>
+                                            <WrapPanel Margin="0,0,0,10">
+                                                <Button Content="打开配置目录" Style="{StaticResource ActionBtn}" Margin="0,0,8,6" Click="BtnOpenUserDataDir_Click" ToolTip="打开个人数据目录"/>
+                                                <Button x:Name="OpenRegistryDirBtn" Content="打开注册表目录" Style="{StaticResource ActionBtn}" Margin="0,0,8,6" Click="OpenRegistryDirBtn_Click" ToolTip="打开规则与检测器配置目录"/>
+                                                <Button Content="打开聊天库" Style="{StaticResource ActionBtn}" Margin="0,0,8,6" Click="BtnOpenAiChatDir_Click" ToolTip="打开 F:\AIChat 跨工具聊天记录库"/>
+                                                <Button x:Name="ExportShareZipBtn" Content="导出分享包" Style="{StaticResource AmberBtn}" Margin="0,0,8,6" Click="ExportShareZipBtn_Click" ToolTip="生成不含个人路径或聊天记录的绿色压缩包"/>
+                                            </WrapPanel>
+                                            <Border Background="{DynamicResource BgInputBrush}" BorderBrush="{DynamicResource BorderSectionBrush}" BorderThickness="1" CornerRadius="5" Padding="12,8" Margin="0,0,0,8">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,10,0">
+                                                        <TextBlock x:Name="StartupRegStatusTitle" Text="正在检查开机自启" FontSize="12" FontWeight="SemiBold" Foreground="#CBD5E1"/>
+                                                        <TextBlock x:Name="StartupRegCommandText" Text="" FontSize="11" Foreground="#64748B" Margin="0,2,0,0" TextTrimming="CharacterEllipsis"/>
+                                                    </StackPanel>
+                                                    <Button x:Name="BtnVerifyStartupReg" Grid.Column="1" Content="核验注册表" Style="{StaticResource ActionBtn}" VerticalAlignment="Center" Click="BtnVerifyStartupReg_Click"/>
+                                                </Grid>
+                                            </Border>
+                                            <CheckBox x:Name="ChkAutoTrustWorkspaces"
+                                                      Content="自动信任工程"
+                                                      ToolTip="自动信任已纳管工程目录，并为后台 CLI 附加 --trust / -f / --approve-mcps，避免交互拦截。"
+                                                      Foreground="#7DD3FC" FontSize="12" Margin="0,0,0,8"
+                                                      Checked="NetworkResilienceSetting_Changed" Unchecked="NetworkResilienceSetting_Changed"/>
+                                            <CheckBox x:Name="ChkFloatingAutoExpand"
+                                                      Content="自动展开已锁定"
+                                                      IsEnabled="False" IsChecked="False"
+                                                      Foreground="#64748B" FontSize="12" Margin="0,0,0,6"
+                                                      ToolTip="形态只由手动切换，任务开始不会自动展开。"
+                                                      Checked="AppSettingCheckBox_Changed" Unchecked="AppSettingCheckBox_Changed"/>
+                                            <CheckBox x:Name="ChkFloatingAutoCollapse"
+                                                      Content="自动收起已锁定"
+                                                      IsEnabled="False" IsChecked="False"
+                                                      Foreground="#64748B" FontSize="12"
+                                                      ToolTip="任务完成后保持当前形态，不会自动收起。"
+                                                      Checked="AppSettingCheckBox_Changed" Unchecked="AppSettingCheckBox_Changed"/>
+                                        </StackPanel>
+                                    </Expander>
+                                </Border>
+                            </StackPanel>
+                        </Grid>
+                    </ScrollViewer>
+                </DockPanel>
 
             </Grid>
         </Grid>

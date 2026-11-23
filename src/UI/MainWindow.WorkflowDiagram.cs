@@ -63,8 +63,7 @@ public partial class MainWindow
     {
         _workflowDiagramPreviewOverride = true;
         _workflowDiagramDemoMode = false;
-        if (WorkflowDiagramDemoBtn != null)
-            WorkflowDiagramDemoBtn.Content = "▶ 演示流转";
+        SyncWorkflowDiagramDemoButton();
         ApplyWorkflowDiagramPhase(phase, round, maxRounds, activeWorkerId);
         RebuildWorkflowDiagramCanvas();
         UpdateWorkflowDiagramAnimationGate();
@@ -75,8 +74,7 @@ public partial class MainWindow
     {
         _workflowDiagramPreviewOverride = false;
         _workflowDiagramDemoMode = false;
-        if (WorkflowDiagramDemoBtn != null)
-            WorkflowDiagramDemoBtn.Content = "▶ 演示流转";
+        SyncWorkflowDiagramDemoButton();
         ResolveWorkflowDiagramLivePhase();
         RebuildWorkflowDiagramCanvas();
         UpdateWorkflowDiagramAnimationGate();
@@ -114,6 +112,21 @@ public partial class MainWindow
     private void WorkflowDiagramDemoBtn_Click(object sender, RoutedEventArgs e)
         => ToggleWorkflowDiagramDemoInternal();
 
+    private void SyncWorkflowDiagramDemoButton()
+    {
+        if (WorkflowDiagramDemoBtn == null) return;
+        bool running = _workflowDiagramDemoMode;
+        WorkflowDiagramDemoBtn.ToolTip = running
+            ? "停止演示，回到真实工作流状态"
+            : "空闲态也可循环演示六阶段流光动画；再点一次停止并回到真实状态";
+        WorkflowDiagramDemoBtn.Style = (Style)FindResource(running ? "IconToolBtnActive" : "IconToolBtn");
+        if (WorkflowDiagramDemoIcon == null) return;
+        WorkflowDiagramDemoIcon.Data = Geometry.Parse(running ? "M7,7 H17 V17 H7 Z" : "M8,5 L18,12 L8,19 Z");
+        var brush = running ? Hex("#FDE68A") : Hex("#E6EDF7");
+        WorkflowDiagramDemoIcon.Stroke = brush;
+        WorkflowDiagramDemoIcon.Fill = running ? brush : Brushes.Transparent;
+    }
+
     private void ToggleWorkflowDiagramDemoInternal()
     {
         _workflowDiagramDemoMode = !_workflowDiagramDemoMode;
@@ -123,13 +136,11 @@ public partial class MainWindow
             _workflowDiagramDemoStep = 0;
             _workflowDiagramDemoStartUtc = DateTime.UtcNow;
             ApplyDemoPhaseStep();
-            if (WorkflowDiagramDemoBtn != null)
-                WorkflowDiagramDemoBtn.Content = "⏹ 停止演示";
+            SyncWorkflowDiagramDemoButton();
         }
         else
         {
-            if (WorkflowDiagramDemoBtn != null)
-                WorkflowDiagramDemoBtn.Content = "▶ 演示流转";
+            SyncWorkflowDiagramDemoButton();
             ResolveWorkflowDiagramLivePhase();
         }
         RebuildWorkflowDiagramCanvas();

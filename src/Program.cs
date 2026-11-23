@@ -951,8 +951,9 @@ public static class Program
             headerBadge.ActualWidth + headerBadge.Margin.Left + headerBadge.Margin.Right + 0.5 >= headerBadge.DesiredSize.Width;
         bool onboardOk = onboardBtn != null &&
             onboardBtn.Visibility == Visibility.Visible &&
-            (onboardBtn.Content as string ?? "").Contains("新手向导", StringComparison.Ordinal) &&
-            onboardBtn.ActualWidth > 20;
+            onboardBtn.ActualWidth >= 24 &&
+            ((System.Windows.Automation.AutomationProperties.GetName(onboardBtn) ?? "").Contains("新手向导", StringComparison.Ordinal)
+             || (onboardBtn.ToolTip as string ?? "").Contains("新手向导", StringComparison.Ordinal));
         bool onboardFits = onboardBtn != null &&
             onboardBtn.ActualWidth + onboardBtn.Margin.Left + onboardBtn.Margin.Right + 0.5 >= onboardBtn.DesiredSize.Width;
         double brandW = brandBlock?.ActualWidth ?? 0;
@@ -976,6 +977,72 @@ public static class Program
         navAdv.IsExpanded = false;
         win.SwitchToTabForTest(4);
         AssertTrue(navAdv.IsExpanded, "SwitchToTabForTest(4) 后 NavAdvancedExpander 自动展开");
+
+        bool HeaderIconFits(Button? b) =>
+            b != null && b.Visibility == Visibility.Visible && b.ActualWidth >= 24 &&
+            b.ActualWidth + b.Margin.Left + b.Margin.Right + 0.5 >= b.DesiredSize.Width;
+        var navSettingsHidden = win.FindName("NavAppSettings") as RadioButton;
+        var topSettingsBtn = win.FindName("TopOpenSettingsBtn") as Button;
+        var floatHeaderBtn = win.FindName("ToggleFloatingBtn") as Button;
+        var wfSwitchBtn = win.FindName("WorkflowSwitchBtn") as Button;
+        var wfSwitchLabel = win.FindName("WorkflowSwitchLabel") as TextBlock;
+        AssertTrue(navSettingsHidden != null && navSettingsHidden.Visibility == Visibility.Collapsed,
+            "左侧不再重复显示设置项");
+        AssertTrue(HeaderIconFits(topSettingsBtn) && HeaderIconFits(floatHeaderBtn) && HeaderIconFits(onboardBtn),
+            $"960px 顶栏设置、悬浮窗、新手向导均可见且不截断 (SettingsW={topSettingsBtn?.ActualWidth:0}, FloatW={floatHeaderBtn?.ActualWidth:0}, OnboardW={onboardBtn?.ActualWidth:0})");
+        AssertTrue(wfSwitchBtn != null && wfSwitchBtn.Visibility == Visibility.Visible && wfSwitchBtn.Content is not string
+            && wfSwitchLabel != null && (wfSwitchLabel.Text == "开" || wfSwitchLabel.Text == "关"),
+            "协同开关保留矢量图标，只显示开或关");
+
+        win.SwitchToTabForTest(6);
+        win.UpdateLayout();
+        var settingsPage = win.FindName("PageAppSettings") as FrameworkElement;
+        var activeSettingsStyle = win.FindResource("IconToolBtnActive") as Style;
+        var idleSettingsStyle = win.FindResource("IconToolBtn") as Style;
+        AssertTrue(settingsPage != null && settingsPage.Visibility == Visibility.Visible
+            && ReferenceEquals(topSettingsBtn?.Style, activeSettingsStyle),
+            "SwitchToTabForTest(6) 进入设置二级页并点亮顶栏设置按钮");
+
+        string[] settingsKeys = { "general", "appearance", "resilience", "about" };
+        string[] settingsPanels = { "SettingsPanelGeneral", "SettingsPanelAppearance", "SettingsPanelResilience", "SettingsPanelAbout" };
+        string[] settingsTabs = { "TabSettingsGeneral", "TabSettingsAppearance", "TabSettingsResilience", "TabSettingsAbout" };
+        for (int si = 0; si < settingsKeys.Length; si++)
+        {
+            win.SwitchSettingsTabForTest(settingsKeys[si]);
+            win.UpdateLayout();
+            bool tabOk = true;
+            for (int sj = 0; sj < settingsPanels.Length; sj++)
+            {
+                var panel = win.FindName(settingsPanels[sj]) as FrameworkElement;
+                var tab = win.FindName(settingsTabs[sj]) as RadioButton;
+                if (panel == null || tab == null) { tabOk = false; break; }
+                bool selected = sj == si;
+                if (selected)
+                {
+                    if (panel.Visibility != Visibility.Visible || tab.IsChecked != true) tabOk = false;
+                }
+                else if (panel.Visibility != Visibility.Collapsed || tab.IsChecked == true)
+                {
+                    tabOk = false;
+                }
+            }
+            AssertTrue(tabOk, $"设置分标签 {settingsKeys[si]} 互斥显隐");
+        }
+        var aboutRepoLabel = win.FindName("LblUpdateRepoUrl") as TextBlock;
+        var aboutRepoBox = win.FindName("TextUpdateRepoUrl") as TextBox;
+        AssertTrue(aboutRepoLabel != null && aboutRepoLabel.Visibility == Visibility.Collapsed
+            && aboutRepoBox != null && aboutRepoBox.Visibility == Visibility.Collapsed,
+            "切到关于后更新源标签与输入框保持隐藏");
+
+        var settingsBackBtn = win.FindName("BtnSettingsBack") as Button;
+        AssertTrue(settingsBackBtn != null, "设置页存在返回按钮");
+        settingsBackBtn!.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        win.UpdateLayout();
+        var opsPage = win.FindName("PageOps") as FrameworkElement;
+        AssertTrue(opsPage != null && opsPage.Visibility == Visibility.Visible
+            && settingsPage!.Visibility == Visibility.Collapsed
+            && ReferenceEquals(topSettingsBtn?.Style, idleSettingsStyle),
+            "从设置返回上一主页面，并取消顶栏设置高亮");
 
         win.Close();
         AssertTrue(Directory.GetFiles(shotsDir, "*.png").Length == 7, "已离屏渲染生成标准尺寸与最小尺寸共 7 张功能页高清截图");
@@ -3159,7 +3226,7 @@ public static class Program
                 var btnsNoUpd = CollectLogicalAndVisual<System.Windows.Controls.Button>(fxHost.DetectedAgentsList);
                 var txtsNoUpd = CollectLogicalAndVisual<System.Windows.Controls.TextBlock>(fxHost.DetectedAgentsList);
                 bool hasClickableInstalledBtn = btnsNoUpd.Any(b => string.Equals(b.Content as string, "✓ CLI已装", StringComparison.Ordinal));
-                bool hasReadOnlyInstalledBadge = txtsNoUpd.Any(t => string.Equals(t.Text, "✓ CLI已装", StringComparison.Ordinal));
+                bool hasReadOnlyInstalledBadge = txtsNoUpd.Any(t => string.Equals(t.Text, "CLI", StringComparison.Ordinal));
 
                 CliInstallService.SetMockUpdateStatusForTest("cursor",
                     new CliInstallService.CliUpdateStatus("cursor", true, @"C:\mock\cursor-agent.cmd", "2026.01.01", "2026.11.18", true, DateTime.UtcNow));
@@ -4614,11 +4681,15 @@ public static class Program
         navProbe.SwitchToTabForTest(4);
         navProbe.UpdateLayout();
         AssertTrue(navExp.IsExpanded, "SwitchToTabForTest(4) 后高级分组展开");
+        var probeNavSettings = navProbe.FindName("NavAppSettings") as RadioButton;
+        AssertTrue(probeNavSettings != null && probeNavSettings.Visibility == Visibility.Collapsed, "窄窗探针左侧设置项保持折叠隐藏");
         navProbe.Width = 960;
         navProbe.UpdateLayout();
         var probeBrand = navProbe.FindName("HeaderBrandText") as TextBlock;
         var probeVer = navProbe.FindName("HeaderVersionText") as TextBlock;
         var probeOnboard = navProbe.FindName("HeaderOnboardingBtn") as Button;
+        var probeFloat = navProbe.FindName("ToggleFloatingBtn") as Button;
+        var probeSettingsBtn = navProbe.FindName("TopOpenSettingsBtn") as Button;
         var probeHeader = navProbe.FindName("HeaderBarGrid") as Grid;
         double probeUsed = 0;
         if (probeHeader != null)
@@ -4632,9 +4703,13 @@ public static class Program
         AssertTrue(
             probeBrand != null && probeBrand.Text.Contains("AIDeck", StringComparison.Ordinal) && probeBrand.ActualWidth > 40 &&
             probeVer != null && probeVer.Text == "v1.9.14" && probeVer.ActualWidth > 20 &&
-            probeOnboard != null && probeOnboard.IsVisible && (probeOnboard.Content as string ?? "").Contains("新手向导") &&
+            probeOnboard != null && probeOnboard.IsVisible && probeOnboard.ActualWidth >= 24 &&
+            ((System.Windows.Automation.AutomationProperties.GetName(probeOnboard) ?? "").Contains("新手向导")
+             || (probeOnboard.ToolTip as string ?? "").Contains("新手向导")) &&
+            probeFloat != null && probeFloat.IsVisible && probeFloat.ActualWidth >= 24 &&
+            probeSettingsBtn != null && probeSettingsBtn.IsVisible && probeSettingsBtn.ActualWidth >= 24 &&
             probeHeader != null && probeUsed <= probeHeader.ActualWidth + 1.0,
-            $"960 宽顶栏 AIDeck、v1.9.14、新手向导均可见且不截断 (Used={probeUsed:0}, HeaderW={probeHeader?.ActualWidth:0})");
+            $"960 宽顶栏 AIDeck、v1.9.14、新手向导、悬浮窗、设置均可见且不截断 (Used={probeUsed:0}, HeaderW={probeHeader?.ActualWidth:0}, OnboardW={probeOnboard?.ActualWidth:0}, FloatW={probeFloat?.ActualWidth:0}, SettingsW={probeSettingsBtn?.ActualWidth:0})");
         navProbe.Close();
 
         var reportPath = Path.Combine(outDir, "self_test_report.txt");
@@ -4699,8 +4774,23 @@ public static class Program
                     win.UpdateLayout();
                 }
             }
+            if (idx == 6)
+            {
+                win.SwitchSettingsTabForTest("general");
+                win.UpdateLayout();
+            }
             win.UpdateLayout();
             CaptureElementPng(win, 1220, 760, Path.Combine(outDir, $"{tabNames[idx - 1]}.png"));
+            if (idx == 6)
+            {
+                win.SwitchSettingsTabForTest("appearance");
+                win.UpdateLayout();
+                CaptureElementPng(win, 1220, 760, Path.Combine(outDir, "live_06c_settings_appearance.png"));
+                win.SwitchSettingsTabForTest("about");
+                win.UpdateLayout();
+                CaptureElementPng(win, 1220, 760, Path.Combine(outDir, "live_06d_settings_about.png"));
+                win.SwitchSettingsTabForTest("general");
+            }
             if (idx == 1)
             {
                 // 额外截一张「执行中」流光高亮运行态，便于目视验收动态流程图
