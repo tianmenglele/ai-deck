@@ -4,7 +4,7 @@ namespace AICollabHub.Services;
 
 public static class AppPaths
 {
-    public const string AppVersion = "1.9.14";
+    public const string AppVersion = "1.9.15";
     private static string? _overrideDataDir;
     public static bool IsIsolatedTest => _overrideDataDir != null;
 

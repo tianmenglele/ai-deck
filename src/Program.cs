@@ -889,19 +889,19 @@ public static class Program
 
         AssertTrue(
             win.FindName("HeaderVersionText") is TextBlock verText &&
-            verText.Text == "v1.9.14" &&
+            verText.Text == "v1.9.15" &&
             verText.Text == AppUpdateService.GetCurrentVersionDisplay() &&
             win.FindName("HeaderVersionBtn") is Button &&
             win.FindName("HeaderUpdateBadgeBtn") is Button updateBadge &&
             updateBadge.Visibility == Visibility.Collapsed &&
             win.FindName("TextAboutCurrentVersion") is TextBlock aboutVer &&
-            aboutVer.Text.Contains("v1.9.14", StringComparison.Ordinal) &&
+            aboutVer.Text.Contains("v1.9.15", StringComparison.Ordinal) &&
             win.FindName("TextAppUpdateStatus") is TextBlock &&
             win.FindName("TextUpdateRepoUrl") is TextBox &&
             win.FindName("ChkAutoCheckAppUpdate") is CheckBox autoUpdateChk &&
             autoUpdateChk.IsChecked == true &&
             win.FindName("BtnCheckAppUpdate") is Button,
-            "顶栏版本徽标显示 v1.9.14，新版本按钮默认折叠，设置页更新卡片已挂上");
+            "顶栏版本徽标显示 v1.9.15，新版本按钮默认折叠，设置页更新卡片已挂上");
         AssertTrue(
             win.FindName("LblUpdateRepoUrl") is TextBlock updateRepoLabel &&
             updateRepoLabel.Visibility == Visibility.Collapsed &&
@@ -922,7 +922,7 @@ public static class Program
         if (headerBadge != null)
         {
             headerBadge.Visibility = Visibility.Visible;
-            headerBadge.Content = "发现新版本 v1.9.15";
+            headerBadge.Content = "发现新版本 v1.9.16";
         }
         win.UpdateLayout();
         double headerUsed = 0;
@@ -938,7 +938,7 @@ public static class Program
         bool headerBrandOk = brandBlock != null &&
             brandBlock.Text.Contains("AIDeck", StringComparison.Ordinal) &&
             brandBlock.ActualWidth > 40;
-        bool headerVersionOk = versionBlock != null && versionBlock.Text == "v1.9.14" && versionBlock.ActualWidth > 20;
+        bool headerVersionOk = versionBlock != null && versionBlock.Text == "v1.9.15" && versionBlock.ActualWidth > 20;
         bool headerBadgeOk = headerBadge != null &&
             headerBadge.Visibility == Visibility.Visible &&
             headerBadge.ActualWidth > 20;
@@ -966,10 +966,10 @@ public static class Program
         }
         AssertTrue(
             brandTitle.Contains("AIDeck", StringComparison.Ordinal) &&
-            brandTitle.Contains("v1.9.14", StringComparison.Ordinal) &&
+            brandTitle.Contains("v1.9.15", StringComparison.Ordinal) &&
             headerBrandOk && headerVersionOk && headerBadgeOk && headerFits &&
             brandFits && versionFits && badgeFits && onboardOk && onboardFits,
-            $"主窗口标题包含 AIDeck 且 HeaderVersionText 仍为 v1.9.14，顶栏不截断 (Title={brandTitle}, Ver={versionBlock?.Text}, BrandW={brandW:0}, VerW={verW:0}, BadgeW={badgeW:0}, OnboardW={onboardBtn?.ActualWidth:0}, HeaderUsed={headerUsed:0}, HeaderW={headerGrid?.ActualWidth:0}, brandFits={brandFits}, versionFits={versionFits}, badgeFits={badgeFits}, onboardFits={onboardFits}, headerFits={headerFits})");
+            $"主窗口标题包含 AIDeck 且 HeaderVersionText 仍为 v1.9.15，顶栏不截断 (Title={brandTitle}, Ver={versionBlock?.Text}, BrandW={brandW:0}, VerW={verW:0}, BadgeW={badgeW:0}, OnboardW={onboardBtn?.ActualWidth:0}, HeaderUsed={headerUsed:0}, HeaderW={headerGrid?.ActualWidth:0}, brandFits={brandFits}, versionFits={versionFits}, badgeFits={badgeFits}, onboardFits={onboardFits}, headerFits={headerFits})");
 
         navAdv!.IsExpanded = false;
         win.SwitchToTabForTest(3);
@@ -1790,7 +1790,7 @@ public static class Program
                 FloatingOverlayWindow.CompactWidthDefault == 356 &&
                 hLo == 165 && hHi == 760 && cLo == 128 && cHi == 680 &&
                 dynCap3 >= 174 && dynCap3 <= 186 && dynCap4 >= 204 && dynCap4 <= 216 &&
-                AppPaths.AppVersion == "1.9.14",
+                AppPaths.AppVersion == "1.9.15",
                 $"悬浮窗尺寸上下限与版本号校验通过 (W={limits}~{limitsHi}, Ultra={uLo}~{uHi}/def={FloatingOverlayWindow.UltraWidthDefault}, H={hLo}~{hHi}, Capsule={cLo}~{cHi}, Dyn3={dynCap3}, Dyn4={dynCap4}, Ver={AppPaths.AppVersion})");
 
             // v1.9.7/1.9.11：5 款内嵌正圆官方 PNG + 发送验证辅助（跨目录根提取/签名）
@@ -1824,7 +1824,7 @@ public static class Program
                 extRoots.Count >= 1 &&
                 extRoots.Any(r => r.Contains("ai-collab-hub", StringComparison.OrdinalIgnoreCase)) &&
                 !string.IsNullOrWhiteSpace(extSig) &&
-                AppPaths.AppVersion == "1.9.14",
+                AppPaths.AppVersion == "1.9.15",
                 $"内嵌正圆图标与发送验证辅助校验通过 (Icons128={brandOk}/5, Circles={circleOk}/5, ExtRoots={extRoots.Count}, ExtSigLen={extSig.Length}, StatusFxRoute={wtStatusFx}, Ver={AppPaths.AppVersion})");
 
             // v1.9.9/1.9.10：官方 CLI 优先配置默认、ResolveCursorAgent 排除 cursor.cmd、渐进尝试与桌面会话索引
@@ -4731,20 +4731,20 @@ public static class Program
         {
             var current = AppUpdateService.GetCurrentVersion();
             var display = AppUpdateService.GetCurrentVersionDisplay();
-            var parsed = AppUpdateService.ParseNormalizedVersion("v1.9.14");
+            var parsed = AppUpdateService.ParseNormalizedVersion("v1.9.15");
             AssertTrue(
-                current == "1.9.14" && current == AppPaths.AppVersion &&
-                display == "v1.9.14" &&
-                parsed.HasValue && parsed.Value.Major == 1 && parsed.Value.Minor == 9 && parsed.Value.Patch == 14 &&
+                current == "1.9.15" && current == AppPaths.AppVersion &&
+                display == "v1.9.15" &&
+                parsed.HasValue && parsed.Value.Major == 1 && parsed.Value.Minor == 9 && parsed.Value.Patch == 15 &&
                 AppUpdateService.ParseNormalizedVersion("不是版本") == null,
                 $"版本展示读取程序集规范版本 (current={current}, display={display})");
 
             AssertTrue(
-                AppUpdateService.IsNewerVersion("1.9.15", "1.9.14") &&
+                AppUpdateService.IsNewerVersion("1.9.16", "1.9.15") &&
                 AppUpdateService.IsNewerVersion("v1.10.0", "1.9.99") &&
-                AppUpdateService.IsNewerVersion("2.0.0", "v1.9.14") &&
-                !AppUpdateService.IsNewerVersion("v1.9.14", "1.9.14") &&
-                !AppUpdateService.IsNewerVersion("1.9.13", "1.9.14") &&
+                AppUpdateService.IsNewerVersion("2.0.0", "v1.9.15") &&
+                !AppUpdateService.IsNewerVersion("v1.9.15", "1.9.15") &&
+                !AppUpdateService.IsNewerVersion("1.9.14", "1.9.15") &&
                 !AppUpdateService.IsNewerVersion("v1.8.20", "1.9.0"),
                 "SemVer 主次修订号比较通过");
 
@@ -4770,7 +4770,7 @@ public static class Program
                 $"更新端点解析通过 (gh={gh.Kind}/{gh.ApiUrl}, gitee={ge.Kind}, custom={custom.Kind})");
 
             const string githubJson = """
-                {"tag_name":"v1.9.15","html_url":"https://github.com/acme/ai-collab-hub/releases/tag/v1.9.15","body":"修复更新","assets":[{"name":"notes.txt","browser_download_url":"https://example.com/notes.txt"},{"name":"AIHub.exe","browser_download_url":"https://example.com/hub.exe"}]}
+                {"tag_name":"v1.9.16","html_url":"https://github.com/acme/ai-collab-hub/releases/tag/v1.9.16","body":"修复更新","assets":[{"name":"notes.txt","browser_download_url":"https://example.com/notes.txt"},{"name":"AIHub.exe","browser_download_url":"https://example.com/hub.exe"}]}
                 """;
             const string giteeJson = """
                 {"tag_name":"v1.9.16","body":"码云说明","html_url":"https://gitee.com/acme/ai-collab-hub/releases/v1.9.16","assets":[{"name":"app.exe","browser_download_url":"https://gitee.com/acme/app.exe"}]}
@@ -4786,10 +4786,10 @@ public static class Program
             var customRel = AppUpdateService.ParseReleaseJson(customJson);
             var tagRel = AppUpdateService.ParseReleaseJson(tagsJson);
             AssertTrue(
-                ghRel != null && ghRel.Version == "1.9.15" &&
+                ghRel != null && ghRel.Version == "1.9.16" &&
                 ghRel.AssetDownloadUrl == "https://example.com/hub.exe" &&
                 ghRel.Notes.Contains("修复更新", StringComparison.Ordinal) &&
-                ghRel.HtmlUrl.Contains("/releases/tag/v1.9.15", StringComparison.Ordinal) &&
+                ghRel.HtmlUrl.Contains("/releases/tag/v1.9.16", StringComparison.Ordinal) &&
                 geRel != null && geRel.Version == "1.9.16" && geRel.AssetName == "app.exe" &&
                 geRel.Notes.Contains("码云说明", StringComparison.Ordinal) &&
                 customRel != null && customRel.Version == "1.9.20" &&
@@ -4940,14 +4940,14 @@ public static class Program
         }
         AssertTrue(
             probeBrand != null && probeBrand.Text.Contains("AIDeck", StringComparison.Ordinal) && probeBrand.ActualWidth > 40 &&
-            probeVer != null && probeVer.Text == "v1.9.14" && probeVer.ActualWidth > 20 &&
+            probeVer != null && probeVer.Text == "v1.9.15" && probeVer.ActualWidth > 20 &&
             probeOnboard != null && probeOnboard.IsVisible && probeOnboard.ActualWidth >= 24 &&
             ((System.Windows.Automation.AutomationProperties.GetName(probeOnboard) ?? "").Contains("新手向导")
              || (probeOnboard.ToolTip as string ?? "").Contains("新手向导")) &&
             probeFloat != null && probeFloat.IsVisible && probeFloat.ActualWidth >= 24 &&
             probeSettingsBtn != null && probeSettingsBtn.IsVisible && probeSettingsBtn.ActualWidth >= 24 &&
             probeHeader != null && probeUsed <= probeHeader.ActualWidth + 1.0,
-            $"960 宽顶栏 AIDeck、v1.9.14、新手向导、悬浮窗、设置均可见且不截断 (Used={probeUsed:0}, HeaderW={probeHeader?.ActualWidth:0}, OnboardW={probeOnboard?.ActualWidth:0}, FloatW={probeFloat?.ActualWidth:0}, SettingsW={probeSettingsBtn?.ActualWidth:0})");
+            $"960 宽顶栏 AIDeck、v1.9.15、新手向导、悬浮窗、设置均可见且不截断 (Used={probeUsed:0}, HeaderW={probeHeader?.ActualWidth:0}, OnboardW={probeOnboard?.ActualWidth:0}, FloatW={probeFloat?.ActualWidth:0}, SettingsW={probeSettingsBtn?.ActualWidth:0})");
         navProbe.Close();
 
         var reportPath = Path.Combine(outDir, "self_test_report.txt");
@@ -5695,7 +5695,7 @@ public static class Program
         floatWin.PreviewCompletionBubble();
         floatWin.SnapCompletionBubbleFullyVisibleForCapture();
         var banner = floatWin.VerifyCelebrationBanner;
-        const int bubbleW = 324;
+        const int bubbleW = 356;
         banner.Measure(new Size(bubbleW, double.PositiveInfinity));
         double wantH = Math.Max(banner.DesiredSize.Height, banner.ActualHeight);
         int bubbleH = Math.Max(116, (int)Math.Ceiling(wantH + 8));

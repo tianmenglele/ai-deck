@@ -7,19 +7,19 @@
 <p>面向 Windows 多工程开发的多 AI 协同调度、特性路由与桌面悬浮监控中心（.NET 8 + WPF 单文件绿色发布）</p>
 
 <p>
-  <a href="https://github.com/tianmenglele/ai-deck/releases"><img src="https://img.shields.io/badge/Version-v1.9.14-blue" alt="Version v1.9.14" /></a>
+  <a href="https://github.com/tianmenglele/ai-deck/releases"><img src="https://img.shields.io/badge/Version-v1.9.15-blue" alt="Version v1.9.15" /></a>
   <img src="https://img.shields.io/badge/Platform-Windows_10%2F11_x64-0078D6" alt="Platform Windows 10/11 x64" />
   <img src="https://img.shields.io/badge/Framework-.NET_8_%2B_WPF-512BD4" alt="Framework .NET 8 + WPF" />
-  <img src="https://img.shields.io/badge/Self--Test-305%2F305_PASS-brightgreen" alt="Self-Test 305/305 PASS" />
+  <img src="https://img.shields.io/badge/Self--Test-364%2F364_PASS-brightgreen" alt="Self-Test 364/364 PASS" />
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow" alt="License MIT" /></a>
 </p>
 
 <p>
   <strong>⬇ <a href="https://github.com/tianmenglele/ai-deck/releases/latest">直接下载开箱即用版</a></strong>
   · 独立免装单文件
-  <code>AIDeck-v1.9.14-win-x64.exe</code>
+  <code>AIDeck-v1.9.15-win-x64.exe</code>
   · 绿色便携包
-  <code>AIDeck-v1.9.14-win-x64-portable.zip</code>
+  <code>AIDeck-v1.9.15-win-x64-portable.zip</code>
 </p>
 
 <p>
@@ -44,7 +44,7 @@
 
 ## 核心特性
 
-当前版本 **v1.9.14**。主脑负责拆解、派单与终验；执行端留在各自桌面会话里完成后台改动，悬浮窗只同步状态，不抢当前焦点。
+当前版本 **v1.9.15**。主脑负责拆解、派单与终验；执行端留在各自桌面会话里完成后台改动，悬浮窗只同步状态，不抢当前焦点。
 
 | 模块 | 说明 |
 | --- | --- |
@@ -53,7 +53,14 @@
 | 桌面置顶悬浮窗全形态锁定 | 折叠胶囊、极简单行、紧凑双行、完整展开。手动切换后永久锁定，任务开始、完成或异常刷新都不会自动弹出抢屏。 |
 | 毫秒/秒级实时状态同步与跨工程防串扰 | 主界面与悬浮窗按毫秒级探测、秒级刷新各 AI 阶段；回执按工程隔离，不串到其他项目。 |
 | 飞行任务单显示具体任务名 | 跨工具派单动画胶囊实时展示提炼后的任务标题，而不是笼统的「处理中」。 |
-| 版本号展示与自主检查更新 | 顶栏版本按钮显示 `v1.9.14`。启动后可对 [Releases](https://github.com/tianmenglele/ai-deck/releases) 做后台静默检查，检查动作带防重入锁。 |
+| 版本号展示与自主检查更新 | 顶栏版本按钮显示 `v1.9.15`。启动后可对 [Releases](https://github.com/tianmenglele/ai-deck/releases) 做后台静默检查，检查动作带防重入锁。 |
+| Magpie 风格中心辐射工作流脑图 | 工作流以中心辐射拓扑展示主脑与执行端分工，阶段关系一眼可读。 |
+| 3 步首次使用新手向导 | 首次打开按 3 步引导完成上手，之后也可从顶栏再次进入。 |
+| 全站 Crisp 矢量图标与 4 分页独立设置页 | 全站使用 Crisp 矢量图标；设置拆成 4 个独立分页，各自维护互不挤占。 |
+| 折叠胶囊自适应磨砂完成气泡 | 标题与正文分离，悬停暂停倒计时，留屏时长可在 4 到 30 秒之间设置，宽度随文案自适应。 |
+| 默认窗口零纵向滚动紧凑布局 | 默认窗口在常规高度下，主界面无需纵向滚动即可浏览。 |
+| 悬浮窗防闪烁非对称去抖与丝滑自适应飞行动画 | 状态切换用非对称去抖抑制闪烁，派单飞行动画按路径自适应。 |
+| 内置官方 GitHub 仓库自动更新源 | 默认指向官方仓库，启动后自动后台检查，无需手填更新源。 |
 | DOLLARS 风格电钢柔和提示旋律 | 5 路 CC0-1.0 柔和提示音轨，支持完整、轻量、静音三档，并有独立静音闸门。 |
 | 单一事实源规则技能零拷贝同步 | 项目内只保留一份规则、技能与经验库真身，同步到各已启用工具；停用即剥离，不在每个工具里各存一份副本。 |
 
@@ -97,6 +104,18 @@
 
 <img src="docs/images/05-snapshots-task.png" alt="代码快照保护与协同任务单" width="100%" />
 
+### 7. 磨砂完成气泡通知与自定义留屏时长
+
+折叠胶囊完成时弹出磨砂气泡：标题与正文分离，悬停暂停，留屏时长可在 4 到 30 秒之间设置。
+
+<img src="docs/images/07-completion-bubble.png" alt="磨砂完成气泡通知与自定义留屏时长" width="100%" />
+
+### 8. 3 步首次使用新手向导
+
+首次打开按 3 步引导完成上手，之后也可从顶栏再次进入。
+
+<img src="docs/images/08-onboarding-wizard.png" alt="3 步首次使用新手向导" width="100%" />
+
 <a id="协同架构"></a>
 
 ## 协同架构
@@ -127,12 +146,12 @@ flowchart TD
 
 | 资源 | 说明 |
 | --- | --- |
-| `AIDeck-v1.9.14-win-x64.exe` | **独立免装运行时单文件版**（自包含 .NET 8，双击即可运行） |
-| `AIDeck-v1.9.14-win-x64-portable.zip` | **绿色便携压缩包**（含主程序、`registry/`、`plugins/`、启动脚本与说明） |
-| `AIDeck-v1.9.14-win-x64-lite.zip` | 轻量版（需本机已安装 [.NET 8 桌面运行时](https://dotnet.microsoft.com/download/dotnet/8.0)） |
+| `AIDeck-v1.9.15-win-x64.exe` | **独立免装运行时单文件版**（自包含 .NET 8，双击即可运行） |
+| `AIDeck-v1.9.15-win-x64-portable.zip` | **绿色便携压缩包**（含主程序、`registry/`、`plugins/`、启动脚本与说明） |
+| `AIDeck-v1.9.15-win-x64-lite.zip` | 轻量版（需本机已安装 [.NET 8 桌面运行时](https://dotnet.microsoft.com/download/dotnet/8.0)） |
 | `SHA256SUMS.txt` | 上述产物的 SHA256 校验清单 |
 
-下载后建议对照 `SHA256SUMS.txt` 校验完整性，再启动 `AI协同中心.exe`（便携包内）或直接运行独立单文件 `AIDeck-v1.9.14-win-x64.exe`。
+下载后建议对照 `SHA256SUMS.txt` 校验完整性，再启动 `AI协同中心.exe`（便携包内）或直接运行独立单文件 `AIDeck-v1.9.15-win-x64.exe`。
 
 ### 从源码编译（开发者）
 
@@ -149,16 +168,16 @@ Release 编译：
 dotnet build src/AICollabHub.csproj -c Release --nologo
 ```
 
-单文件发布到 `outputs/v1.9.14/AI协同中心`（依赖本机 .NET 8 桌面运行时，不带安装向导）：
+单文件发布到 `outputs/v1.9.15/AI协同中心`（依赖本机 .NET 8 桌面运行时，不带安装向导）：
 
 ```powershell
-dotnet publish src/AICollabHub.csproj -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -p:DebugType=portable -p:DebugSymbols=true -o outputs/v1.9.14/AI协同中心 --nologo
+dotnet publish src/AICollabHub.csproj -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -p:DebugType=portable -p:DebugSymbols=true -o outputs/v1.9.15/AI协同中心 --nologo
 ```
 
-全量离线自检。v1.9.14 基线为 **305/305 PASS**。命令不改写正在使用的程序，报告写到 `work/self_test_out`（该目录已被 `.gitignore` 忽略）：
+全量离线自检。v1.9.15 基线为 **364/364 PASS**。命令不改写正在使用的程序，报告写到 `work/self_test_out`（该目录已被 `.gitignore` 忽略）：
 
 ```powershell
-.\outputs\v1.9.14\AI协同中心\AI协同中心.exe --self-test .\work\self_test_out
+.\outputs\v1.9.15\AI协同中心\AI协同中心.exe --self-test .\work\self_test_out
 ```
 
 启动：双击发布目录中的 `AI协同中心.exe`，或：
@@ -169,7 +188,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\启动协同中心.ps1
 
 ### 软件内自主检查更新
 
-在软件内把更新源配置为 `https://github.com/tianmenglele/ai-deck`。检查目标对应 [https://github.com/tianmenglele/ai-deck/releases](https://github.com/tianmenglele/ai-deck/releases)。顶栏版本按钮显示当前 `v1.9.14`；启动后可后台静默检查。同一时刻只允许一路检查进入，占用中的重复触发会被防重入锁拒绝，结束后才能再次检查。
+从 **v1.9.15** 起已内置默认官方仓库地址 `https://github.com/tianmenglele/ai-deck`，检查目标对应 [Releases](https://github.com/tianmenglele/ai-deck/releases)。无需手动填写更新源。默认在启动 4 秒后自动后台检查；顶栏版本按钮显示当前 `v1.9.15`。发现新版本时在顶栏展示提示，并支持一键下载、替换后重启。同一时刻只允许一路检查进入，占用中的重复触发会被防重入锁拒绝，结束后才能再次检查。
 
 <a id="开放扩展"></a>
 
@@ -201,7 +220,9 @@ ai-deck/
 │       ├── 03-rules-skills.png
 │       ├── 04-dialogs-dispatch.png
 │       ├── 05-snapshots-task.png
-│       └── 06-floating-hud.png
+│       ├── 06-floating-hud.png
+│       ├── 07-completion-bubble.png
+│       └── 08-onboarding-wizard.png
 ├── plugins/
 │   └── export_config_digest.ps1
 ├── registry/
@@ -247,6 +268,7 @@ AIDeck 站在诸多优秀开源项目与开发者生态之上。以下仓库与�
 - **[openai/codex](https://github.com/openai/codex)** 与 **[anthropics/claude-code](https://github.com/anthropics/claude-code)**：感谢 OpenAI Codex CLI 与 Claude Code CLI 团队打造的多 Agent 终端工具生态，AIDeck 原生支持其状态探测、版本检查与规则挂载。
 - **[ollama/ollama](https://github.com/ollama/ollama)**：感谢 Ollama 本地开源大模型运行时社区，AIDeck 开箱支持本地 OpenAI 兼容服务探测。
 - **[dotnet/wpf](https://github.com/dotnet/wpf)**：感谢 .NET 8 与 WPF 开源社区提供稳定的 Windows 桌面端单文件发布与 UI Automation 底层能力。
+- **[yetone/magpie](https://github.com/yetone/magpie)**：感谢其中心拓扑脑图视觉设计思路的启发。
 
 同时感谢 **OpenRouter**、**Cursor**、**Antigravity**、**Grok Bot**、**LM Studio**、**Windsurf** 等开发者生态，以及公开分享 `AGENTS.md` / `.cursor/rules` / `.cursor/skills` 规范的开源贡献者。
 
