@@ -1156,6 +1156,9 @@ public partial class MainWindow : Window
                     if (!nextWinMap.TryGetValue(ag.Id, out var winSt) || !winSt.IsRunning) continue;
                     if (AutoDispatchService.ResolveGuiExecutable(ag) == null) continue;
                     var busy = AutoDispatchService.ProbeDesktopAgentBusySilent(ag);
+                    // 超时/UIA 异常是不确定态：没有可靠空闲证据时，禁止写入 false 把工作中清掉。
+                    if (busy.IsInconclusive && !busy.IsWorking)
+                        continue;
                     nextBusyMap[ag.Id] = busy.IsWorking;
                 }
 
@@ -1671,6 +1674,38 @@ public partial class MainWindow : Window
         if (string.IsNullOrWhiteSpace(s)) return "";
         var one = s.Replace("\r", " ").Replace("\n", " ").Trim();
         return one.Length <= maxLen ? one : one[..maxLen] + "...";
+    }
+
+    /// <summary>配置卡片短摘要：按词界收束，避免硬切出孤立字母。</summary>
+    private static string TidyCardSummaryFragment(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw)) return "";
+        var one = raw.Replace('\r', ' ').Replace('\n', ' ').Trim();
+        while (one.Contains("  ", StringComparison.Ordinal))
+            one = one.Replace("  ", " ", StringComparison.Ordinal);
+        const int maxChars = 28;
+        if (one.Length <= maxChars) return one;
+
+        int cut = -1;
+        int limit = maxChars;
+        for (int i = limit - 1; i >= 0; i--)
+        {
+            char c = one[i];
+            if (char.IsWhiteSpace(c) || c is '·' or '、' or '，' or ',' or '/' or '-' or '—' or '（' or '(')
+            {
+                cut = i;
+                break;
+            }
+        }
+
+        if (cut < 4)
+            return one;
+        string head = one[..cut].Trim().TrimEnd('·', '-', '/', '，', ',', '、');
+        int lastSpace = head.LastIndexOf(' ');
+        if (lastSpace > 0 && head.Length - lastSpace <= 2 && char.IsLetter(head[^1]) && head[^1] < 128)
+            head = head[..lastSpace].TrimEnd();
+        if (head.Length == 0) return one;
+        return head + "…";
     }
 
     private Border MakeStatusPill(string text, string bg, string bd, string fg)
@@ -3491,17 +3526,18 @@ public partial class MainWindow : Window
                 {
                     int parenIdx = rawName.IndexOf('(');
                     var clean = parenIdx > 1 ? rawName[..parenIdx].Trim() : rawName.Trim();
-                    modelShown = string.IsNullOrWhiteSpace(clean) ? "自动" : TruncateOneLine(clean, 16);
+                    modelShown = string.IsNullOrWhiteSpace(clean) ? "自动" : TidyCardSummaryFragment(clean);
                 }
             }
-            string posRaw = !string.IsNullOrWhiteSpace(dispNote) ? dispNote.Trim() : (normalizedRoles.FirstOrDefault() ?? "待分工");
-            if (posRaw.Length > 18) posRaw = posRaw[..18];
+            string posRaw = TidyCardSummaryFragment(
+                !string.IsNullOrWhiteSpace(dispNote) ? dispNote : (normalizedRoles.FirstOrDefault() ?? "待分工"));
             infoStack.Children.Add(new TextBlock
             {
                 Text = $"{modelShown} · {posRaw}",
                 FontSize = 12.5,
                 Foreground = Hex("#94A3B8"),
                 Margin = new Thickness(0, 6, 0, 0),
+                TextWrapping = TextWrapping.NoWrap,
                 TextTrimming = TextTrimming.CharacterEllipsis
             });
 

@@ -5307,7 +5307,6 @@ Write-Output ('DISPATCHED_CONFIRMED:' + $selectedChatTitle)
                     }
                     catch
                     {
-                        windowsFailed++;
                     }
 
                     if (abortedByBudget) break;
@@ -5329,7 +5328,6 @@ Write-Output ('DISPATCHED_CONFIRMED:' + $selectedChatTitle)
                     }
                     catch
                     {
-                        windowsFailed++;
                     }
                 }
 

@@ -53,13 +53,13 @@ public sealed class OnboardingWizardDialog : Window
         FontSize = 14,
         Margin = new Thickness(0, 6, 0, 0)
     };
-    private readonly WrapPanel _workerWrap = new() { Margin = new Thickness(0, 8, 0, 0) };
+    private readonly WrapPanel _workerWrap = new() { Margin = new Thickness(0, 4, 0, 0) };
     private readonly TextBlock _step2Note = new()
     {
         Text = "主脑派活，勾选的人来做",
         Foreground = Brush("#8EA0B8"),
         FontSize = 13,
-        Margin = new Thickness(0, 8, 0, 0),
+        Margin = new Thickness(0, 4, 0, 0),
         TextWrapping = TextWrapping.Wrap
     };
     private readonly CheckBox _floatChk = new()
@@ -408,7 +408,7 @@ public sealed class OnboardingWizardDialog : Window
         };
         var stack = new StackPanel();
         var hero = Card();
-        hero.Padding = new Thickness(20, 18, 20, 18);
+        hero.Padding = new Thickness(16, 10, 16, 10);
         var heroStack = new StackPanel();
         heroStack.Children.Add(new TextBlock
         {
@@ -422,7 +422,7 @@ public sealed class OnboardingWizardDialog : Window
             Text = "按已经打开、并且这台电脑上有的助手来排。",
             FontSize = 13,
             Foreground = Brush("#8EA0B8"),
-            Margin = new Thickness(0, 6, 0, 14),
+            Margin = new Thickness(0, 4, 0, 8),
             TextWrapping = TextWrapping.Wrap
         });
         var apply = MakePrimaryButton("一键应用推荐分工");
@@ -440,7 +440,7 @@ public sealed class OnboardingWizardDialog : Window
             FontSize = 14,
             FontWeight = FontWeights.SemiBold,
             Foreground = Brush("#F8FAFC"),
-            Margin = new Thickness(0, 18, 0, 0)
+            Margin = new Thickness(0, 10, 0, 0)
         });
         stack.Children.Add(_masterCombo);
         stack.Children.Add(new TextBlock
@@ -449,7 +449,7 @@ public sealed class OnboardingWizardDialog : Window
             FontSize = 14,
             FontWeight = FontWeights.SemiBold,
             Foreground = Brush("#F8FAFC"),
-            Margin = new Thickness(0, 16, 0, 0)
+            Margin = new Thickness(0, 8, 0, 0)
         });
         stack.Children.Add(_workerWrap);
         stack.Children.Add(_step2Note);
@@ -700,8 +700,8 @@ public sealed class OnboardingWizardDialog : Window
                     IsChecked = ag.Enabled,
                     FontSize = 13,
                     Foreground = Brush("#E6EDF7"),
-                    Margin = new Thickness(0, 0, 8, 8),
-                    Padding = new Thickness(10, 6, 10, 6)
+                    Margin = new Thickness(0),
+                    Padding = new Thickness(8, 3, 8, 3)
                 };
                 var captured = ag;
                 chip.Checked += (_, _) => captured.Enabled = true;
@@ -712,8 +712,8 @@ public sealed class OnboardingWizardDialog : Window
                     Background = Brush("#172233"),
                     BorderBrush = Brush("#2C415C"),
                     BorderThickness = new Thickness(1),
-                    Margin = new Thickness(0, 0, 8, 8),
-                    Padding = new Thickness(4, 2, 8, 2),
+                    Margin = new Thickness(0, 0, 6, 6),
+                    Padding = new Thickness(2, 1, 6, 1),
                     Child = chip
                 };
                 _workerWrap.Children.Add(shell);
