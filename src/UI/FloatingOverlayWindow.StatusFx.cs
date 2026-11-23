@@ -400,15 +400,15 @@ public partial class FloatingOverlayWindow
             Tag = $"avatar:{ag.Id}"
         };
 
-        // 双层动效环（禁用像素取整消除亚像素抖动，活跃工作态呈现丝滑光晕层次）
+        // 双层动效环贴合头像安全框（宿主 size+8），描边 1.6–2.0，缩放不越出裁切
         var innerHalo = new Ellipse
         {
-            Width = size + 2,
-            Height = size + 2,
+            Width = size + 1.5,
+            Height = size + 1.5,
             Stroke = Hex(WithAlphaHex(rich.AccentHex, 0x55)),
-            StrokeThickness = 1.2,
+            StrokeThickness = 1.6,
             Fill = Brushes.Transparent,
-            Opacity = AllowsLoopingStatusAnimation(rich.Kind) ? 0.65 : 0.0,
+            Opacity = AllowsLoopingStatusAnimation(rich.Kind) ? 0.55 : 0.0,
             HorizontalAlignment = HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Center,
             UseLayoutRounding = false,
@@ -418,10 +418,10 @@ public partial class FloatingOverlayWindow
 
         var fxRing = new Ellipse
         {
-            Width = size + 6,
-            Height = size + 6,
+            Width = size + 4,
+            Height = size + 4,
             Stroke = Hex(rich.AccentHex),
-            StrokeThickness = 1.6,
+            StrokeThickness = 1.8,
             Fill = Brushes.Transparent,
             Opacity = 0.85,
             HorizontalAlignment = HorizontalAlignment.Center,
@@ -479,48 +479,66 @@ public partial class FloatingOverlayWindow
     {
         if (AppPaths.IsIsolatedTest) return;
 
+        double ringHi = Math.Min(1.04, (fxRing.Width + 2.6) / Math.Max(8, fxRing.Width));
+        double haloHi = Math.Min(1.03, (innerHalo.Width + 2.2) / Math.Max(8, innerHalo.Width));
         switch (kind)
         {
             case FloatingRichFxKind.MasterAnalyzing:
-                fxRing.StrokeDashArray = new DoubleCollection { 2, 2 };
-                StartPulseScale(fxRing, 0.94, 1.12, 950, loop: true);
-                StartOpacityBreath(innerHalo, 0.25, 0.85, 800, loop: true);
+                fxRing.StrokeThickness = 1.8;
+                fxRing.StrokeDashArray = new DoubleCollection { 2.2, 2.4 };
+                StartPulseScale(fxRing, 0.985, ringHi, 1100, loop: true);
+                StartOpacityBreath(innerHalo, 0.28, 0.72, 1100, loop: true);
                 break;
             case FloatingRichFxKind.Thinking:
-                StartOpacityBreath(fxRing, 0.42, 0.98, 720, loop: true);
-                StartPulseScale(innerHalo, 0.98, 1.10, 720, loop: true);
+                fxRing.StrokeThickness = 1.6;
+                StartOpacityBreath(fxRing, 0.46, 0.9, 980, loop: true);
+                StartPulseScale(innerHalo, 0.99, haloHi, 980, loop: true);
                 break;
             case FloatingRichFxKind.Dispatching:
-                StartPulseScale(fxRing, 0.98, 1.24, 780, loop: true);
-                fxRing.Opacity = 0.68;
-                StartOpacityBreath(innerHalo, 0.35, 0.90, 620, loop: true);
+                fxRing.StrokeThickness = 2.0;
+                StartPulseScale(fxRing, 0.99, ringHi, 920, loop: true);
+                StartOpacityBreath(innerHalo, 0.32, 0.78, 920, loop: true);
                 break;
             case FloatingRichFxKind.Coding:
             {
-                fxRing.StrokeDashArray = new DoubleCollection { 3, 2 };
+                fxRing.StrokeThickness = 1.8;
+                fxRing.StrokeDashArray = new DoubleCollection { 3.2, 2.2 };
+                fxRing.RenderTransformOrigin = new Point(0.5, 0.5);
                 var rot = new RotateTransform(0, fxRing.Width / 2, fxRing.Height / 2);
                 fxRing.RenderTransform = rot;
-                var rotAnim = new DoubleAnimation(0, 360, TimeSpan.FromSeconds(2.4)) { RepeatBehavior = RepeatBehavior.Forever };
+                var rotAnim = new DoubleAnimation(0, 360, TimeSpan.FromSeconds(3.2))
+                {
+                    RepeatBehavior = RepeatBehavior.Forever,
+                    EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut }
+                };
                 rot.BeginAnimation(RotateTransform.AngleProperty, rotAnim);
-                StartOpacityBreath(innerHalo, 0.30, 0.92, 680, loop: true);
+                StartOpacityBreath(innerHalo, 0.30, 0.8, 900, loop: true);
                 break;
             }
             case FloatingRichFxKind.Delivering:
-                StartOpacityBreath(circle, 0.86, 1.0, 680, loop: true);
-                StartPulseScale(fxRing, 0.96, 1.14, 680, loop: true);
-                StartOpacityBreath(innerHalo, 0.35, 0.95, 680, loop: true);
+                fxRing.StrokeThickness = 1.6;
+                StartOpacityBreath(circle, 0.9, 1.0, 860, loop: true);
+                StartPulseScale(fxRing, 0.99, ringHi, 860, loop: true);
+                StartOpacityBreath(innerHalo, 0.34, 0.82, 860, loop: true);
                 break;
             case FloatingRichFxKind.MasterVerifying:
-                fxRing.StrokeDashArray = new DoubleCollection { 4, 2 };
-                StartOpacityBreath(fxRing, 0.48, 1.0, 760, loop: true);
-                StartPulseScale(innerHalo, 0.96, 1.12, 760, loop: true);
+                fxRing.StrokeThickness = 1.8;
+                fxRing.StrokeDashArray = new DoubleCollection { 4, 2.4 };
+                StartOpacityBreath(fxRing, 0.5, 0.95, 900, loop: true);
+                StartPulseScale(innerHalo, 0.99, haloHi, 900, loop: true);
                 break;
             case FloatingRichFxKind.Reworking:
-                StartOpacityBreath(fxRing, 0.50, 1.0, 520, loop: true);
-                StartPulseScale(innerHalo, 0.95, 1.12, 520, loop: true);
+                fxRing.StrokeThickness = 2.0;
+                StartOpacityBreath(fxRing, 0.55, 0.95, 840, loop: true);
+                StartPulseScale(innerHalo, 0.99, haloHi, 840, loop: true);
                 fxRing.Stroke = Hex("#FB923C");
                 break;
             case FloatingRichFxKind.VerifiedDelivered:
+                fxRing.StrokeThickness = 1.6;
+                fxRing.Opacity = 0.78;
+                innerHalo.Opacity = 0.35;
+                StartOpacityBreath(fxRing, 0.62, 0.84, 720, loop: false);
+                break;
             case FloatingRichFxKind.MasterStandby:
             case FloatingRichFxKind.IdleReady:
             case FloatingRichFxKind.IdleOffline:
@@ -672,9 +690,10 @@ public partial class FloatingOverlayWindow
                 {
                     var rot = new RotateTransform(0, 6, 6);
                     gear.RenderTransform = rot;
-                    var rotAnim = new DoubleAnimation(0, 360, TimeSpan.FromSeconds(1.8))
+                    var rotAnim = new DoubleAnimation(0, 360, TimeSpan.FromSeconds(2.4))
                     {
-                        RepeatBehavior = RepeatBehavior.Forever
+                        RepeatBehavior = RepeatBehavior.Forever,
+                        EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut }
                     };
                     rot.BeginAnimation(RotateTransform.AngleProperty, rotAnim);
                 }

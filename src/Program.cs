@@ -1424,6 +1424,13 @@ public static class Program
                 flightEmpty == "📋 任务单" &&
                 flightBlank == "📋 任务单",
                 $"飞行胶囊任务名截断与空回退 (full={flightFull}, ultra={flightUltra}, empty={flightEmpty})");
+            double durShort = FloatingOverlayWindow.ComputeAdaptiveFlightDurationMs(36, compactMode: true);
+            double durLong = FloatingOverlayWindow.ComputeAdaptiveFlightDurationMs(280, compactMode: false);
+            AssertTrue(
+                durShort >= 680 && durShort <= 900 &&
+                durLong >= 1000 && durLong <= 1280 &&
+                durLong > durShort,
+                $"飞行耗时随距离自适应 (short={durShort:F0}, long={durLong:F0})");
         }
 
         // 悬浮窗实时同步：探测缓存 TTL、忙碌点亮与调度进程死后的滞留回落
@@ -2467,6 +2474,64 @@ public static class Program
                 bannerOk &&
                 floatFx.VerifyBannerTriggerCountForTest >= 1,
                 $"飞行交互动画与主脑验收横幅触发通过 (Anim={floatFx.InteractionAnimationTriggerCountForTest}, Banner={floatFx.VerifyBannerTriggerCountForTest})");
+
+            bool flightBakCollapsed = reg.UserConfig.FloatingWindowCollapsed;
+            string flightBakLayout = reg.UserConfig.FloatingLayoutMode;
+            double? flightBakW = reg.UserConfig.FloatingCustomWidth;
+            double? flightBakH = reg.UserConfig.FloatingCustomHeight;
+            try
+            {
+                static bool FlightPathSafe(FloatingOverlayWindow.FlightGeometrySample g)
+                {
+                    double hi = Math.Max(4, g.WinH - 4);
+                    double cap = Math.Max(28, g.WinH - 4);
+                    bool yOk = g.FromY >= 4 - 0.05 && g.FromY <= hi + 0.05 &&
+                               g.MidY >= 4 - 0.05 && g.MidY <= hi + 0.05 &&
+                               g.ToY >= 4 - 0.05 && g.ToY <= hi + 0.05;
+                    return g.WithinSafeZone && yOk && g.MaxRingDiameter > 0 && g.MaxRingDiameter <= cap + 0.05;
+                }
+
+                reg.UserConfig.FloatingWindowCollapsed = true;
+                reg.UserConfig.FloatingLayoutMode = "full";
+                reg.UserConfig.FloatingCustomHeight = null;
+                floatFx.ApplyCollapsedVisual(true, preserveRightAnchor: false);
+                floatFx.RefreshOverlayData(force: true);
+                floatFx.UpdateLayout();
+                floatFx.TriggerFlightForTest("dispatch", "antigravity", "cursor", "折叠胶囊飞行");
+                var collapsedFlight = floatFx.LastFlightGeometryForTest;
+                AssertTrue(
+                    floatFx.ActualHeight > 8 &&
+                    Math.Abs(collapsedFlight.WinH - floatFx.ActualHeight) < 1.5 &&
+                    FlightPathSafe(collapsedFlight) &&
+                    floatFx.InteractionFxChildCountForTest == 0,
+                    $"折叠胶囊飞行不越出高度安全区且无残留 (H={floatFx.ActualHeight:F1}, midY={collapsedFlight.MidY:F1}, ring={collapsedFlight.MaxRingDiameter:F1}, residue={floatFx.InteractionFxChildCountForTest})");
+
+                reg.UserConfig.FloatingWindowCollapsed = false;
+                reg.UserConfig.FloatingLayoutMode = "full";
+                reg.UserConfig.FloatingCustomWidth = 520;
+                reg.UserConfig.FloatingCustomHeight = 300;
+                floatFx.ApplyCollapsedVisual(false, preserveRightAnchor: false);
+                floatFx.RefreshOverlayData(force: true);
+                floatFx.UpdateLayout();
+                floatFx.TriggerFlightForTest("verified_delivered", "cursor", "antigravity", "展开验收飞行");
+                var fullFlight = floatFx.LastFlightGeometryForTest;
+                AssertTrue(
+                    floatFx.CurrentCompactModeForTest == FloatingOverlayWindow.FloatingCompactMode.Full &&
+                    Math.Abs(fullFlight.WinH - floatFx.ActualHeight) < 2.0 &&
+                    FlightPathSafe(fullFlight) &&
+                    fullFlight.WinH > 64 &&
+                    floatFx.InteractionFxChildCountForTest == 0,
+                    $"展开态飞行不越出高度安全区且无残留 (H={floatFx.ActualHeight:F1}, midY={fullFlight.MidY:F1}, ring={fullFlight.MaxRingDiameter:F1}, residue={floatFx.InteractionFxChildCountForTest})");
+            }
+            finally
+            {
+                reg.UserConfig.FloatingWindowCollapsed = flightBakCollapsed;
+                reg.UserConfig.FloatingLayoutMode = flightBakLayout;
+                reg.UserConfig.FloatingCustomWidth = flightBakW;
+                reg.UserConfig.FloatingCustomHeight = flightBakH;
+                floatFx.ApplyCollapsedVisual(flightBakCollapsed, preserveRightAnchor: false);
+                floatFx.UpdateLayout();
+            }
 
             // 动效构建冒烟：刷新后卡片树非空（含能量竖条/状态签）
             AssertTrue(

@@ -1,9 +1,11 @@
+using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
+using System.Windows.Media.Effects;
 using System.Windows.Shapes;
 using System.Windows.Threading;
 using AICollabHub.Models;
@@ -141,6 +143,34 @@ public partial class FloatingOverlayWindow
 
     public int InteractionAnimationTriggerCountForTest => _interactionAnimCount;
     public int VerifyBannerTriggerCountForTest => _verifyBannerCount;
+    public int InteractionFxChildCountForTest => InteractionFxCanvas?.Children.Count ?? 0;
+
+    /// <summary>最近一次飞行的安全区几何（快速路径清理画布后仍可断言）。</summary>
+    public readonly struct FlightGeometrySample
+    {
+        public double FromX { get; init; }
+        public double FromY { get; init; }
+        public double MidX { get; init; }
+        public double MidY { get; init; }
+        public double ToX { get; init; }
+        public double ToY { get; init; }
+        public double WinW { get; init; }
+        public double WinH { get; init; }
+        public double MaxRingDiameter { get; init; }
+        public bool CompactMode { get; init; }
+        public bool WithinSafeZone { get; init; }
+    }
+
+    public FlightGeometrySample LastFlightGeometryForTest { get; private set; }
+
+    /// <summary>
+    /// 距离自适应飞行耗时：短距不再拖到 1850ms，长距仍保持可跟随的上限。
+    /// </summary>
+    public static double ComputeAdaptiveFlightDurationMs(double distancePx, bool compactMode)
+    {
+        double dist = double.IsFinite(distancePx) ? Math.Max(0, distancePx) : 0;
+        return Math.Clamp((compactMode ? 620.0 : 660.0) + dist * 2.0, 680.0, 1280.0);
+    }
 
     public (double MinW, double MaxW, double DefaultW, double UltraMinW, double UltraDefaultW, double MinH, double MaxH, double MinCollapsedW, double MaxCollapsedW, double DefaultCollapsedW)
         GetSizeLimitsForTest() =>
@@ -194,6 +224,10 @@ public partial class FloatingOverlayWindow
         return _interactionAnimCount;
     }
 
+    /// <summary>离屏自检：触发飞行并保留路径几何，供安全区与残留断言。</summary>
+    public int TriggerFlightForTest(string kind, string fromAgentId, string toAgentId, string? taskSummary = null)
+        => TriggerInteractionAnimationForTest(kind, fromAgentId, toAgentId, taskSummary);
+
     /// <summary>
     /// 飞行胶囊文案：有精简任务名时显示「图标 + 任务名」（按窗口宽度截断），否则回退固定单名。
     /// </summary>
@@ -202,9 +236,10 @@ public partial class FloatingOverlayWindow
         string k = (kind ?? "").Trim().ToLowerInvariant();
         string fallback = k switch
         {
-            "deliver" or "delivery" or "master_verifying" => "📦 交付包",
+            "deliver" or "delivery" or "master_verifying" or "verify" => "📦 交付包",
             "rework" or "reworking" => "🔧 重修单",
             "relay" or "handover" => "⚡ 接力",
+            "verified_delivered" or "verified" => "✅ 已交付",
             _ => "📋 任务单"
         };
         if (string.IsNullOrWhiteSpace(taskSummary)) return fallback;
@@ -229,19 +264,25 @@ public partial class FloatingOverlayWindow
         {
             case "deliver":
             case "delivery":
+            case "verify":
             case "master_verifying":
-                glow = "#34D399";
+                glow = "#A78BFA";
                 break;
             case "rework":
             case "reworking":
                 glow = "#F59E0B";
+                break;
+            case "verified_delivered":
+            case "verified":
+            case "done":
+                glow = "#34D399";
                 break;
             case "relay":
             case "handover":
                 glow = "#22D3EE";
                 break;
             default:
-                glow = "#A78BFA";
+                glow = "#38BDF8";
                 break;
         }
 
@@ -1008,7 +1049,7 @@ public partial class FloatingOverlayWindow
                          prevPhase is "executing" or "reworking" or "working");
                     if (skippedVerifying)
                     {
-                        PlayInteractionKind("deliver", ag.Id, masterId, lv?.TaskSummary);
+                        PlayInteractionKind("verified_delivered", ag.Id, masterId, lv?.TaskSummary);
                     }
                     string? detail = string.IsNullOrWhiteSpace(lv?.VerificationSummary) ? null : lv!.VerificationSummary;
                     ShowVerificationCelebration(ExtractConciseTaskTitle(lv?.TaskSummary), masterId, ag.Id, detail);
@@ -1223,7 +1264,7 @@ public partial class FloatingOverlayWindow
         }
     }
 
-    private void LaunchBezierFlight(Point from, Point to, string label, string glowHex, string pulseTargetAgentId)
+    public void LaunchBezierFlight(Point from, Point to, string label, string glowHex, string pulseTargetAgentId)
     {
         if (InteractionFxCanvas == null) return;
         SoundFxService.Play(_reg.UserConfig, SoundFxService.SoundKind.DispatchFlight);
@@ -1233,120 +1274,321 @@ public partial class FloatingOverlayWindow
             return;
         }
 
-        double dx = to.X - from.X;
-        double dy = to.Y - from.Y;
-        double winW = ActualWidth > 40 ? ActualWidth : Math.Max(UltraWidthDefault, Width);
-        double winH = ActualHeight > 40 ? ActualHeight : Math.Max(80, Height > 40 ? Height : 120);
-        double padX = Math.Max(16, Math.Min(28, winW * 0.08));
-        double maxMidX = Math.Max(padX + 8, winW - padX);
-        double maxMidY = Math.Max(12, winH - 12);
-        Point mid;
-        if (Math.Abs(dx) < 60)
-        {
-            double sideLift = Math.Min(Math.Max(36, winW * 0.28), Math.Max(24, maxMidX - Math.Max(from.X, to.X)));
-            double midX = Math.Clamp(Math.Max(from.X, to.X) + sideLift, padX, maxMidX);
-            mid = new Point(midX, Math.Clamp((from.Y + to.Y) / 2.0 - 12, 10, maxMidY));
-        }
-        else
-        {
-            double lift = Math.Min(Math.Max(28, Math.Abs(dx) * 0.36), Math.Max(24, winH * 0.35));
-            double midY = Math.Min(from.Y, to.Y) - lift;
-            if (midY < 8) midY = Math.Min(maxMidY, Math.Max(from.Y, to.Y) + lift * 0.55);
-            mid = new Point(Math.Clamp((from.X + to.X) / 2.0, padX, maxMidX), Math.Clamp(midY, 8, maxMidY));
-        }
-        const double durationMs = 1850;
-        _ = dy;
+        var plan = BuildFlightPlan(from, to, glowHex);
+        RememberFlightGeometry(plan);
+        double durationMs = plan.DurationMs;
+        var spawned = new List<UIElement>();
 
-        var arcOuter = CreateFlightArcPath(from, mid, to, Hex(WithAlphaHex(glowHex, 0x66)), 6, null);
-        var arcInner = CreateFlightArcPath(from, mid, to, Hex(glowHex), 2.2, new DoubleCollection { 6, 4 });
+        var arcOuter = CreateFlightArcPath(plan.From, plan.Mid, plan.To, CreateFlightStrokeBrush(plan.StartHex, plan.EndHex, 0x55), plan.Tight ? 3.0 : 4.2, null);
+        var arcInner = CreateFlightArcPath(plan.From, plan.Mid, plan.To, CreateFlightStrokeBrush(plan.StartHex, plan.EndHex, 0xE8), 1.5, new DoubleCollection { 7, 9 });
+        arcOuter.Opacity = 0;
+        arcInner.Opacity = 0;
         InteractionFxCanvas.Children.Add(arcOuter);
         InteractionFxCanvas.Children.Add(arcInner);
-        var arcIn = new DoubleAnimation(0, 0.85, TimeSpan.FromMilliseconds(280))
+        spawned.Add(arcOuter);
+        spawned.Add(arcInner);
+
+        var arcIn = new DoubleAnimation(0, 0.92, TimeSpan.FromMilliseconds(220))
         {
-            EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut }
+            EasingFunction = new SineEase { EasingMode = EasingMode.EaseOut }
         };
         arcOuter.BeginAnimation(UIElement.OpacityProperty, arcIn);
         arcInner.BeginAnimation(UIElement.OpacityProperty, arcIn);
-
-        var launchRing = new Ellipse
+        var flow = new DoubleAnimation(22, 0, TimeSpan.FromMilliseconds(durationMs))
         {
-            Width = 24,
-            Height = 24,
-            Stroke = Hex(glowHex),
-            StrokeThickness = 2.2,
-            Fill = Brushes.Transparent,
-            IsHitTestVisible = false,
-            UseLayoutRounding = false,
-            SnapsToDevicePixels = false,
-            RenderTransformOrigin = new Point(0.5, 0.5)
+            EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut }
         };
-        Canvas.SetLeft(launchRing, from.X - 12);
-        Canvas.SetTop(launchRing, from.Y - 12);
-        var launchScale = new ScaleTransform(1, 1);
-        launchRing.RenderTransform = launchScale;
-        InteractionFxCanvas.Children.Add(launchRing);
-        var launchGrow = new DoubleAnimation(1, 62.0 / 24.0, TimeSpan.FromMilliseconds(420))
-        {
-            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
-        };
-        var launchFade = new DoubleAnimation(0.9, 0, TimeSpan.FromMilliseconds(420));
-        launchFade.Completed += (_, _) => InteractionFxCanvas.Children.Remove(launchRing);
-        launchScale.BeginAnimation(ScaleTransform.ScaleXProperty, launchGrow);
-        launchScale.BeginAnimation(ScaleTransform.ScaleYProperty, launchGrow);
-        launchRing.BeginAnimation(UIElement.OpacityProperty, launchFade);
+        arcInner.BeginAnimation(Shape.StrokeDashOffsetProperty, flow);
 
-        var trailDots = new List<Ellipse>();
-        for (int i = 0; i < 10; i++)
+        SpawnLaunchRing(plan.From, plan, spawned, isolatedImmediate: false);
+
+        for (int i = 0; i < 8; i++)
         {
-            double sz = 14.0 - i * (10.0 / 9.0);
-            double peak = 0.95 - i * (0.75 / 9.0);
+            double sz = 9.2 - i * 0.85;
+            double peak = 0.78 - i * 0.08;
             var dot = new Ellipse
             {
                 Width = sz,
                 Height = sz,
-                Fill = Hex(WithAlphaHex(glowHex, (byte)Math.Clamp(peak * 255, 40, 255))),
+                Fill = CreateTrailParticleBrush(plan.StartHex, plan.EndHex, peak),
                 UseLayoutRounding = false,
                 SnapsToDevicePixels = false,
                 IsHitTestVisible = false,
-                Opacity = 0.0
+                Opacity = 0
             };
             Canvas.SetLeft(dot, -sz / 2.0);
             Canvas.SetTop(dot, -sz / 2.0);
-            var dotTt = new TranslateTransform(from.X, from.Y);
+            var dotTt = new TranslateTransform(plan.From.X, plan.From.Y);
             dot.RenderTransform = dotTt;
             InteractionFxCanvas.Children.Add(dot);
-            trailDots.Add(dot);
+            spawned.Add(dot);
 
-            var delay = TimeSpan.FromMilliseconds(i * 32);
-            dotTt.BeginAnimation(TranslateTransform.XProperty, BuildSmoothBezierTrack(from.X, mid.X, to.X, durationMs, delay));
-            dotTt.BeginAnimation(TranslateTransform.YProperty, BuildSmoothBezierTrack(from.Y, mid.Y, to.Y, durationMs, delay));
+            var delay = TimeSpan.FromMilliseconds(i * 28);
+            dotTt.BeginAnimation(TranslateTransform.XProperty, BuildSmoothBezierTrack(plan.From.X, plan.Mid.X, plan.To.X, durationMs, delay));
+            dotTt.BeginAnimation(TranslateTransform.YProperty, BuildSmoothBezierTrack(plan.From.Y, plan.Mid.Y, plan.To.Y, durationMs, delay));
             var opAnim = new DoubleAnimationUsingKeyFrames
             {
                 Duration = TimeSpan.FromMilliseconds(durationMs),
                 BeginTime = delay
             };
             opAnim.KeyFrames.Add(new LinearDoubleKeyFrame(0.0, KeyTime.FromPercent(0)));
-            opAnim.KeyFrames.Add(new LinearDoubleKeyFrame(peak, KeyTime.FromPercent(0.12)));
+            opAnim.KeyFrames.Add(new LinearDoubleKeyFrame(peak, KeyTime.FromPercent(0.14)));
             opAnim.KeyFrames.Add(new LinearDoubleKeyFrame(0.0, KeyTime.FromPercent(1.0)));
             dot.BeginAnimation(UIElement.OpacityProperty, opAnim);
         }
 
-        var halo = new Ellipse
+        var host = BuildCometHost(plan, label, out var badge, out var halo);
+        InteractionFxCanvas.Children.Add(host);
+        spawned.Add(host);
+
+        var tt = new TranslateTransform(plan.From.X, plan.From.Y);
+        host.RenderTransform = tt;
+        var badgeScale = new ScaleTransform(0.94, 0.94);
+        badge.RenderTransform = badgeScale;
+        badge.RenderTransformOrigin = new Point(0.5, 0.5);
+        var haloScale = new ScaleTransform(1, 1);
+        halo.RenderTransform = haloScale;
+        halo.RenderTransformOrigin = new Point(0.5, 0.5);
+
+        var breath = new DoubleAnimation(0.96, 1.04, TimeSpan.FromMilliseconds(Math.Max(320, durationMs * 0.46)))
         {
-            Width = 56,
-            Height = 56,
-            Fill = Hex(WithAlphaHex(glowHex, 0x44)),
-            Opacity = 0.9,
+            AutoReverse = true,
+            EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut }
+        };
+        var haloPulse = new DoubleAnimation(0.9, 1.06, TimeSpan.FromMilliseconds(Math.Max(360, durationMs * 0.5)))
+        {
+            AutoReverse = true,
+            EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut }
+        };
+
+        var animX = BuildSmoothBezierTrack(plan.From.X, plan.Mid.X, plan.To.X, durationMs, TimeSpan.Zero);
+        var animY = BuildSmoothBezierTrack(plan.From.Y, plan.Mid.Y, plan.To.Y, durationMs, TimeSpan.Zero);
+        animY.Completed += (_, _) =>
+        {
+            var fadeEase = new SineEase { EasingMode = EasingMode.EaseInOut };
+            var fadeInner = new DoubleAnimation(1, 0, TimeSpan.FromMilliseconds(280))
+            {
+                EasingFunction = fadeEase
+            };
+            fadeInner.Completed += (_, _) =>
+            {
+                RemoveFlightVisuals(spawned);
+                PulseAvatarRing(pulseTargetAgentId, glowHex);
+                SoundFxService.Play(_reg.UserConfig, SoundFxService.SoundKind.StatusChange);
+            };
+            arcOuter.BeginAnimation(UIElement.OpacityProperty, new DoubleAnimation(1, 0, TimeSpan.FromMilliseconds(280)) { EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut } });
+            arcInner.BeginAnimation(UIElement.OpacityProperty, fadeInner);
+            host.BeginAnimation(UIElement.OpacityProperty, new DoubleAnimation(1, 0, TimeSpan.FromMilliseconds(280)) { EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut } });
+        };
+        tt.BeginAnimation(TranslateTransform.XProperty, animX);
+        tt.BeginAnimation(TranslateTransform.YProperty, animY);
+        badgeScale.BeginAnimation(ScaleTransform.ScaleXProperty, breath);
+        badgeScale.BeginAnimation(ScaleTransform.ScaleYProperty, breath);
+        haloScale.BeginAnimation(ScaleTransform.ScaleXProperty, haloPulse);
+        haloScale.BeginAnimation(ScaleTransform.ScaleYProperty, haloPulse);
+    }
+
+    /// <summary>离屏自检：同步生成安全区几何后立即拆掉临时视觉，避免 720ms 动画残留。</summary>
+    private void LaunchBezierFlightIsolatedFast(Point from, Point to, string label, string glowHex, string pulseTargetAgentId)
+    {
+        if (InteractionFxCanvas == null) return;
+        var plan = BuildFlightPlan(from, to, glowHex);
+        RememberFlightGeometry(plan);
+        var spawned = new List<UIElement>();
+        try
+        {
+            var arcOuter = CreateFlightArcPath(plan.From, plan.Mid, plan.To, CreateFlightStrokeBrush(plan.StartHex, plan.EndHex, 0x55), plan.Tight ? 3.0 : 4.2, null);
+            var arcInner = CreateFlightArcPath(plan.From, plan.Mid, plan.To, CreateFlightStrokeBrush(plan.StartHex, plan.EndHex, 0xE8), 1.5, new DoubleCollection { 7, 9 });
+            InteractionFxCanvas.Children.Add(arcOuter);
+            InteractionFxCanvas.Children.Add(arcInner);
+            spawned.Add(arcOuter);
+            spawned.Add(arcInner);
+            SpawnLaunchRing(plan.From, plan, spawned, isolatedImmediate: true);
+            for (int i = 0; i < 8; i++)
+            {
+                double sz = 9.2 - i * 0.85;
+                var dot = new Ellipse
+                {
+                    Width = sz,
+                    Height = sz,
+                    Fill = CreateTrailParticleBrush(plan.StartHex, plan.EndHex, 0.7 - i * 0.07),
+                    IsHitTestVisible = false,
+                    Opacity = 0.4
+                };
+                Canvas.SetLeft(dot, plan.From.X - sz / 2.0);
+                Canvas.SetTop(dot, plan.From.Y - sz / 2.0);
+                InteractionFxCanvas.Children.Add(dot);
+                spawned.Add(dot);
+            }
+            var host = BuildCometHost(plan, label, out _, out _);
+            Canvas.SetLeft(host, plan.From.X);
+            Canvas.SetTop(host, plan.From.Y);
+            InteractionFxCanvas.Children.Add(host);
+            spawned.Add(host);
+        }
+        finally
+        {
+            RemoveFlightVisuals(spawned);
+        }
+        PulseAvatarRing(pulseTargetAgentId, glowHex);
+    }
+
+    private readonly struct FlightPlan
+    {
+        public Point From { get; init; }
+        public Point Mid { get; init; }
+        public Point To { get; init; }
+        public double WinW { get; init; }
+        public double WinH { get; init; }
+        public bool Tight { get; init; }
+        public double Distance { get; init; }
+        public double DurationMs { get; init; }
+        public double MaxRing { get; init; }
+        public bool WithinSafeZone { get; init; }
+        public string StartHex { get; init; }
+        public string EndHex { get; init; }
+    }
+
+    private void RememberFlightGeometry(FlightPlan plan)
+    {
+        LastFlightGeometryForTest = new FlightGeometrySample
+        {
+            FromX = plan.From.X,
+            FromY = plan.From.Y,
+            MidX = plan.Mid.X,
+            MidY = plan.Mid.Y,
+            ToX = plan.To.X,
+            ToY = plan.To.Y,
+            WinW = plan.WinW,
+            WinH = plan.WinH,
+            MaxRingDiameter = plan.MaxRing,
+            CompactMode = plan.Tight,
+            WithinSafeZone = plan.WithinSafeZone
+        };
+    }
+
+    private (double WinW, double WinH) ReadFlightViewport()
+    {
+        double winW = ActualWidth > 40 ? ActualWidth : (Width > 40 ? Width : UltraWidthDefault);
+        double winH;
+        if (ActualHeight > 8) winH = ActualHeight;
+        else if (!double.IsNaN(Height) && Height > 8) winH = Height;
+        else if (_reg.UserConfig.FloatingWindowCollapsed) winH = 38;
+        else winH = 120;
+        return (Math.Max(48, winW), Math.Max(16, winH));
+    }
+
+    private FlightPlan BuildFlightPlan(Point from, Point to, string glowHex)
+    {
+        var (winW, winH) = ReadFlightViewport();
+        bool tight = winH <= 64 || _reg.UserConfig.FloatingWindowCollapsed;
+        var (startHex, endHex) = ResolveFlightGradient(glowHex);
+        double cap = Math.Max(28, winH - 4);
+        double preferred = Math.Min(cap, tight ? 30 : 46);
+        double half = preferred / 2.0;
+        double yLo = 4;
+        double yHi = Math.Max(yLo + 1, winH - 4);
+        double centerLo = Math.Max(yLo, Math.Min(yHi, half + 1));
+        double centerHi = Math.Max(centerLo, Math.Min(yHi, winH - half - 1));
+        double padX = tight ? 6 : Math.Max(12, Math.Min(28, winW * 0.06));
+        double maxX = Math.Max(padX + 4, winW - padX);
+
+        Point a = new Point(Math.Clamp(from.X, padX, maxX), Math.Clamp(from.Y, centerLo, centerHi));
+        Point b = new Point(Math.Clamp(to.X, padX, maxX), Math.Clamp(to.Y, centerLo, centerHi));
+        double dx = b.X - a.X;
+        double lift = tight
+            ? Math.Min(Math.Max(4, Math.Abs(dx) * 0.06), Math.Max(4, (centerHi - centerLo) * 0.45))
+            : Math.Min(Math.Max(22, Math.Abs(dx) * 0.30), Math.Max(18, winH * 0.26));
+        double midY = Math.Min(a.Y, b.Y) - lift;
+        if (midY < yLo)
+        {
+            double down = Math.Max(a.Y, b.Y) + lift * 0.5;
+            midY = down <= yHi ? down : (a.Y + b.Y) / 2.0;
+        }
+        double midX;
+        if (Math.Abs(dx) < 48)
+        {
+            double side = tight ? Math.Min(16, winW * 0.12) : Math.Min(Math.Max(28, winW * 0.18), winW * 0.26);
+            midX = Math.Clamp(Math.Max(a.X, b.X) + side * Math.Sign(dx == 0 ? 1 : dx), padX, maxX);
+            midY = Math.Clamp((a.Y + b.Y) / 2.0, yLo, yHi);
+        }
+        else
+        {
+            midX = Math.Clamp((a.X + b.X) / 2.0, padX, maxX);
+            midY = Math.Clamp(midY, yLo, yHi);
+        }
+        var mid = new Point(midX, midY);
+        double dist = Math.Sqrt((b.X - a.X) * (b.X - a.X) + (b.Y - a.Y) * (b.Y - a.Y));
+        double maxRing = FitRingDiameter(b.Y, winH, preferred);
+        bool zone = PointInVerticalSafeZone(a.Y, winH)
+            && PointInVerticalSafeZone(mid.Y, winH)
+            && PointInVerticalSafeZone(b.Y, winH)
+            && maxRing <= cap + 0.01
+            && maxRing > 0;
+        return new FlightPlan
+        {
+            From = a,
+            Mid = mid,
+            To = b,
+            WinW = winW,
+            WinH = winH,
+            Tight = tight,
+            Distance = dist,
+            DurationMs = ComputeAdaptiveFlightDurationMs(dist, tight),
+            MaxRing = maxRing,
+            WithinSafeZone = zone,
+            StartHex = startHex,
+            EndHex = endHex
+        };
+    }
+
+    private static bool PointInVerticalSafeZone(double y, double winH)
+    {
+        double hi = Math.Max(4, winH - 4);
+        return y >= 4 - 0.05 && y <= hi + 0.05;
+    }
+
+    private static double FitRingDiameter(double centerY, double winH, double desired)
+    {
+        double cap = Math.Max(28, winH - 4);
+        double room = 2.0 * Math.Min(Math.Max(0, centerY - 1), Math.Max(0, winH - 1 - centerY));
+        double fitted = Math.Min(Math.Min(desired, cap), Math.Max(10, room));
+        return Math.Min(fitted, cap);
+    }
+
+    private static (string Start, string End) ResolveFlightGradient(string glowHex)
+    {
+        string key = (glowHex ?? "").Trim().ToUpperInvariant();
+        return key switch
+        {
+            "#A78BFA" => ("#A78BFA", "#38BDF8"),
+            "#F59E0B" => ("#F59E0B", "#FBBF24"),
+            "#34D399" => ("#34D399", "#6EE7B7"),
+            "#22D3EE" => ("#22D3EE", "#38BDF8"),
+            _ => ("#38BDF8", "#818CF8")
+        };
+    }
+
+    private Canvas BuildCometHost(FlightPlan plan, string label, out Border badge, out Ellipse halo)
+    {
+        bool tight = plan.Tight;
+        double haloSz = tight ? 24 : 36;
+        double coreSz = tight ? 7 : 10;
+        halo = new Ellipse
+        {
+            Width = haloSz,
+            Height = haloSz,
+            Fill = CreateCometHaloBrush(plan.StartHex, plan.EndHex),
+            IsHitTestVisible = false,
             UseLayoutRounding = false,
             SnapsToDevicePixels = false,
-            IsHitTestVisible = false,
-            RenderTransformOrigin = new Point(0.5, 0.5)
+            Opacity = 0.95
         };
         var core = new Ellipse
         {
-            Width = 34,
-            Height = 34,
-            Fill = Hex(WithAlphaHex(glowHex, 0xD0)),
+            Width = coreSz,
+            Height = coreSz,
+            Fill = CreateCometCoreBrush(),
             IsHitTestVisible = false,
             UseLayoutRounding = false,
             SnapsToDevicePixels = false
@@ -1354,23 +1596,41 @@ public partial class FloatingOverlayWindow
         var badgeText = new TextBlock
         {
             Text = label,
-            FontSize = 12.5,
-            FontWeight = FontWeights.Bold,
-            Foreground = Hex("#FFFFFF")
+            FontSize = tight ? 10.5 : 11,
+            FontWeight = FontWeights.SemiBold,
+            Foreground = Hex("#F8FAFC"),
+            TextWrapping = TextWrapping.NoWrap,
+            TextTrimming = TextTrimming.CharacterEllipsis
         };
-        var badge = new Border
+        badge = new Border
         {
-            Background = Hex("#F2152033"),
-            BorderBrush = Hex(glowHex),
-            BorderThickness = new Thickness(2),
-            CornerRadius = new CornerRadius(12),
-            Padding = new Thickness(10, 4, 10, 4),
-            Opacity = 1,
+            Background = Hex(tight ? "#D9111824" : "#EB111A2B"),
+            BorderBrush = tight ? CreateFlightStrokeBrush(plan.StartHex, plan.EndHex, 0x99) : Hex("#66E2E8F0"),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(tight ? 8 : 10),
+            Padding = tight ? new Thickness(6, 2, 6, 2) : new Thickness(8, 3, 8, 3),
             IsHitTestVisible = false,
             RenderTransformOrigin = new Point(0.5, 0.5),
             Child = badgeText
         };
-        FitFlightBadge(badge, badgeText, winW);
+        if (!tight)
+        {
+            badge.Effect = new DropShadowEffect
+            {
+                BlurRadius = 12,
+                ShadowDepth = 0,
+                Opacity = 0.5,
+                Color = ParseFlightColor(plan.StartHex, 0xFF),
+                RenderingBias = RenderingBias.Quality
+            };
+        }
+        double minAx = Math.Min(plan.From.X, Math.Min(plan.Mid.X, plan.To.X));
+        double maxAx = Math.Max(plan.From.X, Math.Max(plan.Mid.X, plan.To.X));
+        FitFlightBadge(badge, badgeText, plan.WinW, minAx, maxAx, tight);
+        badge.Measure(new Size(Math.Max(48, badge.MaxWidth), 40));
+        double badgeH = badge.DesiredSize.Height;
+        if (double.IsNaN(badgeH) || badgeH < 8) badgeH = tight ? 18 : 22;
+        Canvas.SetTop(badge, ResolveBadgeTop(badgeH, plan.From.Y, plan.Mid.Y, plan.To.Y, plan.WinH));
 
         var host = new Canvas
         {
@@ -1383,198 +1643,100 @@ public partial class FloatingOverlayWindow
         host.Children.Add(halo);
         host.Children.Add(core);
         host.Children.Add(badge);
-        Canvas.SetLeft(halo, -28);
-        Canvas.SetTop(halo, -28);
-        Canvas.SetLeft(core, -17);
-        Canvas.SetTop(core, -17);
-        Canvas.SetTop(badge, -16);
-        InteractionFxCanvas.Children.Add(host);
-
-        var tt = new TranslateTransform(from.X, from.Y);
-        host.RenderTransform = tt;
-        var badgeScale = new ScaleTransform(0.85, 0.85);
-        badge.RenderTransform = badgeScale;
-        var haloScale = new ScaleTransform(1, 1);
-        halo.RenderTransform = haloScale;
-
-        var breath = new DoubleAnimationUsingKeyFrames { Duration = TimeSpan.FromMilliseconds(durationMs) };
-        breath.KeyFrames.Add(new EasingDoubleKeyFrame(0.85, KeyTime.FromPercent(0)));
-        breath.KeyFrames.Add(new EasingDoubleKeyFrame(1.32, KeyTime.FromPercent(0.42)) { EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut } });
-        breath.KeyFrames.Add(new EasingDoubleKeyFrame(1.05, KeyTime.FromPercent(1)) { EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut } });
-        var haloPulse = new DoubleAnimation(0.86, 1.16, TimeSpan.FromMilliseconds(460))
-        {
-            AutoReverse = true,
-            RepeatBehavior = RepeatBehavior.Forever,
-            EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut }
-        };
-
-        var animX = BuildSmoothBezierTrack(from.X, mid.X, to.X, durationMs, TimeSpan.Zero);
-        var animY = BuildSmoothBezierTrack(from.Y, mid.Y, to.Y, durationMs, TimeSpan.Zero);
-        animY.Completed += (_, _) =>
-        {
-            var fade = new DoubleAnimation(0.85, 0, TimeSpan.FromMilliseconds(320));
-            fade.Completed += (_, _) =>
-            {
-                InteractionFxCanvas.Children.Remove(arcOuter);
-                InteractionFxCanvas.Children.Remove(arcInner);
-                InteractionFxCanvas.Children.Remove(host);
-                InteractionFxCanvas.Children.Remove(launchRing);
-                foreach (var d in trailDots) InteractionFxCanvas.Children.Remove(d);
-                PulseAvatarRing(pulseTargetAgentId, glowHex);
-                SoundFxService.Play(_reg.UserConfig, SoundFxService.SoundKind.StatusChange);
-            };
-            arcOuter.BeginAnimation(UIElement.OpacityProperty, fade);
-            arcInner.BeginAnimation(UIElement.OpacityProperty, fade);
-        };
-        tt.BeginAnimation(TranslateTransform.XProperty, animX);
-        tt.BeginAnimation(TranslateTransform.YProperty, animY);
-        badgeScale.BeginAnimation(ScaleTransform.ScaleXProperty, breath);
-        badgeScale.BeginAnimation(ScaleTransform.ScaleYProperty, breath);
-        haloScale.BeginAnimation(ScaleTransform.ScaleXProperty, haloPulse);
-        haloScale.BeginAnimation(ScaleTransform.ScaleYProperty, haloPulse);
+        Canvas.SetLeft(halo, -haloSz / 2.0);
+        Canvas.SetTop(halo, -haloSz / 2.0);
+        Canvas.SetLeft(core, -coreSz / 2.0);
+        Canvas.SetTop(core, -coreSz / 2.0);
+        return host;
     }
 
-    /// <summary>离屏自检沿用原 720ms 轻量轨迹，不追加航迹、彗尾和礼花，Anim 计数保持一次触发。</summary>
-    private void LaunchBezierFlightIsolatedFast(Point from, Point to, string label, string glowHex, string pulseTargetAgentId)
+    private static double ResolveBadgeTop(double badgeH, double fromY, double midY, double toY, double winH)
     {
-        double winW = ActualWidth > 40 ? ActualWidth : Math.Max(UltraWidthDefault, Width);
-        double winH = ActualHeight > 40 ? ActualHeight : Math.Max(80, Height > 40 ? Height : 120);
-        double padX = Math.Max(14, Math.Min(24, winW * 0.08));
-        double midX = Math.Clamp((from.X + to.X) / 2.0, padX, Math.Max(padX + 8, winW - padX));
-        double lift = Math.Min(Math.Max(22, Math.Abs(to.X - from.X) * 0.18), Math.Max(18, winH * 0.28));
-        double midY = Math.Clamp(Math.Min(from.Y, to.Y) - lift, 8, Math.Max(12, winH - 12));
-        var mid = new Point(midX, midY);
-        const double durationMs = 720;
+        double top = -badgeH / 2.0;
+        double minY = Math.Min(fromY, Math.Min(midY, toY));
+        double maxY = Math.Max(fromY, Math.Max(midY, toY));
+        if (minY + top < 2) top += 2 - (minY + top);
+        if (maxY + top + badgeH > winH - 2) top -= (maxY + top + badgeH) - (winH - 2);
+        if (minY + top < 1) top = 1 - minY;
+        return top;
+    }
 
-        // 层次 1：3 颗渐缩彗星拖尾粒子（沿连续二次贝塞尔曲线原生 VSync 丝滑追随）
-        var trailDots = new List<Ellipse>();
-        for (int i = 3; i >= 1; i--)
+    private void SpawnLaunchRing(Point at, FlightPlan plan, List<UIElement> spawned, bool isolatedImmediate)
+    {
+        if (InteractionFxCanvas == null) return;
+        double baseSz = Math.Min(16, Math.Max(10, plan.MaxRing * 0.45));
+        var ring = new Ellipse
         {
-            double sz = 3.0 + (4 - i) * 1.8;
-            var dot = new Ellipse
-            {
-                Width = sz,
-                Height = sz,
-                Fill = Hex(WithAlphaHex(glowHex, (byte)(0xB0 - i * 0x26))),
-                UseLayoutRounding = false,
-                SnapsToDevicePixels = false,
-                IsHitTestVisible = false,
-                Opacity = 0.0
-            };
-            Canvas.SetLeft(dot, -sz / 2.0);
-            Canvas.SetTop(dot, -sz / 2.0);
-            var dotTt = new TranslateTransform(from.X, from.Y);
-            dot.RenderTransform = dotTt;
-            InteractionFxCanvas.Children.Add(dot);
-            trailDots.Add(dot);
-
-            if (!AppPaths.IsIsolatedTest)
-            {
-                var delay = TimeSpan.FromMilliseconds(i * 38);
-                var dx = BuildSmoothBezierTrack(from.X, mid.X, to.X, durationMs, delay);
-                var dy = BuildSmoothBezierTrack(from.Y, mid.Y, to.Y, durationMs, delay);
-                var opAnim = new DoubleAnimationUsingKeyFrames
-                {
-                    Duration = TimeSpan.FromMilliseconds(durationMs),
-                    BeginTime = delay
-                };
-                opAnim.KeyFrames.Add(new LinearDoubleKeyFrame(0.0, KeyTime.FromPercent(0)));
-                opAnim.KeyFrames.Add(new LinearDoubleKeyFrame(0.84 - i * 0.16, KeyTime.FromPercent(0.18)));
-                opAnim.KeyFrames.Add(new LinearDoubleKeyFrame(0.0, KeyTime.FromPercent(1.0)));
-                dotTt.BeginAnimation(TranslateTransform.XProperty, dx);
-                dotTt.BeginAnimation(TranslateTransform.YProperty, dy);
-                dot.BeginAnimation(UIElement.OpacityProperty, opAnim);
-            }
-        }
-
-        // 层次 2：柔和光晕底座
-        var halo = new Ellipse
-        {
-            Width = 28,
-            Height = 28,
-            Fill = Hex(WithAlphaHex(glowHex, 0x48)),
-            Opacity = 0.72,
-            UseLayoutRounding = false,
-            SnapsToDevicePixels = false,
-            IsHitTestVisible = false
-        };
-        // 层次 3：清晰高对比圆角指令胶囊
-        var badgeText = new TextBlock
-        {
-            Text = label,
-            FontSize = 11,
-            FontWeight = FontWeights.Bold,
-            Foreground = Hex("#FFFFFF")
-        };
-        var badge = new Border
-        {
-            Background = Hex("#F2152033"),
-            BorderBrush = Hex(glowHex),
-            BorderThickness = new Thickness(1.5),
-            CornerRadius = new CornerRadius(10),
-            Padding = new Thickness(8, 3, 8, 3),
-            Opacity = 0.98,
+            Width = baseSz,
+            Height = baseSz,
+            Stroke = CreateFlightStrokeBrush(plan.StartHex, plan.EndHex, 0xDD),
+            StrokeThickness = 1.6,
+            Fill = Brushes.Transparent,
             IsHitTestVisible = false,
-            Child = badgeText
-        };
-        FitFlightBadge(badge, badgeText, winW);
-
-        var host = new Canvas
-        {
-            Width = 1,
-            Height = 1,
             UseLayoutRounding = false,
             SnapsToDevicePixels = false,
-            IsHitTestVisible = false
+            RenderTransformOrigin = new Point(0.5, 0.5),
+            Opacity = 0.9
         };
-        host.Children.Add(halo);
-        host.Children.Add(badge);
-        Canvas.SetLeft(halo, -14);
-        Canvas.SetTop(halo, -14);
-        Canvas.SetTop(badge, -12);
-        InteractionFxCanvas.Children.Add(host);
-
-        var tt = new TranslateTransform(from.X, from.Y);
-        host.RenderTransform = tt;
-        var scale = new ScaleTransform(0.92, 0.92);
-        badge.RenderTransform = scale;
-        badge.RenderTransformOrigin = new Point(0.5, 0.5);
-
-        var animX = BuildSmoothBezierTrack(from.X, mid.X, to.X, durationMs, TimeSpan.Zero);
-        var animY = BuildSmoothBezierTrack(from.Y, mid.Y, to.Y, durationMs, TimeSpan.Zero);
-        var breath = new DoubleAnimation(0.92, 1.12, TimeSpan.FromMilliseconds(durationMs / 2))
+        Canvas.SetLeft(ring, at.X - baseSz / 2.0);
+        Canvas.SetTop(ring, at.Y - baseSz / 2.0);
+        InteractionFxCanvas.Children.Add(ring);
+        spawned.Add(ring);
+        if (isolatedImmediate) return;
+        double maxScale = Math.Max(1.05, plan.MaxRing / baseSz);
+        var scale = new ScaleTransform(1, 1);
+        ring.RenderTransform = scale;
+        var grow = new DoubleAnimation(1, maxScale, TimeSpan.FromMilliseconds(420))
         {
-            AutoReverse = true,
+            EasingFunction = new SineEase { EasingMode = EasingMode.EaseOut }
+        };
+        var fade = new DoubleAnimation(0.9, 0, TimeSpan.FromMilliseconds(420))
+        {
             EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut }
         };
-        var haloFade = new DoubleAnimation(0.72, 0.08, TimeSpan.FromMilliseconds(durationMs));
-
-        animY.Completed += (_, _) =>
+        fade.Completed += (_, _) =>
         {
-            InteractionFxCanvas.Children.Remove(host);
-            foreach (var d in trailDots) InteractionFxCanvas.Children.Remove(d);
-            PulseAvatarRing(pulseTargetAgentId, glowHex);
-            SoundFxService.Play(_reg.UserConfig, SoundFxService.SoundKind.StatusChange);
+            if (InteractionFxCanvas != null) InteractionFxCanvas.Children.Remove(ring);
+            spawned.Remove(ring);
         };
-        tt.BeginAnimation(TranslateTransform.XProperty, animX);
-        tt.BeginAnimation(TranslateTransform.YProperty, animY);
-        scale.BeginAnimation(ScaleTransform.ScaleXProperty, breath);
-        scale.BeginAnimation(ScaleTransform.ScaleYProperty, breath);
-        halo.BeginAnimation(UIElement.OpacityProperty, haloFade);
+        scale.BeginAnimation(ScaleTransform.ScaleXProperty, grow);
+        scale.BeginAnimation(ScaleTransform.ScaleYProperty, grow);
+        ring.BeginAnimation(UIElement.OpacityProperty, fade);
     }
 
-    /// <summary>飞行胶囊最大宽度随窗口收紧，单行省略，避免撑破或裁出悬浮窗。</summary>
-    private static void FitFlightBadge(Border badge, TextBlock text, double windowW)
+    private void RemoveFlightVisuals(List<UIElement> spawned)
     {
-        bool ultra = windowW < 320;
-        double maxW = ultra
-            ? Math.Clamp(windowW * 0.78, 96, 168)
-            : Math.Clamp(windowW * 0.56, 128, 236);
+        if (InteractionFxCanvas == null) return;
+        foreach (var el in spawned.ToArray())
+        {
+            el.BeginAnimation(UIElement.OpacityProperty, null);
+            InteractionFxCanvas.Children.Remove(el);
+        }
+        spawned.Clear();
+    }
+
+    /// <summary>飞行胶囊按实测宽度居中，并钳在窗口左右安全边内。</summary>
+    private static void FitFlightBadge(Border badge, TextBlock text, double windowW, double minAnchorX, double maxAnchorX, bool tight)
+    {
+        double maxW = tight
+            ? Math.Clamp(windowW - 8, 72, 168)
+            : Math.Clamp(windowW * 0.56, 112, 236);
+        maxW = Math.Min(maxW, Math.Max(72, windowW - 8));
         badge.MaxWidth = maxW;
         text.TextWrapping = TextWrapping.NoWrap;
         text.TextTrimming = TextTrimming.CharacterEllipsis;
-        text.MaxWidth = Math.Max(64, maxW - 22);
-        Canvas.SetLeft(badge, -maxW / 2.0);
+        double pad = badge.Padding.Left + badge.Padding.Right + badge.BorderThickness.Left + badge.BorderThickness.Right;
+        text.MaxWidth = Math.Max(48, maxW - pad - 2);
+        badge.Measure(new Size(maxW, 40));
+        double actualW = badge.DesiredSize.Width;
+        if (double.IsNaN(actualW) || actualW < 8) actualW = Math.Min(maxW, 96);
+        actualW = Math.Min(actualW, maxW);
+        double left = -actualW / 2.0;
+        double minLeft = 3 - minAnchorX;
+        double maxLeft = windowW - 3 - actualW - maxAnchorX;
+        if (minLeft <= maxLeft) left = Math.Clamp(left, minLeft, maxLeft);
+        else left = minLeft;
+        Canvas.SetLeft(badge, left);
     }
 
     /// <summary>生成无停顿连续二次贝塞尔曲线轨迹（余弦缓入缓出，原生显示器 VSync 满帧运行）。</summary>
@@ -1611,12 +1773,89 @@ public partial class FloatingOverlayWindow
             StrokeThickness = thickness,
             StrokeStartLineCap = PenLineCap.Round,
             StrokeEndLineCap = PenLineCap.Round,
+            StrokeLineJoin = PenLineJoin.Round,
             StrokeDashArray = dash,
             Fill = Brushes.Transparent,
             Opacity = 0,
             IsHitTestVisible = false,
+            UseLayoutRounding = false,
             SnapsToDevicePixels = false
         };
+    }
+
+    private static Color ParseFlightColor(string hex, byte alpha)
+    {
+        var clean = (hex ?? "").Trim().TrimStart('#');
+        if (clean.Length == 8) clean = clean[2..];
+        if (clean.Length != 6) clean = "38BDF8";
+        byte r = byte.Parse(clean[..2], NumberStyles.HexNumber, CultureInfo.InvariantCulture);
+        byte g = byte.Parse(clean.Substring(2, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture);
+        byte b = byte.Parse(clean.Substring(4, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture);
+        return Color.FromArgb(alpha, r, g, b);
+    }
+
+    private static LinearGradientBrush CreateFlightStrokeBrush(string startHex, string endHex, byte alpha)
+    {
+        var brush = new LinearGradientBrush
+        {
+            StartPoint = new Point(0, 0.5),
+            EndPoint = new Point(1, 0.5),
+            MappingMode = BrushMappingMode.RelativeToBoundingBox
+        };
+        brush.GradientStops.Add(new GradientStop(ParseFlightColor(startHex, alpha), 0));
+        brush.GradientStops.Add(new GradientStop(ParseFlightColor(endHex, alpha), 1));
+        if (brush.CanFreeze) brush.Freeze();
+        return brush;
+    }
+
+    private static RadialGradientBrush CreateCometHaloBrush(string startHex, string endHex)
+    {
+        var brush = new RadialGradientBrush
+        {
+            GradientOrigin = new Point(0.38, 0.38),
+            Center = new Point(0.45, 0.45),
+            RadiusX = 0.5,
+            RadiusY = 0.5
+        };
+        brush.GradientStops.Add(new GradientStop(ParseFlightColor(startHex, 0x9C), 0));
+        brush.GradientStops.Add(new GradientStop(ParseFlightColor(endHex, 0x48), 0.42));
+        brush.GradientStops.Add(new GradientStop(ParseFlightColor(endHex, 0x00), 1));
+        if (brush.CanFreeze) brush.Freeze();
+        return brush;
+    }
+
+    private static RadialGradientBrush CreateCometCoreBrush()
+    {
+        var brush = new RadialGradientBrush
+        {
+            GradientOrigin = new Point(0.38, 0.32),
+            Center = new Point(0.5, 0.5),
+            RadiusX = 0.5,
+            RadiusY = 0.5
+        };
+        brush.GradientStops.Add(new GradientStop(Color.FromArgb(0xFF, 0xFF, 0xFF, 0xFF), 0));
+        brush.GradientStops.Add(new GradientStop(Color.FromArgb(0xF2, 0xF8, 0xFB, 0xFF), 0.28));
+        brush.GradientStops.Add(new GradientStop(Color.FromArgb(0x00, 0xFF, 0xFF, 0xFF), 1));
+        if (brush.CanFreeze) brush.Freeze();
+        return brush;
+    }
+
+    private static RadialGradientBrush CreateTrailParticleBrush(string startHex, string endHex, double peak)
+    {
+        byte a0 = (byte)Math.Clamp(peak * 210, 28, 210);
+        byte a1 = (byte)Math.Clamp(peak * 90, 0, 120);
+        var brush = new RadialGradientBrush
+        {
+            GradientOrigin = new Point(0.4, 0.4),
+            Center = new Point(0.5, 0.5),
+            RadiusX = 0.5,
+            RadiusY = 0.5
+        };
+        brush.GradientStops.Add(new GradientStop(ParseFlightColor(startHex, a0), 0));
+        brush.GradientStops.Add(new GradientStop(ParseFlightColor(endHex, a1), 0.55));
+        brush.GradientStops.Add(new GradientStop(ParseFlightColor(endHex, 0x00), 1));
+        if (brush.CanFreeze) brush.Freeze();
+        return brush;
     }
 
     private void PulseAvatarRing(string agentId, string glowHex)
@@ -1628,128 +1867,112 @@ public partial class FloatingOverlayWindow
         }
         if (!_avatarHostsByAgent.TryGetValue(agentId, out var host) || host == null || InteractionFxCanvas == null) return;
         var center = ResolveAvatarCenter(agentId) ?? new Point(40, 40);
-        for (int wave = 0; wave < 3; wave++)
+        var (startHex, endHex) = ResolveFlightGradient(glowHex);
+        var (_, winH) = ReadFlightViewport();
+        double cap = Math.Max(28, winH - 4);
+        double preferred = Math.Min(cap, winH <= 64 ? 30 : 46);
+        double maxDiam = FitRingDiameter(center.Y, winH, preferred);
+        center = new Point(center.X, Math.Clamp(center.Y, maxDiam / 2.0 + 1, Math.Max(maxDiam / 2.0 + 1, winH - maxDiam / 2.0 - 1)));
+        for (int wave = 0; wave < 2; wave++)
         {
-            double baseSz = Math.Max(26, host.ActualWidth + 8 - wave * 3);
+            double baseSz = Math.Max(12, maxDiam * (wave == 0 ? 0.46 : 0.36));
+            double scaleTo = Math.Max(1.04, maxDiam / baseSz);
             var ripple = new Ellipse
             {
                 Width = baseSz,
                 Height = baseSz,
-                Stroke = Hex(glowHex),
-                StrokeThickness = 2.8,
+                Stroke = CreateFlightStrokeBrush(startHex, endHex, wave == 0 ? (byte)0xDD : (byte)0x99),
+                StrokeThickness = 1.6,
                 Fill = Brushes.Transparent,
                 UseLayoutRounding = false,
                 SnapsToDevicePixels = false,
                 IsHitTestVisible = false,
-                Opacity = 0.96 - wave * 0.12,
+                Opacity = wave == 0 ? 0.9 : 0.62,
                 RenderTransformOrigin = new Point(0.5, 0.5)
             };
             InteractionFxCanvas.Children.Add(ripple);
-            Canvas.SetLeft(ripple, center.X - ripple.Width / 2);
-            Canvas.SetTop(ripple, center.Y - ripple.Height / 2);
-
+            Canvas.SetLeft(ripple, center.X - baseSz / 2.0);
+            Canvas.SetTop(ripple, center.Y - baseSz / 2.0);
             var delay = TimeSpan.FromMilliseconds(wave * 90);
             var scale = new ScaleTransform(1, 1);
             ripple.RenderTransform = scale;
-            var animScale = new DoubleAnimation(1, 2.4, TimeSpan.FromMilliseconds(820))
+            var animScale = new DoubleAnimation(1, scaleTo, TimeSpan.FromMilliseconds(640))
             {
                 BeginTime = delay,
-                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+                EasingFunction = new SineEase { EasingMode = EasingMode.EaseOut }
             };
-            var animThick = new DoubleAnimation(2.8, 1.4, TimeSpan.FromMilliseconds(820))
+            var animOpacity = new DoubleAnimation(ripple.Opacity, 0, TimeSpan.FromMilliseconds(640))
             {
                 BeginTime = delay,
-                EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut }
-            };
-            var animOpacity = new DoubleAnimation(ripple.Opacity, 0, TimeSpan.FromMilliseconds(820))
-            {
-                BeginTime = delay,
-                EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut }
+                EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut }
             };
             animOpacity.Completed += (_, _) => InteractionFxCanvas.Children.Remove(ripple);
             scale.BeginAnimation(ScaleTransform.ScaleXProperty, animScale);
             scale.BeginAnimation(ScaleTransform.ScaleYProperty, animScale);
-            ripple.BeginAnimation(Shape.StrokeThicknessProperty, animThick);
             ripple.BeginAnimation(OpacityProperty, animOpacity);
-        }
-
-        for (int i = 0; i < 6; i++)
-        {
-            double ang = i * Math.PI / 3.0;
-            double dist = 28 + (i % 3) * 7;
-            var star = new Ellipse
-            {
-                Width = 6,
-                Height = 6,
-                Fill = Hex(glowHex),
-                IsHitTestVisible = false,
-                UseLayoutRounding = false,
-                SnapsToDevicePixels = false,
-                Opacity = 0.95
-            };
-            Canvas.SetLeft(star, -3);
-            Canvas.SetTop(star, -3);
-            var starTt = new TranslateTransform(center.X, center.Y);
-            star.RenderTransform = starTt;
-            InteractionFxCanvas.Children.Add(star);
-            var moveX = new DoubleAnimation(center.X, center.X + Math.Cos(ang) * dist, TimeSpan.FromMilliseconds(520))
-            {
-                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
-            };
-            var moveY = new DoubleAnimation(center.Y, center.Y + Math.Sin(ang) * dist, TimeSpan.FromMilliseconds(520))
-            {
-                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
-            };
-            var starFade = new DoubleAnimation(0.95, 0, TimeSpan.FromMilliseconds(520));
-            starFade.Completed += (_, _) => InteractionFxCanvas.Children.Remove(star);
-            starTt.BeginAnimation(TranslateTransform.XProperty, moveX);
-            starTt.BeginAnimation(TranslateTransform.YProperty, moveY);
-            star.BeginAnimation(UIElement.OpacityProperty, starFade);
         }
     }
 
     private void PulseAvatarRingIsolatedFast(string agentId, string glowHex)
     {
-        if (!_avatarHostsByAgent.TryGetValue(agentId, out var host) || host == null) return;
-        var center = ResolveAvatarCenter(agentId) ?? new Point(40, 40);
-        for (int wave = 0; wave < 2; wave++)
+        if (InteractionFxCanvas == null) return;
+        var (startHex, endHex) = ResolveFlightGradient(glowHex);
+        var (_, winH) = ReadFlightViewport();
+        Point center = new Point(winH / 2.0, winH / 2.0);
+        if (_avatarHostsByAgent.TryGetValue(agentId, out var host) && host != null)
         {
-            double baseSz = Math.Max(22, host.ActualWidth + 4 - wave * 4);
-            var ripple = new Ellipse
+            var resolved = ResolveAvatarCenter(agentId);
+            if (resolved.HasValue) center = resolved.Value;
+        }
+        double cap = Math.Max(28, winH - 4);
+        double preferred = Math.Min(cap, winH <= 64 ? 30 : 46);
+        double maxDiam = FitRingDiameter(center.Y, winH, preferred);
+        if (LastFlightGeometryForTest.MaxRingDiameter <= 0 || LastFlightGeometryForTest.MaxRingDiameter > cap + 0.01)
+        {
+            var prev = LastFlightGeometryForTest;
+            LastFlightGeometryForTest = new FlightGeometrySample
             {
-                Width = baseSz,
-                Height = baseSz,
-                Stroke = Hex(glowHex),
-                StrokeThickness = wave == 0 ? 2.2 : 1.4,
-                Fill = Brushes.Transparent,
-                UseLayoutRounding = false,
-                SnapsToDevicePixels = false,
-                IsHitTestVisible = false,
-                Opacity = wave == 0 ? 0.92 : 0.72
+                FromX = prev.FromX,
+                FromY = prev.FromY,
+                MidX = prev.MidX,
+                MidY = prev.MidY,
+                ToX = prev.ToX,
+                ToY = prev.ToY,
+                WinW = prev.WinW,
+                WinH = prev.WinH > 8 ? prev.WinH : winH,
+                MaxRingDiameter = maxDiam,
+                CompactMode = prev.CompactMode,
+                WithinSafeZone = prev.WithinSafeZone && maxDiam <= cap + 0.01
             };
-            InteractionFxCanvas.Children.Add(ripple);
-            Canvas.SetLeft(ripple, center.X - ripple.Width / 2);
-            Canvas.SetTop(ripple, center.Y - ripple.Height / 2);
-
-            var delay = TimeSpan.FromMilliseconds(wave * 110);
-            var scale = new ScaleTransform(1, 1, ripple.Width / 2, ripple.Height / 2);
-            ripple.RenderTransform = scale;
-            var animScale = new DoubleAnimation(1, wave == 0 ? 1.78 : 1.52, TimeSpan.FromMilliseconds(520))
+        }
+        var spawned = new List<UIElement>();
+        try
+        {
+            for (int wave = 0; wave < 2; wave++)
             {
-                BeginTime = delay,
-                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
-            };
-            var animOpacity = new DoubleAnimation(ripple.Opacity, 0, TimeSpan.FromMilliseconds(520))
-            {
-                BeginTime = delay,
-                EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut }
-            };
-            animOpacity.Completed += (_, _) => InteractionFxCanvas.Children.Remove(ripple);
-            scale.BeginAnimation(ScaleTransform.ScaleXProperty, animScale);
-            scale.BeginAnimation(ScaleTransform.ScaleYProperty, animScale);
-            ripple.BeginAnimation(OpacityProperty, animOpacity);
+                double baseSz = Math.Max(12, maxDiam * (wave == 0 ? 0.46 : 0.36));
+                var ripple = new Ellipse
+                {
+                    Width = baseSz,
+                    Height = baseSz,
+                    Stroke = CreateFlightStrokeBrush(startHex, endHex, 0xCC),
+                    StrokeThickness = 1.6,
+                    Fill = Brushes.Transparent,
+                    IsHitTestVisible = false,
+                    Opacity = 0.8
+                };
+                Canvas.SetLeft(ripple, center.X - baseSz / 2.0);
+                Canvas.SetTop(ripple, center.Y - baseSz / 2.0);
+                InteractionFxCanvas.Children.Add(ripple);
+                spawned.Add(ripple);
+            }
+        }
+        finally
+        {
+            RemoveFlightVisuals(spawned);
         }
     }
+
 
     private void ShowVerificationCelebration(string taskTitle, string masterAgentId, string workerAgentId, string? detailSummary = null)
     {
