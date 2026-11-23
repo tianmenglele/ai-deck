@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "adapters": [
+    {
+      "id": "antigravity_native",
+      "name": "Antigravity 原生挂载 (.agents/skills.json + AGENTS.md)",
+      "writes_agents_skills_json": true,
+      "updates_agents_md_anchor": true,
+      "writes_claude_md_pointer": false,
+      "mirrors_to_bridge_dir": false
+    },
+    {
+      "id": "cursor_native",
+      "name": "Cursor 原生目录 (.cursor/ + AGENTS.md)",
+      "writes_agents_skills_json": false,
+      "updates_agents_md_anchor": true,
+      "writes_claude_md_pointer": false,
+      "mirrors_to_bridge_dir": false
+    },
+    {
+      "id": "markdown_anchor",
+      "name": "通用本地代理协议 (AGENTS.md 锚点段路由)",
+      "writes_agents_skills_json": false,
+      "updates_agents_md_anchor": true,
+      "writes_claude_md_pointer": false,
+      "mirrors_to_bridge_dir": false
+    },
+    {
+      "id": "claude_md",
+      "name": "Claude 协议 (CLAUDE.md 跳板 + AGENTS.md)",
+      "writes_agents_skills_json": false,
+      "updates_agents_md_anchor": true,
+      "writes_claude_md_pointer": true,
+      "mirrors_to_bridge_dir": false
+    },
+    {
+      "id": "bridge_folder",
+      "name": "外部 VPS/共享桥接文件夹投送",
+      "writes_agents_skills_json": false,
+      "updates_agents_md_anchor": false,
+      "writes_claude_md_pointer": true,
+      "mirrors_to_bridge_dir": true
+    },
+    {
+      "id": "capsule_only",
+      "name": "无目录远程胶囊模式 (REMOTE_PACK.md 剪贴板收发)",
+      "writes_agents_skills_json": false,
+      "updates_agents_md_anchor": false,
+      "writes_claude_md_pointer": false,
+      "mirrors_to_bridge_dir": false
+    }
+  ]
+}

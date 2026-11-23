@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "presets": [
+    {
+      "id": "general_code",
+      "name": "通用代码工程 (Web / 后端 / 桌面工具)",
+      "create_gdignore": false,
+      "snapshot_extensions": [".cs", ".py", ".js", ".ts", ".tsx", ".vue", ".json", ".md", ".yaml", ".yml", ".toml", ".html", ".css", ".ps1", ".sh"],
+      "excluded_dirs": [".git", "node_modules", "bin", "obj", "dist", "build", "__pycache__", ".venv", "outputs", "backups", "work"]
+    },
+    {
+      "id": "godot_project",
+      "name": "Godot 游戏工程 (自动写入 .gdignore 防缓存污染)",
+      "create_gdignore": true,
+      "snapshot_extensions": [".gd", ".tscn", ".tres", ".gdshader", ".cfg", ".py", ".json", ".md", ".ps1"],
+      "excluded_dirs": [".git", ".godot", "build", "addons", "work", "_agent_xfer", ".grokbot", ".configurator_versions", "__pycache__"]
+    },
+    {
+      "id": "unity_unreal",
+      "name": "Unity / Unreal 游戏工程",
+      "create_gdignore": false,
+      "snapshot_extensions": [".cs", ".cpp", ".h", ".shader", ".hlsl", ".json", ".yaml", ".md", ".ini"],
+      "excluded_dirs": [".git", "Library", "Temp", "Obj", "Binaries", "Intermediate", "Saved", "DerivedDataCache", "work"]
+    }
+  ]
+}

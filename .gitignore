@@ -1,0 +1,28 @@
+# .NET / Visual Studio / IDE
+src/bin/
+src/obj/
+.vs/
+*.user
+*.suo
+*.cache
+*.log
+*.tmp
+*.bak
+*.swp
+*~
+
+# 本地发布、运行与测试产出（建议通过 GitHub Releases 分发可执行文件）
+/bin/
+/outputs/
+/work/
+/AI协同中心.exe
+/AI协同中心.pdb
+
+# 本机协同中心自动同步生成的本地指针目录
+/.agents/
+/.cursor/
+
+# 系统文件
+Thumbs.db
+Desktop.ini
+.DS_Store

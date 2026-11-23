@@ -1,0 +1,90 @@
+{
+  "schema_version": 1,
+  "workflows": [
+    {
+      "id": "tier_s_tweak",
+      "name": "● S档：日常随手微调（单兵直出）",
+      "description": "单文件小修、UI 局部对齐、边试玩边调手感参数，跳过交接板零损耗闭环",
+      "stages": [
+        {
+          "id": "s_live_edit",
+          "name": "局部微调与即时预览",
+          "required_tag": "ide_live_tweak",
+          "require_direct_write": true,
+          "require_preview_mcp": false,
+          "deliverable": "直接保存单文件并实机查看"
+        }
+      ]
+    },
+    {
+      "id": "tier_m_feature",
+      "name": "◆ M档：常规功能开发（主力一条龙 + 微调）",
+      "description": "跨目录新增字段/功能、打包交付与实机验收，按需前置策划推演",
+      "stages": [
+        {
+          "id": "m_spec",
+          "name": "① 策划文案 / 曲线预演（可选）",
+          "required_tag": "design_copywriting",
+          "require_direct_write": false,
+          "require_preview_mcp": false,
+          "deliverable": "写入 work/collab/TASK.md 方案区或 sandbox/ 预览图"
+        },
+        {
+          "id": "m_build",
+          "name": "② 跨目录实装与构建测试",
+          "required_tag": "cross_repo_impl",
+          "require_direct_write": true,
+          "require_preview_mcp": false,
+          "deliverable": "快照护航落盘、生成 LATEST.diff 并写交接参数到 TASK.md"
+        },
+        {
+          "id": "m_gate",
+          "name": "③ 实机画面 / 硬闸门验收",
+          "required_tag": "visual_gate",
+          "require_direct_write": false,
+          "require_preview_mcp": true,
+          "deliverable": "完成实机截图或自动化验证并确认无误"
+        }
+      ]
+    },
+    {
+      "id": "tier_l_hardbug",
+      "name": "▲ L档：大系统重构 / 疑难双盲会诊",
+      "description": "多轮未破的硬骨头或高风险重构：多模型盲审猜想 ➔ 隔离证伪落盘 ➔ 异构红军挑刺 ➔ 终验收口",
+      "stages": [
+        {
+          "id": "l_blind_diag",
+          "name": "① 异构双盲会诊推演",
+          "required_tag": "deep_bug_hunt",
+          "require_direct_write": false,
+          "require_preview_mcp": false,
+          "deliverable": "独立输出根因猜想或架构边界至 TASK.md / inbox/"
+        },
+        {
+          "id": "l_impl_diff",
+          "name": "② 探测证伪与快照实装",
+          "required_tag": "cross_repo_impl",
+          "require_direct_write": true,
+          "require_preview_mcp": false,
+          "deliverable": "最小脚本实测锁定真解，落盘并吐出 LATEST.diff"
+        },
+        {
+          "id": "l_red_review",
+          "name": "③ 异构红军挑刺审查",
+          "required_tag": "adversarial_review",
+          "require_direct_write": false,
+          "require_preview_mcp": false,
+          "deliverable": "只读 LATEST.diff 排查漏同步与边界隐患，写入 TASK.md 审查栏"
+        },
+        {
+          "id": "l_final_gate",
+          "name": "④ 收口终验与经验入库",
+          "required_tag": "visual_gate",
+          "require_direct_write": true,
+          "require_preview_mcp": true,
+          "deliverable": "修复有效审查项、实机验收、归档 TASK.md 并沉淀 1 行避坑规则"
+        }
+      ]
+    }
+  ]
+}

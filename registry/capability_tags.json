@@ -1,0 +1,77 @@
+{
+  "schema_version": 1,
+  "tags": [
+    {
+      "id": "design_copywriting",
+      "name": "策划发散与文案",
+      "description": "机制边界推演、词条文案起草、创意头脑风暴",
+      "color": "#A855F7"
+    },
+    {
+      "id": "offline_math_plot",
+      "name": "离线曲线与预览图",
+      "description": "用纯脚本快速生成轨迹弧线、数值分布等对比图供挑选",
+      "color": "#EC4899"
+    },
+    {
+      "id": "cross_repo_impl",
+      "name": "跨目录底层实装",
+      "description": "跨主工程与配套工具的多文件联动修改、重构与字段打通",
+      "color": "#38BDF8"
+    },
+    {
+      "id": "ide_live_tweak",
+      "name": "IDE 实时手感微调",
+      "description": "紧贴编辑器毫秒级响应，适合单脚本参数、UI 对齐与表现微操",
+      "color": "#10B981"
+    },
+    {
+      "id": "build_delivery",
+      "name": "构建打包与测试",
+      "description": "后台执行无窗口测试套件、编译正式发布包并维护版本目录卫生",
+      "color": "#0EA5E9"
+    },
+    {
+      "id": "adversarial_review",
+      "name": "异构红军挑刺",
+      "description": "站在独立模型视角只读审查 Diff，排查漏同步、死锁与边界漏洞",
+      "color": "#F59E0B"
+    },
+    {
+      "id": "deep_bug_hunt",
+      "name": "疑难重症推理",
+      "description": "适合多轮未定位的复杂渲染、物理或状态机硬骨头双盲会诊",
+      "color": "#EF4444"
+    },
+    {
+      "id": "visual_gate",
+      "name": "实机画面 MCP 把关",
+      "description": "连接引擎或预览 MCP 截出真实运行画面进行最终交付验收",
+      "color": "#22C55E"
+    },
+    {
+      "id": "image_asset_gen",
+      "name": "图片与贴图创作",
+      "description": "概念原画、UI 图标、材质贴图与立绘视觉生成",
+      "color": "#F472B6"
+    },
+    {
+      "id": "video_storyboard",
+      "name": "视频与动态分镜",
+      "description": "宣传视频生成、镜头运动设计与序列帧动态表现",
+      "color": "#FB7185"
+    },
+    {
+      "id": "audio_sfx_music",
+      "name": "音效配乐与语音",
+      "description": "SFX 打击环境音效、BGM 作曲编曲与角色 TTS 配音",
+      "color": "#34D399"
+    },
+    {
+      "id": "model_3d_anim",
+      "name": "3D建模与骨骼动作",
+      "description": "Blender/glTF 模型处理、骨骼权重蒙皮与动画轨道",
+      "color": "#60A5FA"
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+* text=auto
+
+# Windows 脚本保持 CRLF
+*.ps1 text eol=crlf
+*.cmd text eol=crlf
+*.bat text eol=crlf
+
+# 源码与配置统一 LF
+*.cs text eol=lf
+*.xaml text eol=lf
+*.csproj text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.manifest text eol=lf
+
+# 二进制资源
+*.wav binary
+*.png binary
+*.ico binary
+*.jpg binary
+*.zip binary
+*.exe binary
+*.pdb binary
