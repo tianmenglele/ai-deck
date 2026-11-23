@@ -902,6 +902,12 @@ public static class Program
             autoUpdateChk.IsChecked == true &&
             win.FindName("BtnCheckAppUpdate") is Button,
             "顶栏版本徽标显示 v1.9.14，新版本按钮默认折叠，设置页更新卡片已挂上");
+        AssertTrue(
+            win.FindName("LblUpdateRepoUrl") is TextBlock updateRepoLabel &&
+            updateRepoLabel.Visibility == Visibility.Collapsed &&
+            win.FindName("TextUpdateRepoUrl") is TextBox updateRepoBox &&
+            updateRepoBox.Visibility == Visibility.Collapsed,
+            "设置页更新源标签与输入框默认隐藏");
 
         win.Width = 960;
         win.UpdateLayout();
@@ -4519,6 +4525,15 @@ public static class Program
                 !AppUpdateService.HasMzHeader(new byte[] { 0x3C, 0x68 }) &&
                 !AppUpdateService.HasMzHeader(Array.Empty<byte>()),
                 "未配置返回 NeedsRepoConfig，隔离测试不发外网且拒绝替换程序");
+            AssertTrue(
+                AppUpdateService.DefaultOfficialRepoUrl == "https://github.com/tianmenglele/ai-deck",
+                "DefaultOfficialRepoUrl 等于官方仓库地址");
+            AssertTrue(
+                AppUpdateService.ResolveEffectiveRepoUrl("") == AppUpdateService.DefaultOfficialRepoUrl &&
+                AppUpdateService.ResolveEffectiveRepoUrl("   ") == AppUpdateService.DefaultOfficialRepoUrl &&
+                AppUpdateService.ResolveEffectiveRepoUrl("\t") == AppUpdateService.DefaultOfficialRepoUrl &&
+                AppUpdateService.ResolveEffectiveRepoUrl("  https://github.com/acme/repo  ") == "https://github.com/acme/repo",
+                "ResolveEffectiveRepoUrl 空白回落官方仓库，非空则 Trim");
 
             var freshCfg = new UserHubConfig();
             AssertTrue(

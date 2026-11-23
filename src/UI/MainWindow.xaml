@@ -871,7 +871,7 @@
                                             Content="立即检查更新"
                                             Style="{StaticResource PrimaryBtn}"
                                             VerticalAlignment="Center"
-                                            ToolTip="向已配置的 GitHub / Gitee / 自定义 JSON 更新源检查 AIDeck 新版本"
+                                            ToolTip="从 AIDeck 官方 GitHub 发布源检查最新版本"
                                             Click="BtnCheckAppUpdate_Click"/>
                                 </Grid>
                                 <Border Background="{DynamicResource BgInputBrush}" BorderBrush="{DynamicResource BorderSectionBrush}" BorderThickness="1" CornerRadius="6" Padding="12,9">
@@ -879,9 +879,9 @@
                                         <TextBlock x:Name="TextAboutCurrentVersion" Text="AIDeck · 多 AI 协同中心 v1.9.14" FontSize="13" FontWeight="SemiBold" Foreground="#E0F2FE" Margin="0,0,0,4"/>
                                         <TextBlock x:Name="TextAppUpdateStatus" Text="尚未检查更新" FontSize="12" Foreground="#94A3B8" TextWrapping="Wrap" Margin="0,0,0,8"
                                                    ToolTip="可手动检查，或等待启动后的后台静默检查。只有发现新版本才提示。"/>
-                                        <TextBlock Text="更新源" Foreground="#CBD5E1" FontSize="12" Margin="0,0,0,4"
+                                        <TextBlock x:Name="LblUpdateRepoUrl" Text="更新源" Foreground="#CBD5E1" FontSize="12" Margin="0,0,0,4" Visibility="Collapsed"
                                                    ToolTip="GitHub / Gitee 仓库、SSH、owner/repo，或自定义 JSON。留空则读取本地 Git origin。"/>
-                                        <TextBox x:Name="TextUpdateRepoUrl" Height="28" FontSize="12" Padding="8,4" Margin="0,0,0,8" LostFocus="TextUpdateRepoUrl_LostFocus"
+                                        <TextBox x:Name="TextUpdateRepoUrl" Height="28" FontSize="12" Padding="8,4" Margin="0,0,0,8" Visibility="Collapsed" LostFocus="TextUpdateRepoUrl_LostFocus"
                                                  ToolTip="例如 https://github.com/owner/repo 、git@gitee.com:owner/repo.git 或 https://example.com/latest.json"/>
                                         <CheckBox x:Name="ChkAutoCheckAppUpdate"
                                                   Content="启动后查更新"

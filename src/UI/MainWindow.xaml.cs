@@ -5603,6 +5603,7 @@ public partial class MainWindow : Window
 
     private void BtnCheckAppUpdate_Click(object sender, RoutedEventArgs e)
     {
+        if (_suppressEvents) return;
         PersistUpdateRepoUrlFromUi();
         BeginAppUpdateCheck(silent: false);
     }
@@ -5611,7 +5612,7 @@ public partial class MainWindow : Window
 
     private void PersistUpdateRepoUrlFromUi()
     {
-        if (TextUpdateRepoUrl == null || _suppressEvents) return;
+        if (TextUpdateRepoUrl == null || TextUpdateRepoUrl.Visibility != Visibility.Visible || _suppressEvents) return;
         var text = (TextUpdateRepoUrl.Text ?? "").Trim();
         if (string.Equals(text, _reg.UserConfig.AppUpdateRepoUrl ?? "", StringComparison.Ordinal)) return;
         _reg.UserConfig.AppUpdateRepoUrl = text;
@@ -5640,7 +5641,7 @@ public partial class MainWindow : Window
             if (TextAppUpdateStatus != null) TextAppUpdateStatus.Text = "正在检查软件更新…";
         }
 
-        var repo = (TextUpdateRepoUrl?.Text ?? _reg.UserConfig.AppUpdateRepoUrl ?? "").Trim();
+        var repo = AppUpdateService.ResolveEffectiveRepoUrl(_reg.UserConfig.AppUpdateRepoUrl);
         _ = System.Threading.Tasks.Task.Run(async () =>
         {
             AppUpdateCheckResult result;

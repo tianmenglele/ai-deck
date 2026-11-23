@@ -68,6 +68,11 @@ public sealed class AppUpdateApplyResult
 /// </summary>
 public static class AppUpdateService
 {
+    public const string DefaultOfficialRepoUrl = "https://github.com/tianmenglele/ai-deck";
+
+    public static string ResolveEffectiveRepoUrl(string? configuredRepoUrl) =>
+        string.IsNullOrWhiteSpace(configuredRepoUrl) ? DefaultOfficialRepoUrl : configuredRepoUrl.Trim();
+
     public const string NeedsRepoConfigMessage =
         "尚未配置软件更新源。请在「软件设置」填写 GitHub / Gitee 仓库地址、owner/repo，或自定义版本 JSON 链接；若程序位于 Git 仓库内，检查时会自动读取 origin。";
 
