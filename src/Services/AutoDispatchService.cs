@@ -17,7 +17,9 @@ public sealed record DesktopBusyProbeResult(
     bool IsWorking,
     string ActiveChatTitle,
     string ActiveProjectHint,
-    DateTime ProbedUtc);
+    DateTime ProbedUtc,
+    bool IsInconclusive = false,
+    bool ProcessFound = true);
 
 public sealed class LiveAgentWorkState
 {
@@ -64,13 +66,26 @@ public sealed class AutoDispatchService
     private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(180) };
     private static readonly ConcurrentDictionary<string, SemaphoreSlim> DesktopUiaLocks = new(StringComparer.OrdinalIgnoreCase);
     private static readonly ConcurrentDictionary<string, (DateTime Utc, string ChatTitle)> RecentDesktopDispatches = new(StringComparer.OrdinalIgnoreCase);
+    private readonly record struct DesktopBusyDebounceTracker(
+        bool IsWorking,
+        int ConsecutiveIdleCount,
+        DateTime? IdleStreakStartUtc);
+
     private static readonly ConcurrentDictionary<string, DesktopBusyProbeResult> LiveDesktopBusyCache = new(StringComparer.OrdinalIgnoreCase);
     private static readonly ConcurrentDictionary<string, DesktopBusyProbeResult> TestDesktopBusyOverrides = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly ConcurrentDictionary<string, DesktopBusyDebounceTracker> DesktopBusyDebounceByAgent = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly object DesktopBusyDebounceSync = new();
     private static readonly ConcurrentDictionary<string, byte> DesktopProbeInFlight = new(StringComparer.OrdinalIgnoreCase);
     private static int _desktopProbeSweepGate;
 
     /// <summary>桌面忙碌探测缓存有效期（约 1.2~1.5 秒，供 --self-test 断言）。</summary>
     public const int DesktopLiveProbeCacheTtlMs = 1300;
+
+    /// <summary>可靠空闲需连续达到这么多次，才允许从忙碌回落。</summary>
+    public const int DesktopBusyIdleReleaseSamples = 3;
+
+    /// <summary>可靠空闲还需跨够这么多毫秒，才允许从忙碌回落。</summary>
+    public const int DesktopBusyIdleReleaseMs = 3500;
 
     /// <summary>探测结果相对上次发生变化时触发，悬浮窗据此立即重绘。</summary>
     public static event Action? DesktopLiveProbeChanged;
@@ -4998,6 +5013,40 @@ Write-Output ('DISPATCHED_CONFIRMED:' + $selectedChatTitle)
         return (status, phase, false);
     }
 
+    /// <summary>
+    /// 桌面忙碌防抖：上行立即切忙；超时/异常不确定态保持原状态；进程退出立即空闲；
+    /// 可靠空闲需连续样本与持续时间都达标才从忙碌回落。
+    /// </summary>
+    public static (bool StableIsWorking, int NextConsecutiveIdleCount, DateTime? NextIdleStreakStartUtc, bool StateChanged) ResolveDebouncedDesktopBusyTransition(
+        bool prevIsWorking,
+        int prevConsecutiveIdleCount,
+        DateTime? prevIdleStreakStartUtc,
+        bool probeIsWorking,
+        bool probeIsInconclusive,
+        bool probeProcessFound,
+        DateTime nowUtc)
+    {
+        if (probeIsWorking)
+            return (true, 0, null, !prevIsWorking);
+
+        if (probeIsInconclusive)
+            return (prevIsWorking, prevConsecutiveIdleCount, prevIdleStreakStartUtc, false);
+
+        if (!probeProcessFound)
+            return (false, 0, null, prevIsWorking);
+
+        if (!prevIsWorking)
+            return (false, 0, null, false);
+
+        var startUtc = prevIdleStreakStartUtc ?? nowUtc;
+        int nextCount = prevConsecutiveIdleCount + 1;
+        bool released = nextCount >= DesktopBusyIdleReleaseSamples
+                        && (nowUtc - startUtc) >= TimeSpan.FromMilliseconds(DesktopBusyIdleReleaseMs);
+        if (released)
+            return (false, 0, null, true);
+        return (true, nextCount, startUtc, false);
+    }
+
     /// <summary>后台扫一遍已启用桌面 AI。缓存未过期则跳过；不阻塞 WPF UI 线程。</summary>
     public static void RequestDesktopLiveProbeSweep(IEnumerable<AgentRosterEntry>? agents)
     {
@@ -5073,15 +5122,57 @@ Write-Output ('DISPATCHED_CONFIRMED:' + $selectedChatTitle)
 
         try
         {
-            AgentRosterEntry agentNonNull = agent;
-            var result = ProbeDesktopAgentBusyOnMtaThread(agentNonNull) ?? empty;
-            bool hadPrev = LiveDesktopBusyCache.TryGetValue(agentId, out var prev);
-            bool changed = !hadPrev ||
-                           prev!.IsWorking != result.IsWorking ||
-                           !string.Equals(prev.ActiveChatTitle, result.ActiveChatTitle, StringComparison.Ordinal);
-            // IsWorking==false：立刻写入空闲探测，清除忙态叠加
-            LiveDesktopBusyCache[agentId] = result;
-            if (changed)
+            var raw = ProbeDesktopAgentBusyOnMtaThread(agent);
+            var nowUtc = DateTime.UtcNow;
+            DesktopBusyProbeResult result;
+            bool notify = false;
+            lock (DesktopBusyDebounceSync)
+            {
+                var prevTracker = DesktopBusyDebounceByAgent.TryGetValue(agentId, out var existing)
+                    ? existing
+                    : new DesktopBusyDebounceTracker(
+                        LiveDesktopBusyCache.TryGetValue(agentId, out var seed) && seed.IsWorking,
+                        0,
+                        null);
+                var transition = ResolveDebouncedDesktopBusyTransition(
+                    prevTracker.IsWorking,
+                    prevTracker.ConsecutiveIdleCount,
+                    prevTracker.IdleStreakStartUtc,
+                    raw.IsWorking,
+                    raw.IsInconclusive,
+                    raw.ProcessFound,
+                    nowUtc);
+                DesktopBusyDebounceByAgent[agentId] = new DesktopBusyDebounceTracker(
+                    transition.StableIsWorking,
+                    transition.NextConsecutiveIdleCount,
+                    transition.NextIdleStreakStartUtc);
+
+                bool hadPrev = LiveDesktopBusyCache.TryGetValue(agentId, out var prev);
+                string title = raw.ActiveChatTitle;
+                if (transition.StableIsWorking &&
+                    string.IsNullOrWhiteSpace(title) &&
+                    hadPrev &&
+                    prev != null &&
+                    !string.IsNullOrWhiteSpace(prev.ActiveChatTitle))
+                {
+                    title = prev.ActiveChatTitle;
+                }
+
+                string prevTitle = hadPrev && prev != null ? prev.ActiveChatTitle : "";
+                bool titleChangedWhileBusy = transition.StableIsWorking && hadPrev &&
+                    !string.Equals(prevTitle, title, StringComparison.Ordinal);
+                notify = transition.StateChanged || titleChangedWhileBusy;
+                result = new DesktopBusyProbeResult(
+                    transition.StableIsWorking,
+                    title,
+                    raw.ActiveProjectHint,
+                    nowUtc,
+                    raw.IsInconclusive,
+                    raw.ProcessFound);
+                LiveDesktopBusyCache[agentId] = result;
+            }
+
+            if (notify)
             {
                 try { DesktopLiveProbeChanged?.Invoke(); } catch { }
             }
@@ -5095,7 +5186,9 @@ Write-Output ('DISPATCHED_CONFIRMED:' + $selectedChatTitle)
 
     static DesktopBusyProbeResult ProbeDesktopAgentBusyOnMtaThread(AgentRosterEntry agent)
     {
-        var empty = new DesktopBusyProbeResult(false, "", "", DateTime.UtcNow);
+        static DesktopBusyProbeResult Inconclusive() =>
+            new(false, "", "", DateTime.UtcNow, IsInconclusive: true, ProcessFound: true);
+
         var deskProfile = ResolveDesktopUiAutomationProfile(agent);
         var procNames = deskProfile.ProcessNames?.Where(s => !string.IsNullOrWhiteSpace(s)).Select(s => s.Trim()).Distinct(StringComparer.OrdinalIgnoreCase).ToList()
                         ?? new List<string>();
@@ -5106,7 +5199,7 @@ Write-Output ('DISPATCHED_CONFIRMED:' + $selectedChatTitle)
             else if (!string.IsNullOrWhiteSpace(deskProfile.WinTitle)) procNames.Add(deskProfile.WinTitle);
         }
 
-        DesktopBusyProbeResult result = empty;
+        DesktopBusyProbeResult result = Inconclusive();
         using var done = new System.Threading.ManualResetEventSlim(false);
         var thread = new System.Threading.Thread(() =>
         {
@@ -5116,12 +5209,12 @@ Write-Output ('DISPATCHED_CONFIRMED:' + $selectedChatTitle)
                 hDesk = OpenDesktopW("Default", 0, false, 0x01FF);
                 if (hDesk != IntPtr.Zero)
                     SetThreadDesktop(hDesk);
-                var (working, title) = ProbeGlobalDesktopBusyViaInProcessUia(procNames, hDesk);
-                result = new DesktopBusyProbeResult(working, title, "", DateTime.UtcNow);
+                var (working, title, inconclusive, processFound) = ProbeGlobalDesktopBusyViaInProcessUia(procNames, hDesk);
+                result = new DesktopBusyProbeResult(working, title, "", DateTime.UtcNow, inconclusive, processFound);
             }
             catch
             {
-                result = empty;
+                result = Inconclusive();
             }
             finally
             {
@@ -5136,15 +5229,17 @@ Write-Output ('DISPATCHED_CONFIRMED:' + $selectedChatTitle)
         thread.SetApartmentState(System.Threading.ApartmentState.MTA);
         thread.Start();
         if (!done.Wait(2500))
-            return LiveDesktopBusyCache.TryGetValue(agent.Id.Trim(), out var stale) ? stale : empty;
+            return Inconclusive();
         return result;
     }
 
     /// <summary>全窗口忙碌：Stop generation / Stop execution / Steer / 侧栏 Working。不按工程分组过滤。</summary>
-    static (bool IsWorking, string ChatTitle) ProbeGlobalDesktopBusyViaInProcessUia(List<string> procNames, IntPtr hDesktop)
+    static (bool IsWorking, string ChatTitle, bool IsInconclusive, bool ProcessFound) ProbeGlobalDesktopBusyViaInProcessUia(List<string> procNames, IntPtr hDesktop)
     {
         var ownedProcs = new List<System.Diagnostics.Process>();
         var sw = System.Diagnostics.Stopwatch.StartNew();
+        bool abortedByBudget = false;
+        int windowsReadOk = 0;
         try
         {
             foreach (var pn in procNames)
@@ -5158,9 +5253,38 @@ Write-Output ('DISPATCHED_CONFIRMED:' + $selectedChatTitle)
                 catch { }
             }
 
+            if (ownedProcs.Count == 0)
+                return (false, "", false, false);
+
+            bool TryReadWindow(System.Windows.Automation.AutomationElement? el, out bool isWorking, out string chatTitle)
+            {
+                isWorking = false;
+                chatTitle = "";
+                if (el == null)
+                    return false;
+                try
+                {
+                    var snap = BuildSidebarBusySnapshotFromRoot(el);
+                    var hit = EvaluateGlobalDesktopBusy(snap);
+                    windowsReadOk++;
+                    isWorking = hit.IsWorking;
+                    chatTitle = hit.ChatTitle;
+                    return true;
+                }
+                catch
+                {
+                    return false;
+                }
+            }
+
             foreach (var proc in ownedProcs)
             {
-                if (sw.ElapsedMilliseconds >= 2200) break;
+                if (sw.ElapsedMilliseconds >= 2200)
+                {
+                    abortedByBudget = true;
+                    break;
+                }
+
                 var hwnds = FindVisibleHwndsForProcess(proc.Id, hDesktop);
                 if (hwnds.Count == 0)
                 {
@@ -5170,34 +5294,46 @@ Write-Output ('DISPATCHED_CONFIRMED:' + $selectedChatTitle)
                             System.Windows.Automation.AutomationElement.ProcessIdProperty, proc.Id);
                         var topWins = System.Windows.Automation.AutomationElement.RootElement.FindAll(
                             System.Windows.Automation.TreeScope.Children, pidCond);
-                        for (int i = 0; i < topWins.Count && sw.ElapsedMilliseconds < 2200; i++)
+                        for (int i = 0; i < topWins.Count; i++)
                         {
-                            try
+                            if (sw.ElapsedMilliseconds >= 2200)
                             {
-                                var snap = BuildSidebarBusySnapshotFromRoot(topWins[i]);
-                                var hit = EvaluateGlobalDesktopBusy(snap);
-                                if (hit.IsWorking) return hit;
+                                abortedByBudget = true;
+                                break;
                             }
-                            catch { }
+                            if (TryReadWindow(topWins[i], out bool working, out string title) && working)
+                                return (true, title, false, true);
                         }
                     }
-                    catch { }
+                    catch
+                    {
+                        windowsFailed++;
+                    }
+
+                    if (abortedByBudget) break;
                     continue;
                 }
 
                 foreach (var hwnd in hwnds)
                 {
-                    if (sw.ElapsedMilliseconds >= 2200) break;
+                    if (sw.ElapsedMilliseconds >= 2200)
+                    {
+                        abortedByBudget = true;
+                        break;
+                    }
                     try
                     {
                         var el = System.Windows.Automation.AutomationElement.FromHandle(hwnd);
-                        if (el == null) continue;
-                        var snap = BuildSidebarBusySnapshotFromRoot(el);
-                        var hit = EvaluateGlobalDesktopBusy(snap);
-                        if (hit.IsWorking) return hit;
+                        if (TryReadWindow(el, out bool working, out string title) && working)
+                            return (true, title, false, true);
                     }
-                    catch { }
+                    catch
+                    {
+                        windowsFailed++;
+                    }
                 }
+
+                if (abortedByBudget) break;
             }
         }
         finally
@@ -5207,7 +5343,12 @@ Write-Output ('DISPATCHED_CONFIRMED:' + $selectedChatTitle)
                 try { proc.Dispose(); } catch { }
             }
         }
-        return (false, "");
+
+        // 无超时且至少完整读完 1 个窗口、又没有忙碌信号：可靠空闲。
+        // 预算中止、采样全部失败，或一个窗口都没读到：不确定，不能当成空闲。
+        if (!abortedByBudget && windowsReadOk >= 1)
+            return (false, "", false, true);
+        return (false, "", true, true);
     }
 
     public static (bool IsWorking, string ChatTitle) EvaluateGlobalDesktopBusy(SidebarBusyWindowSnapshot? snap)
@@ -5331,6 +5472,10 @@ Write-Output ('DISPATCHED_CONFIRMED:' + $selectedChatTitle)
                 ApplyBusyOverlay(id, probe);
                 return;
             }
+
+            // 超时或 UIA 异常：不确定，禁止当成 probeFresh 且空闲去清掉 working。
+            if (probe.IsInconclusive)
+                return;
 
             if (!result.TryGetValue(id, out var existing)) return;
             if (existing.Status is not ("working" or "reworking")) return;

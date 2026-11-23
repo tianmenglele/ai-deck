@@ -1384,6 +1384,54 @@ public static class Program
                 stopHit.IsWorking && !idleHit.IsWorking,
                 $"忙碌/空闲双向合并 (lit={lit.Status}/{lit.WorkflowPhase}, stale={stale.Status}, rework={reworkStale.Status}, keep={keepAlive.Status}, stop={stopHit.IsWorking})");
 
+            var debounceT0 = new DateTime(2026, 11, 23, 9, 0, 0, DateTimeKind.Utc);
+            var debounceUp = AutoDispatchService.ResolveDebouncedDesktopBusyTransition(
+                false, 2, debounceT0, true, false, true, debounceT0.AddSeconds(1));
+            AssertTrue(
+                debounceUp.StableIsWorking && debounceUp.NextConsecutiveIdleCount == 0 &&
+                debounceUp.NextIdleStreakStartUtc == null && debounceUp.StateChanged,
+                "上行即时切忙：空闲收到 working 立即为 true 并清零空闲计数");
+
+            var debounceHold = AutoDispatchService.ResolveDebouncedDesktopBusyTransition(
+                true, 1, debounceT0, false, true, true, debounceT0.AddSeconds(2));
+            AssertTrue(
+                debounceHold.StableIsWorking && debounceHold.NextConsecutiveIdleCount == 1 &&
+                debounceHold.NextIdleStreakStartUtc == debounceT0 && !debounceHold.StateChanged,
+                "超时或异常不确定态保态：保持 working 且不推进空闲计数");
+
+            var debounceIdle1 = AutoDispatchService.ResolveDebouncedDesktopBusyTransition(
+                true, 0, null, false, false, true, debounceT0);
+            var debounceIdle2 = AutoDispatchService.ResolveDebouncedDesktopBusyTransition(
+                debounceIdle1.StableIsWorking, debounceIdle1.NextConsecutiveIdleCount, debounceIdle1.NextIdleStreakStartUtc,
+                false, false, true, debounceT0.AddMilliseconds(1300));
+            var debounceIdleShort = AutoDispatchService.ResolveDebouncedDesktopBusyTransition(
+                debounceIdle2.StableIsWorking, debounceIdle2.NextConsecutiveIdleCount, debounceIdle2.NextIdleStreakStartUtc,
+                false, false, true, debounceT0.AddMilliseconds(3499));
+            AssertTrue(
+                debounceIdle1.StableIsWorking && debounceIdle1.NextConsecutiveIdleCount == 1 && !debounceIdle1.StateChanged &&
+                debounceIdle2.StableIsWorking && debounceIdle2.NextConsecutiveIdleCount == 2 && !debounceIdle2.StateChanged &&
+                debounceIdleShort.StableIsWorking && debounceIdleShort.NextConsecutiveIdleCount == 3 && !debounceIdleShort.StateChanged,
+                "短暂可靠空闲防抖：1~2 次或连续 3 次但不足 3500ms 仍保持 working");
+
+            var debounceIdleLong = AutoDispatchService.ResolveDebouncedDesktopBusyTransition(
+                debounceIdle2.StableIsWorking, debounceIdle2.NextConsecutiveIdleCount, debounceIdle2.NextIdleStreakStartUtc,
+                false, false, true, debounceT0.AddMilliseconds(3500));
+            var debounceAlreadyIdle = AutoDispatchService.ResolveDebouncedDesktopBusyTransition(
+                false, 4, debounceT0, false, false, true, debounceT0.AddSeconds(8));
+            AssertTrue(
+                !debounceIdleLong.StableIsWorking && debounceIdleLong.NextConsecutiveIdleCount == 0 &&
+                debounceIdleLong.NextIdleStreakStartUtc == null && debounceIdleLong.StateChanged &&
+                !debounceAlreadyIdle.StableIsWorking && debounceAlreadyIdle.NextConsecutiveIdleCount == 0 &&
+                debounceAlreadyIdle.NextIdleStreakStartUtc == null && !debounceAlreadyIdle.StateChanged,
+                "连续 >=3 次可靠空闲且跨度 >=3500ms 回落为空闲；本来空闲则保持 false 并清零");
+
+            var debounceExited = AutoDispatchService.ResolveDebouncedDesktopBusyTransition(
+                true, 2, debounceT0, false, false, false, debounceT0.AddSeconds(1));
+            AssertTrue(
+                !debounceExited.StableIsWorking && debounceExited.NextConsecutiveIdleCount == 0 &&
+                debounceExited.NextIdleStreakStartUtc == null && debounceExited.StateChanged,
+                "进程退出（ProcessFound=false）立即回落为空闲");
+
             string overlaySrc = @"C:\Project\Godot\配套工具\tools\ai-collab-hub\src\UI\FloatingOverlayWindow.xaml.cs";
             string overlayTxt = File.Exists(overlaySrc) ? File.ReadAllText(overlaySrc, Encoding.UTF8) : "";
             AssertTrue(
