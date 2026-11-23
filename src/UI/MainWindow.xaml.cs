@@ -277,6 +277,7 @@ public partial class MainWindow : Window
                         });
                     });
                 }
+
             };
 
             Closing += (_, e) =>
@@ -364,6 +365,12 @@ public partial class MainWindow : Window
             {
                 PerformShutdownWorkflowCleanup();
             };
+        }
+
+        if (!AppPaths.IsIsolatedTest)
+        {
+            Loaded += (_, _) =>
+                Dispatcher.BeginInvoke(new Action(TryAutoShowOnboarding), DispatcherPriority.ApplicationIdle);
         }
     }
 
@@ -711,6 +718,66 @@ public partial class MainWindow : Window
         }
         fw.RefreshOverlayData(force: true);
         UpdateFloatingButtonBadge();
+    }
+
+    private bool _onboardingAutoPrompted;
+
+    /// <summary>全新首次启动时弹出 3 步引导。隔离测试、已完成、以及已有启用项的老配置都不自动打扰。</summary>
+    private void TryAutoShowOnboarding()
+    {
+        if (_onboardingAutoPrompted || !IsLoaded || AppPaths.IsIsolatedTest) return;
+        _onboardingAutoPrompted = true;
+        if (!OnboardingWizardDialog.ShouldAutoShowOnboarding(
+                _reg.UserConfig,
+                _reg.ConfigFileExistedAtLoad,
+                AppPaths.IsIsolatedTest))
+            return;
+        OpenOnboardingWizard();
+    }
+
+    private void BtnReopenOnboarding_Click(object sender, RoutedEventArgs e) => OpenOnboardingWizard();
+
+    public void OpenOnboardingWizard()
+    {
+        var dlg = new OnboardingWizardDialog(_reg, _discovery, this);
+        if (AppPaths.IsIsolatedTest)
+        {
+            return;
+        }
+        if (IsLoaded)
+        {
+            dlg.Owner = this;
+            dlg.WindowStartupLocation = WindowStartupLocation.CenterOwner;
+        }
+        bool accepted = false;
+        try
+        {
+            accepted = dlg.ShowDialog() == true;
+        }
+        catch
+        {
+            accepted = _reg.UserConfig.HasCompletedOnboarding;
+        }
+        if (!accepted) return;
+        ApplyOnboardingClosed();
+    }
+
+    private void ApplyOnboardingClosed()
+    {
+        _lastOverviewSignature = "";
+        try { RenderOverviewPage(fastPoll: true); } catch { /* 向导关闭后的刷新不应打断主界面 */ }
+        try { RenderSettingsPage(); } catch { }
+        try { SyncAppSettingsControlsIfLoaded(); } catch { }
+        if (_reg.UserConfig.FloatingWindowVisible)
+        {
+            if (!AppPaths.IsIsolatedTest)
+                ShowFloatingOverlayWindow();
+        }
+        else if (_floatingWindow != null)
+        {
+            _floatingWindow.Hide();
+            UpdateFloatingButtonBadge();
+        }
     }
 
     public void UpdateFloatingButtonBadge()

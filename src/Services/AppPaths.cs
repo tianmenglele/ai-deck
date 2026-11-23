@@ -83,6 +83,9 @@ public static class AppPaths
 
     public static string UserConfigFile => Path.Combine(UserDataDir, "user_hub_config.json");
 
+    /// <summary>与 <see cref="UserConfigFile"/> 同一路径。新手引导用它判断配置文件在本次读取前是否已在磁盘上。</summary>
+    public static string UserConfigPath => UserConfigFile;
+
     public static string BackupsDir
     {
         get

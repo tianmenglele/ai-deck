@@ -845,6 +845,7 @@
                                                    Foreground="#94A3B8" FontSize="12" Margin="0,2,0,0" TextWrapping="Wrap"/>
                                     </StackPanel>
                                     <WrapPanel Grid.Column="1" VerticalAlignment="Center">
+                                        <Button x:Name="BtnReopenOnboarding" Content="新手引导" Style="{StaticResource ActionBtn}" Margin="0,0,6,0" Click="BtnReopenOnboarding_Click" ToolTip="再看一遍 3 步新手引导"/>
                                         <Button x:Name="BtnCreateDesktopShortcuts" Content="生成桌面图标" Style="{StaticResource ActionBtn}" Margin="0,0,6,0" Click="BtnCreateDesktopShortcuts_Click"/>
                                         <Button x:Name="BtnForceQuitApp" Content="彻底退出软件" Style="{StaticResource AmberBtn}" ToolTip="彻底退出本软件（若勾选了仅软件运行时生效，退出时将自动卸载协同锚点）" Click="BtnForceQuitApp_Click"/>
                                     </WrapPanel>

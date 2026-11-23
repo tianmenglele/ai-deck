@@ -21,6 +21,8 @@ public sealed class RegistryService
     public WorkflowRegistryFile Workflows { get; private set; } = new();
     public PresetRegistryFile Presets { get; private set; } = new();
     public UserHubConfig UserConfig { get; private set; } = new();
+    /// <summary>本次 LoadAll 读盘前，用户配置文件是否已经存在。供新手引导区分老用户，避免随后的保存把新文件误判成老配置。</summary>
+    public bool ConfigFileExistedAtLoad { get; private set; }
     private DateTime _lastUserConfigDiskWriteUtc = DateTime.MinValue;
 
     public void LoadAll()
@@ -32,6 +34,7 @@ public sealed class RegistryService
         Adapters = LoadJsonOrDefault<AdapterRegistryFile>(Path.Combine(AppPaths.RegistryDir, "adapters.json"));
         Workflows = LoadJsonOrDefault<WorkflowRegistryFile>(Path.Combine(AppPaths.RegistryDir, "workflows.json"));
         Presets = LoadJsonOrDefault<PresetRegistryFile>(Path.Combine(AppPaths.RegistryDir, "project_presets.json"));
+        ConfigFileExistedAtLoad = File.Exists(AppPaths.UserConfigPath);
         UserConfig = LoadJsonOrDefault<UserHubConfig>(AppPaths.UserConfigFile);
         if (File.Exists(AppPaths.UserConfigFile))
         {

@@ -172,6 +172,13 @@ public sealed class UserHubConfig
     /// <summary>旧字段：与 CloseButtonAction=minimize_to_tray 同步；默认 false，保持向后兼容。</summary>
     [JsonPropertyName("close_main_window_to_floating")] public bool CloseMainWindowToFloating { get; set; } = false;
     [JsonPropertyName("floating_window_enabled")] public bool FloatingWindowEnabled { get; set; } = true;
+    /// <summary>新手引导「开启桌面置顶悬浮窗」读写入口，与 FloatingWindowEnabled 同一开关，不另存一份以免旧配置分叉。</summary>
+    [JsonIgnore]
+    public bool FloatingWindowVisible
+    {
+        get => FloatingWindowEnabled;
+        set => FloatingWindowEnabled = value;
+    }
     [JsonPropertyName("floating_window_topmost")] public bool FloatingWindowTopmost { get; set; } = true;
     [JsonPropertyName("floating_window_collapsed")] public bool FloatingWindowCollapsed { get; set; } = false;
     [JsonPropertyName("floating_layout_mode")] public string FloatingLayoutMode { get; set; } = "auto";
@@ -201,6 +208,9 @@ public sealed class UserHubConfig
     [JsonPropertyName("team_profiles")] public List<TeamConfigProfile> TeamProfiles { get; set; } = new();
     [JsonPropertyName("projects")] public List<ProjectProfile> Projects { get; set; } = new();
     [JsonPropertyName("agents")] public List<AgentRosterEntry> Agents { get; set; } = new();
+    /// <summary>已完成或主动跳过 3 步新手引导。旧配置缺省该字段时为 false。</summary>
+    [JsonPropertyName("has_completed_onboarding")]
+    public bool HasCompletedOnboarding { get; set; } = false;
 }
 
 public sealed class TeamAgentSnapshot
