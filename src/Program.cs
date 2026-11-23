@@ -3719,7 +3719,7 @@ public static class Program
                 fxHost.SwitchSettingsSubViewForTest(false);
                 fxHost.UpdateLayout();
                 var mainCards = CollectLogicalAndVisual<System.Windows.Controls.Border>(fxHost.DetectedAgentsList)
-                    .Where(bd => bd.Margin.Bottom is 0 or 8)
+                    .Where(bd => bd.Margin.Bottom is 0 or 6 or 8)
                     .ToList();
                 var codexMainCard = mainCards.FirstOrDefault(bd =>
                     CollectLogicalAndVisual<System.Windows.Controls.TextBlock>(bd).Any(t => t.Text.Contains("Codex", StringComparison.OrdinalIgnoreCase)));
@@ -3909,8 +3909,29 @@ public static class Program
                     fxHost.UpdateLayout();
                     var overviewCards = fxHost.OverviewAgentsCards.Children.OfType<Border>().ToList();
                     AssertTrue(overviewCards.Count == 0 || overviewCards.All(c =>
-                            Math.Abs(c.Height - 66) < 0.5 || Math.Abs(c.ActualHeight - 66) < 1.5),
-                        $"OverviewAgentsCards 卡片 Height/ActualHeight 均为 66 (count={overviewCards.Count})");
+                            Math.Abs(c.Height - 56) < 0.5 || Math.Abs(c.ActualHeight - 56) < 1.5),
+                        $"OverviewAgentsCards 卡片 Height/ActualHeight 均为 56 (count={overviewCards.Count})");
+
+                    double compactBakW = fxHost.Width;
+                    double compactBakH = fxHost.Height;
+                    fxHost.Width = 1220;
+                    fxHost.Height = 760;
+                    fxHost.SwitchToTabForTest(1);
+                    fxHost.UpdateLayout();
+                    AssertTrue(fxHost.PageOverview.ActualHeight > 400 && fxHost.PageOverview.ScrollableHeight <= 1.0,
+                        $"工作台 1220x760 零垂直滚动 (ScrollableHeight={fxHost.PageOverview.ScrollableHeight:F2}, Viewport={fxHost.PageOverview.ActualHeight:F1})");
+                    fxHost.SwitchToTabForTest(6);
+                    foreach (var settingsKey in new[] { "general", "appearance", "resilience", "about" })
+                    {
+                        fxHost.SwitchSettingsTabForTest(settingsKey);
+                        fxHost.UpdateLayout();
+                        var settingsScroll = CollectLogicalAndVisual<ScrollViewer>(fxHost.PageAppSettings).FirstOrDefault();
+                        AssertTrue(settingsScroll != null && settingsScroll.ActualHeight > 200 && settingsScroll.ScrollableHeight <= 1.0,
+                            $"设置页 {settingsKey} 1220x760 零垂直滚动 (ScrollableHeight={settingsScroll?.ScrollableHeight:F2}, Viewport={settingsScroll?.ActualHeight:F1})");
+                    }
+                    fxHost.Width = compactBakW;
+                    fxHost.Height = compactBakH;
+                    fxHost.UpdateLayout();
                 }
                 finally
                 {

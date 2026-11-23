@@ -403,7 +403,7 @@ public partial class MainWindow
         double w = WorkflowDiagramCanvas.ActualWidth;
         if (w < 40) w = Math.Max(40, ActualWidth - 80);
         double h = WorkflowDiagramCanvas.ActualHeight;
-        if (h < 40) h = 264;
+        if (h < 40) h = 226;
 
         double cx = w * 0.5;
         double cy = h * 0.5;
@@ -411,9 +411,9 @@ public partial class MainWindow
         DrawMindMapStarGrid(w, h);
         DrawMindMapAurora(cx, cy);
 
-        const double masterW = 196, masterH = 92;
-        const double sideW = 168, sideH = 64;
-        const double workerW = 184, workerH = 58;
+        const double masterW = 192, masterH = 82;
+        const double sideW = 164, sideH = 56;
+        const double workerW = 180, workerH = 52;
         const double leftX = 0.16;
         const double rightX = 0.84;
 
@@ -433,7 +433,7 @@ public partial class MainWindow
         var intakeNode = AddMindMapSideNode(
             tag: "MindMapNode:intake",
             centerX: w * leftX,
-            centerY: cy - 48,
+            centerY: cy - 42,
             width: sideW,
             height: sideH,
             title: "需求入口",
@@ -447,7 +447,7 @@ public partial class MainWindow
         var verifyNode = AddMindMapSideNode(
             tag: "MindMapNode:verify",
             centerX: w * leftX,
-            centerY: cy + 48,
+            centerY: cy + 42,
             width: sideW,
             height: sideH,
             title: "验收交付",
@@ -462,7 +462,7 @@ public partial class MainWindow
         var liveMap = AutoDispatchService.ReadMergedGlobalWorkStatesWithDesktopLive();
         var displayWorkers = BuildDisplayWorkers(workers);
         int n = Math.Max(1, displayWorkers.Count);
-        double span = Math.Min(h - workerH - 16, Math.Max(workerH, (n - 1) * (workerH + 10)));
+        double span = Math.Min(Math.Max(0, h - workerH - 8), Math.Max(workerH, (n - 1) * (workerH + 8)));
         double startY = cy - span / 2.0;
         var workerNodes = new List<(AgentRosterEntry? Agent, Border Card, Point LeftAnchor, bool IsOverflow)>();
         for (int i = 0; i < displayWorkers.Count; i++)

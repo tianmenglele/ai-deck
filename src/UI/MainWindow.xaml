@@ -271,13 +271,13 @@
             </Border>
 
             <!-- 右侧 6 个功能页容器 -->
-            <Grid Grid.Column="1" Margin="18,14,18,14">
+            <Grid Grid.Column="1" Margin="14,10,14,10">
 
                 <!-- ==================== PAGE 1: 协同工作台 ==================== -->
                 <ScrollViewer x:Name="PageOverview" Visibility="Visible" VerticalScrollBarVisibility="Auto">
                     <StackPanel>
                         <!-- 顶部：单行清爽主脑统筹条 -->
-                        <Border x:Name="OverviewTopBannerCard" Style="{StaticResource SectionCard}" Height="52" Padding="16,8" Margin="0,0,0,14">
+                        <Border x:Name="OverviewTopBannerCard" Style="{StaticResource SectionCard}" Height="42" Padding="14,6" Margin="0,0,0,8">
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
@@ -295,7 +295,7 @@
                                 </StackPanel>
                                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                                     <Button x:Name="OverviewRefreshBtn" Visibility="Collapsed" Click="OverviewRefreshBtn_Click"/>
-                                    <Button Content="去配置 AI" Style="{StaticResource PrimaryBtn}" Padding="16,8" FontSize="14" Click="JumpToSettingsBtn_Click"
+                                    <Button Content="去配置 AI" Style="{StaticResource PrimaryBtn}" Padding="12,5" FontSize="13" Click="JumpToSettingsBtn_Click"
                                             ToolTip="打开 AI 配置，编辑模型与分工"/>
                                 </StackPanel>
                             </Grid>
@@ -326,9 +326,9 @@
                         </Border>
 
                         <!-- 当前工作流动态流程运行图（全宽，位于断点横幅下方、中部双栏上方） -->
-                        <Border x:Name="WorkflowDiagramCard" Style="{StaticResource SectionCard}" Padding="14,10" Margin="0,0,0,14">
+                        <Border x:Name="WorkflowDiagramCard" Style="{StaticResource SectionCard}" Padding="12,8" Margin="0,0,0,8">
                             <DockPanel LastChildFill="True">
-                                <Grid DockPanel.Dock="Top" Margin="0,0,0,8">
+                                <Grid DockPanel.Dock="Top" Margin="0,0,0,4">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*"/>
                                         <ColumnDefinition Width="Auto"/>
@@ -355,7 +355,7 @@
                                         </Button>
                                     </StackPanel>
                                 </Grid>
-                                <Canvas x:Name="WorkflowDiagramCanvas" Height="264" ClipToBounds="True" SizeChanged="WorkflowDiagramCanvas_SizeChanged"/>
+                                <Canvas x:Name="WorkflowDiagramCanvas" Height="226" ClipToBounds="True" SizeChanged="WorkflowDiagramCanvas_SizeChanged"/>
                             </DockPanel>
                         </Border>
 
@@ -368,23 +368,25 @@
                             </Grid.ColumnDefinitions>
 
                             <!-- 左栏：各 AI 实时状态 -->
-                            <Border Grid.Column="0" Style="{StaticResource SectionCard}">
+                            <Border Grid.Column="0" Style="{StaticResource SectionCard}" Padding="12,10">
                                 <StackPanel>
-                                    <TextBlock Text="在岗 AI 成员" FontSize="15" FontWeight="SemiBold" Foreground="#F8FAFC" Margin="0,0,0,12"/>
-                                    <StackPanel x:Name="OverviewAgentsCards"/>
+                                    <TextBlock Text="在岗 AI 成员" FontSize="15" FontWeight="SemiBold" Foreground="#F8FAFC" Margin="0,0,0,8"/>
+                                    <ScrollViewer MaxHeight="248" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                                        <StackPanel x:Name="OverviewAgentsCards"/>
+                                    </ScrollViewer>
                                 </StackPanel>
                             </Border>
 
                             <!-- 右栏：最近一次协同派单与工程概况 -->
                             <StackPanel Grid.Column="2">
-                                <Border Style="{StaticResource SectionCard}" Margin="0,0,0,14">
+                                <Border Style="{StaticResource SectionCard}" Padding="12,10" Margin="0,0,0,8">
                                     <StackPanel>
                                         <TextBlock Text="最近协同回执" FontSize="14" FontWeight="SemiBold" Foreground="#F8FAFC" Margin="0,0,0,8"/>
-                                        <Border Height="138" Background="#111722" BorderBrush="#202B3D" BorderThickness="1" CornerRadius="6" Padding="12,10" Margin="0,0,0,10" ClipToBounds="True">
+                                        <Border Height="112" Background="#111722" BorderBrush="#202B3D" BorderThickness="1" CornerRadius="6" Padding="10,8" Margin="0,0,0,8" ClipToBounds="True">
                                             <StackPanel>
                                                 <TextBlock x:Name="LatestDispatchHeaderText" Text="正在读取最近协同记录..." FontSize="12.5" FontWeight="SemiBold" Foreground="#E2E8F0" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"/>
                                                 <TextBlock x:Name="LatestDispatchMetaText" Text="" FontSize="11.5" Foreground="#64748B" Margin="0,3,0,6" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"/>
-                                                <TextBlock x:Name="LatestDispatchSnippetText" Text="" FontSize="12" Foreground="#94A3B8" LineHeight="18" TextWrapping="Wrap" MaxHeight="72" TextTrimming="CharacterEllipsis"/>
+                                                <TextBlock x:Name="LatestDispatchSnippetText" Text="" FontSize="12" Foreground="#94A3B8" LineHeight="18" TextWrapping="Wrap" MaxHeight="56" TextTrimming="CharacterEllipsis"/>
                                             </StackPanel>
                                         </Border>
                                         <WrapPanel>
@@ -402,7 +404,7 @@
                                     </StackPanel>
                                 </Border>
 
-                                <Border Style="{StaticResource SectionCard}">
+                                <Border Style="{StaticResource SectionCard}" Padding="12,8">
                                     <Expander IsExpanded="False" Foreground="#E6EDF7" Background="Transparent">
                                         <Expander.Header>
                                             <TextBlock Text="当前工程概况" FontSize="14" FontWeight="SemiBold" Foreground="#F8FAFC"/>
@@ -734,7 +736,7 @@
                     <StackPanel>
 
                         <!-- 1. 顶部配置方案总览栏（极简无套娃设计） -->
-                        <Border Style="{StaticResource SectionCard}" Padding="14,10" Margin="0,0,0,10">
+                        <Border Style="{StaticResource SectionCard}" Padding="12,8" Margin="0,0,0,8">
                             <StackPanel>
                                 <!-- 第 1 行：配置方案选择 + 切换启用 + 配置方案入口 -->
                                 <Grid Margin="0,0,0,8">
@@ -799,7 +801,7 @@
                         </Border>
 
                         <!-- 2. 主卡片：当前方案 AI 角色·功能只读总览 & 工作路由总览 + 右侧非配置运维操作 -->
-                        <Border Style="{StaticResource SectionCard}" Margin="0,0,0,12">
+                        <Border Style="{StaticResource SectionCard}" Padding="12,8" Margin="0,0,0,8">
                             <StackPanel>
                                 <Grid Margin="0,0,0,12">
                                     <Grid.ColumnDefinitions>
@@ -935,7 +937,7 @@
 
                 <!-- ==================== PAGE 6: 设置二级页（常规 / 外观 / 容灾 / 关于） ==================== -->
                 <DockPanel x:Name="PageAppSettings" Visibility="Collapsed" LastChildFill="True">
-                    <Border DockPanel.Dock="Top" BorderBrush="{DynamicResource BorderSectionBrush}" BorderThickness="0,0,0,1" Padding="0,0,0,8" Margin="0,0,0,12">
+                    <Border DockPanel.Dock="Top" BorderBrush="{DynamicResource BorderSectionBrush}" BorderThickness="0,0,0,1" Padding="0,0,0,8" Margin="0,0,0,8">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto"/>
@@ -1002,10 +1004,10 @@
                         </Grid>
                     </Border>
 
-                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <ScrollViewer x:Name="AppSettingsBodyScroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                         <Grid>
                             <StackPanel x:Name="SettingsPanelGeneral">
-                                <Border Style="{StaticResource SectionCard}" Padding="14,12">
+                                <Border Style="{StaticResource SectionCard}" Padding="12,10" Margin="0,0,0,8">
                                     <StackPanel>
                                         <Grid Margin="0,0,0,10">
                                             <Grid.ColumnDefinitions>
@@ -1074,7 +1076,7 @@
                             </StackPanel>
 
                             <StackPanel x:Name="SettingsPanelAppearance" Visibility="Collapsed">
-                                <Border Style="{StaticResource SectionCard}" Padding="14,12">
+                                <Border Style="{StaticResource SectionCard}" Padding="12,10" Margin="0,0,0,8">
                                     <StackPanel>
                                         <Grid Margin="0,0,0,10">
                                             <Grid.ColumnDefinitions>
@@ -1252,7 +1254,7 @@
                             </StackPanel>
 
                             <StackPanel x:Name="SettingsPanelResilience" Visibility="Collapsed">
-                                <Border Style="{StaticResource SectionCard}" Padding="14,12">
+                                <Border Style="{StaticResource SectionCard}" Padding="12,10" Margin="0,0,0,8">
                                     <StackPanel>
                                         <Grid Margin="0,0,0,10">
                                             <Grid.ColumnDefinitions>
@@ -1292,7 +1294,7 @@
                                                 <ColumnDefinition Width="12"/>
                                                 <ColumnDefinition Width="0.85*"/>
                                             </Grid.ColumnDefinitions>
-                                            <Border Grid.Column="0" Background="{DynamicResource BgInputBrush}" BorderBrush="{DynamicResource BorderSectionBrush}" BorderThickness="1" CornerRadius="6" Padding="14,12">
+                                            <Border Grid.Column="0" Background="{DynamicResource BgInputBrush}" BorderBrush="{DynamicResource BorderSectionBrush}" BorderThickness="1" CornerRadius="6" Padding="12,10">
                                                 <StackPanel>
                                                     <CheckBox x:Name="ChkEnableNetRetry"
                                                               Content="断线自动重连"
@@ -1316,7 +1318,7 @@
                                                               Checked="NetworkResilienceSetting_Changed" Unchecked="NetworkResilienceSetting_Changed"/>
                                                 </StackPanel>
                                             </Border>
-                                            <Border Grid.Column="2" Background="{DynamicResource BgInputBrush}" BorderBrush="{DynamicResource BorderSectionBrush}" BorderThickness="1" CornerRadius="6" Padding="14,12">
+                                            <Border Grid.Column="2" Background="{DynamicResource BgInputBrush}" BorderBrush="{DynamicResource BorderSectionBrush}" BorderThickness="1" CornerRadius="6" Padding="12,10">
                                                 <StackPanel>
                                                     <TextBlock Text="重连次数" Foreground="{StaticResource FgSecondaryBrush}" FontSize="12" Margin="0,0,0,3"
                                                                ToolTip="单轮最大自动重连尝试次数"/>
@@ -1352,7 +1354,7 @@
                             </StackPanel>
 
                             <StackPanel x:Name="SettingsPanelAbout" Visibility="Collapsed">
-                                <Border Style="{StaticResource SectionCard}" Padding="16,14" Margin="0,0,0,12">
+                                <Border Style="{StaticResource SectionCard}" Padding="12,10" Margin="0,0,0,8">
                                     <Grid>
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*"/>
@@ -1363,7 +1365,7 @@
                                         <Button x:Name="BtnReopenOnboarding" Grid.Column="1" Content="重开向导" Style="{StaticResource PrimaryBtn}" Padding="14,7" FontSize="13" VerticalAlignment="Center" Click="BtnReopenOnboarding_Click" ToolTip="再看一遍 3 步新手向导"/>
                                     </Grid>
                                 </Border>
-                                <Border Style="{StaticResource SectionCard}" Padding="14,12" Margin="0,0,0,12">
+                                <Border Style="{StaticResource SectionCard}" Padding="12,10" Margin="0,0,0,8">
                                     <StackPanel>
                                         <Grid Margin="0,0,0,8">
                                             <Grid.ColumnDefinitions>
@@ -1399,7 +1401,7 @@
                                         </Border>
                                     </StackPanel>
                                 </Border>
-                                <Border Style="{StaticResource SectionCard}" Padding="14,10">
+                                <Border Style="{StaticResource SectionCard}" Padding="12,10" Margin="0,0,0,8">
                                     <Expander IsExpanded="False" Foreground="#E6EDF7" Background="Transparent">
                                         <Expander.Header>
                                             <TextBlock Text="高级与开发者" FontSize="13.5" FontWeight="SemiBold" Foreground="#9AA8BE" Margin="4,0,0,0"/>

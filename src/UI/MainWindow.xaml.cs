@@ -1474,24 +1474,23 @@ public partial class MainWindow : Window
         for (int i = 0; i < enabledAgents.Count; i++)
         {
             var ag = enabledAgents[i];
-            bool isLast = i == enabledAgents.Count - 1;
             liveMap.TryGetValue(ag.Id, out var agLive);
 
             bool isWorking = agLive != null && agLive.Status == "working";
 
             var rowBorder = new Border
             {
-                Height = 66,
+                Height = 56,
                 Background = isWorking ? Hex("#1B1914") : Hex("#141B26"),
                 BorderBrush = isWorking ? Hex("#B45309") : Hex("#222C3D"),
                 BorderThickness = new Thickness(1),
                 CornerRadius = new CornerRadius(7),
-                Padding = new Thickness(12, 8, 12, 8),
-                Margin = new Thickness(0, 0, 0, isLast ? 0 : 10),
+                Padding = new Thickness(10, 0, 10, 0),
+                Margin = new Thickness(0, 0, 0, 6),
                 ClipToBounds = true
             };
 
-            var stack = new StackPanel();
+            var stack = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
             var topGrid = new Grid();
             topGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             topGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -3565,7 +3564,6 @@ public partial class MainWindow : Window
         for (int i = 0; i < detectedOrCustom.Count; i++)
         {
             var agent = detectedOrCustom[i];
-            bool isLast = i == detectedOrCustom.Count - 1;
             bool dispEnabled = GetSnapEnabled(agent);
             bool isMaster = !string.IsNullOrWhiteSpace(resolvedMasterId) && string.Equals(resolvedMasterId, agent.Id, StringComparison.OrdinalIgnoreCase);
             bool isFallback = !string.IsNullOrWhiteSpace(resolvedFallbackId) && string.Equals(resolvedFallbackId, agent.Id, StringComparison.OrdinalIgnoreCase);
@@ -3576,17 +3574,17 @@ public partial class MainWindow : Window
 
             var rowBorder = new Border
             {
-                Height = 72,
+                Height = 60,
                 Background = dispEnabled ? Hex("#121824") : Hex("#0E131D"),
                 BorderBrush = Hex(dispEnabled ? "#1E293B" : "#18202E"),
                 BorderThickness = new Thickness(1),
                 CornerRadius = new CornerRadius(7),
-                Padding = new Thickness(14, 10, 14, 10),
-                Margin = new Thickness(0, 0, 0, isLast ? 0 : 8),
+                Padding = new Thickness(12, 0, 12, 0),
+                Margin = new Thickness(0, 0, 0, 6),
                 ClipToBounds = true
             };
 
-            var rowGrid = new Grid();
+            var rowGrid = new Grid { VerticalAlignment = VerticalAlignment.Center };
             rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -3935,7 +3933,7 @@ public partial class MainWindow : Window
             rowGrid.Children.Add(rightWrap);
             if (cliDrawer.Children.Count > 0)
             {
-                var outerStack = new StackPanel();
+                var outerStack = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
                 outerStack.Children.Add(rowGrid);
                 outerStack.Children.Add(cliDrawer);
                 rowBorder.Child = outerStack;
