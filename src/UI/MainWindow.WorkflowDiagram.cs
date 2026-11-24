@@ -496,6 +496,9 @@ public partial class MainWindow
         string masterSub = string.IsNullOrWhiteSpace(_workflowDiagramPhaseLabel)
             ? masterTier
             : ShortName(_workflowDiagramPhaseLabel, 14);
+        int masterTaskCount = 0;
+        if (master != null && liveMap.TryGetValue(master.Id, out var masterLive))
+            masterTaskCount = masterLive.ActiveTaskCount;
         var masterNode = AddMindMapMasterNode(
             centerX: cx,
             centerY: cy,
@@ -505,7 +508,8 @@ public partial class MainWindow
             title: ShortName(masterName, 12),
             subtitle: masterSub,
             tip: $"主脑：{masterName}\n模型档位：{masterTier}\n职责：深度分析 / 派单 / 终验\n当前阶段：{_workflowDiagramPhaseLabel} · 轮次 R{_workflowDiagramRound}/{_workflowDiagramMaxRounds}",
-            onClick: () => NavDialogs.IsChecked = true);
+            onClick: () => NavDialogs.IsChecked = true,
+            activeTaskCount: masterTaskCount);
 
         // 底层静默连线 + 激活彗星流光
         string? activeWorkerId = ResolveActiveWorkerId(workers);
@@ -700,7 +704,8 @@ public partial class MainWindow
         string title,
         string subtitle,
         string tip,
-        Action? onClick)
+        Action? onClick,
+        int activeTaskCount = 0)
     {
         double left = centerX - width / 2;
         double top = centerY - height / 2;
@@ -743,6 +748,7 @@ public partial class MainWindow
         var avatar = master != null
             ? OfficialBrandIconService.CreateCircularAvatarVisual(master.Id, 32, master, OfficialBrandIconService.GetBrandColor(master.Id), 1.15)
             : MakeMindMapVectorIcon("master", 28, Hex("#C4B5FD"));
+        avatar = DecorateAvatarWithTaskCount(avatar, master != null ? activeTaskCount : 0, 32);
         avatar.VerticalAlignment = VerticalAlignment.Center;
         avatar.Margin = new Thickness(0, 0, 10, 0);
         Grid.SetColumn(avatar, 0);
@@ -944,6 +950,7 @@ public partial class MainWindow
         {
             avatar = OfficialBrandIconService.CreateCircularAvatarVisual(
                 agent.Id, 24, agent, OfficialBrandIconService.GetBrandColor(agent.Id), 1.05);
+            avatar = DecorateAvatarWithTaskCount(avatar, live?.ActiveTaskCount ?? 0, 24);
             name = agent.Name;
             string tier = !string.IsNullOrWhiteSpace(live?.SelectedTierBadge)
                 ? live!.SelectedTierBadge

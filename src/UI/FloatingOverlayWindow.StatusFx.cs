@@ -127,6 +127,20 @@ public partial class FloatingOverlayWindow
                 };
             }
 
+            // 主脑自己仍在 working/reworking、但还没有子 AI 承接时，保持深度分析，避免档位微标掉回自动选档
+            if (live != null && (status is "working" or "reworking"))
+            {
+                return new FloatingRichStatus(
+                    FloatingRichFxKind.MasterAnalyzing,
+                    "🧠 深度分析中",
+                    "主脑正在深度分析与模型档位匹配",
+                    "#701A75",
+                    "#F472B6",
+                    "#FFFFFF",
+                    "#E879F9",
+                    true);
+            }
+
             if (live != null && (phase.Equals("verified_delivered", StringComparison.OrdinalIgnoreCase) || status == "done"))
             {
                 return new FloatingRichStatus(
@@ -389,7 +403,7 @@ public partial class FloatingOverlayWindow
         return ResolveRichStatusForTest(ag, agLive, winRunning, _reg.UserConfig.WorkflowEngineEnabled, isMaster, activeWorker, recentDelivered);
     }
 
-    private UIElement BuildRichAvatarWithFx(AgentRosterEntry ag, double size, double dotSize, FloatingRichStatus rich, double marginRight)
+    private UIElement BuildRichAvatarWithFx(AgentRosterEntry ag, double size, double dotSize, FloatingRichStatus rich, double marginRight, int activeTaskCount = 0)
     {
         var host = new Grid
         {
@@ -458,9 +472,69 @@ public partial class FloatingOverlayWindow
         host.Children.Add(fxRing);
         host.Children.Add(circleHost);
         host.Children.Add(statusDot);
+        var taskBadge = TryBuildAvatarTaskCountBadge(activeTaskCount, size);
+        if (taskBadge != null) host.Children.Add(taskBadge);
         ApplyAvatarMicroFx(fxRing, innerHalo, statusDot, circleHost, rich.Kind, rich.AccentHex);
         return host;
     }
+
+    /// <summary>并行任务数 ≥ 2 时在头像右上角叠数字角标，右下角状态点保持可见。</summary>
+    public static Border? TryBuildAvatarTaskCountBadge(int activeTaskCount, double avatarSize)
+    {
+        if (activeTaskCount < 2) return null;
+        string label = activeTaskCount > 9 ? "9+" : activeTaskCount.ToString();
+        double side = Math.Clamp(avatarSize * 0.42, 11, 16);
+        if (label.Length > 1) side = Math.Clamp(Math.Max(side, avatarSize * 0.5), 13, 18);
+        double font = label.Length > 1 ? Math.Max(7.0, side * 0.42) : Math.Max(8.0, side * 0.52);
+        return new Border
+        {
+            Name = "AvatarTaskCountBadge",
+            Tag = "task_count:" + activeTaskCount,
+            Width = side,
+            Height = side,
+            MinWidth = side,
+            CornerRadius = new CornerRadius(side / 2.0),
+            Background = Hex("#EA580C"),
+            BorderBrush = Hex("#0F1521"),
+            BorderThickness = new Thickness(1.5),
+            HorizontalAlignment = HorizontalAlignment.Right,
+            VerticalAlignment = VerticalAlignment.Top,
+            Margin = new Thickness(0, 0, 0, 0),
+            IsHitTestVisible = false,
+            Child = new TextBlock
+            {
+                Text = label,
+                Foreground = Brushes.White,
+                FontWeight = FontWeights.Bold,
+                FontSize = font,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                TextAlignment = TextAlignment.Center,
+                Padding = new Thickness(0)
+            }
+        };
+    }
+
+    public static FrameworkElement WrapAvatarWithTaskBadge(FrameworkElement avatar, int activeTaskCount, double avatarSize)
+    {
+        var badge = TryBuildAvatarTaskCountBadge(activeTaskCount, avatarSize);
+        if (badge == null) return avatar;
+        var host = new Grid
+        {
+            Width = avatarSize + 8,
+            Height = avatarSize + 8,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        avatar.HorizontalAlignment = HorizontalAlignment.Center;
+        avatar.VerticalAlignment = VerticalAlignment.Center;
+        host.Children.Add(avatar);
+        host.Children.Add(badge);
+        return host;
+    }
+
+    public FrameworkElement BuildRichAvatarForTest(AgentRosterEntry ag, FloatingRichStatus rich, double size, int activeTaskCount)
+        => (FrameworkElement)BuildRichAvatarWithFx(ag, size, Math.Max(6, size * 0.28), rich, 0, activeTaskCount);
 
     /// <summary>仅活跃工作态允许循环动画；静止/终态（待命/空闲/已交付/离线）必须关闭循环闪烁。</summary>
     public static bool AllowsLoopingStatusAnimation(FloatingRichFxKind kind) => kind switch
@@ -477,6 +551,27 @@ public partial class FloatingOverlayWindow
 
     private void ApplyAvatarMicroFx(Ellipse fxRing, Ellipse innerHalo, Border statusDot, FrameworkElement circle, FloatingRichFxKind kind, string accentHex)
     {
+        if (kind == FloatingRichFxKind.Coding)
+        {
+            // 只保留 RenderTransformOrigin 一处圆心；RotateTransform 中心必须为 0，否则双重原点会偏心乱转
+            fxRing.Tag = "avatar_fx_ring";
+            fxRing.StrokeThickness = 1.8;
+            fxRing.StrokeDashArray = new DoubleCollection { 3.2, 2.2 };
+            fxRing.RenderTransformOrigin = new Point(0.5, 0.5);
+            var rot = new RotateTransform(0);
+            fxRing.RenderTransform = rot;
+            if (!AppPaths.IsIsolatedTest)
+            {
+                var rotAnim = new DoubleAnimation(0, 360, TimeSpan.FromSeconds(2.6))
+                {
+                    RepeatBehavior = RepeatBehavior.Forever
+                };
+                rot.BeginAnimation(RotateTransform.AngleProperty, rotAnim);
+                StartOpacityBreath(innerHalo, 0.30, 0.8, 900, loop: true);
+            }
+            return;
+        }
+
         if (AppPaths.IsIsolatedTest) return;
 
         double ringHi = Math.Min(1.04, (fxRing.Width + 2.6) / Math.Max(8, fxRing.Width));
@@ -499,22 +594,6 @@ public partial class FloatingOverlayWindow
                 StartPulseScale(fxRing, 0.99, ringHi, 920, loop: true);
                 StartOpacityBreath(innerHalo, 0.32, 0.78, 920, loop: true);
                 break;
-            case FloatingRichFxKind.Coding:
-            {
-                fxRing.StrokeThickness = 1.8;
-                fxRing.StrokeDashArray = new DoubleCollection { 3.2, 2.2 };
-                fxRing.RenderTransformOrigin = new Point(0.5, 0.5);
-                var rot = new RotateTransform(0, fxRing.Width / 2, fxRing.Height / 2);
-                fxRing.RenderTransform = rot;
-                var rotAnim = new DoubleAnimation(0, 360, TimeSpan.FromSeconds(3.2))
-                {
-                    RepeatBehavior = RepeatBehavior.Forever,
-                    EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut }
-                };
-                rot.BeginAnimation(RotateTransform.AngleProperty, rotAnim);
-                StartOpacityBreath(innerHalo, 0.30, 0.8, 900, loop: true);
-                break;
-            }
             case FloatingRichFxKind.Delivering:
                 fxRing.StrokeThickness = 1.6;
                 StartOpacityBreath(circle, 0.9, 1.0, 860, loop: true);
@@ -686,14 +765,14 @@ public partial class FloatingOverlayWindow
                     UseLayoutRounding = false,
                     SnapsToDevicePixels = false
                 };
+                gear.RenderTransformOrigin = new Point(0.5, 0.5);
+                var rot = new RotateTransform(0);
+                gear.RenderTransform = rot;
                 if (!AppPaths.IsIsolatedTest)
                 {
-                    var rot = new RotateTransform(0, 6, 6);
-                    gear.RenderTransform = rot;
-                    var rotAnim = new DoubleAnimation(0, 360, TimeSpan.FromSeconds(2.4))
+                    var rotAnim = new DoubleAnimation(0, 360, TimeSpan.FromSeconds(2.6))
                     {
-                        RepeatBehavior = RepeatBehavior.Forever,
-                        EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut }
+                        RepeatBehavior = RepeatBehavior.Forever
                     };
                     rot.BeginAnimation(RotateTransform.AngleProperty, rotAnim);
                 }

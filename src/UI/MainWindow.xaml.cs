@@ -27,6 +27,7 @@ public partial class MainWindow : Window
     private TrayIconService? _traySvc;
 
     private bool _suppressEvents;
+    private int _modalBackdropDepth;
     private int _lastMainTabIndex = 1;
     private const string GeoSliders = "M3,6 H21 M3,12 H21 M3,18 H21 M9,4 V8 M16,10 V14 M7,16 V20";
     private const string GeoWindow = "M4,5 H20 V19 H4 Z M4,9 H20";
@@ -1111,6 +1112,43 @@ public partial class MainWindow : Window
 
     private static Brush Hex(string h) => UiBrushPool.Get(h);
 
+    public void PushModalBackdrop()
+    {
+        _modalBackdropDepth++;
+        if (ModalBackdropOverlay != null)
+            ModalBackdropOverlay.Visibility = Visibility.Visible;
+    }
+
+    public void PopModalBackdrop()
+    {
+        if (_modalBackdropDepth > 0) _modalBackdropDepth--;
+        if (_modalBackdropDepth <= 0 && ModalBackdropOverlay != null)
+            ModalBackdropOverlay.Visibility = Visibility.Collapsed;
+    }
+
+    public bool IsModalBackdropVisibleForTest =>
+        ModalBackdropOverlay != null && ModalBackdropOverlay.Visibility == Visibility.Visible;
+
+    private static FrameworkElement DecorateAvatarWithTaskCount(FrameworkElement avatar, int activeTaskCount, double avatarSize)
+    {
+        var badge = FloatingOverlayWindow.TryBuildAvatarTaskCountBadge(activeTaskCount, avatarSize);
+        if (badge == null) return avatar;
+        var host = new Grid
+        {
+            Width = avatarSize,
+            Height = avatarSize,
+            VerticalAlignment = avatar.VerticalAlignment,
+            HorizontalAlignment = avatar.HorizontalAlignment,
+            Margin = avatar.Margin
+        };
+        avatar.Margin = new Thickness(0);
+        avatar.HorizontalAlignment = HorizontalAlignment.Center;
+        avatar.VerticalAlignment = VerticalAlignment.Center;
+        host.Children.Add(avatar);
+        host.Children.Add(badge);
+        return host;
+    }
+
     private void SetStatus(string msg)
     {
         StatusText.Text = $"[{DateTime.Now:HH:mm:ss}] {msg}";
@@ -1500,7 +1538,7 @@ public partial class MainWindow : Window
                 ag.Id, 22, ag, isWorking ? "#B45309" : "#334155", 1.2);
             overviewAvatar.Margin = new Thickness(0, 0, 8, 0);
             overviewAvatar.VerticalAlignment = VerticalAlignment.Center;
-            titleWrap.Children.Add(overviewAvatar);
+            titleWrap.Children.Add(DecorateAvatarWithTaskCount(overviewAvatar, agLive?.ActiveTaskCount ?? 0, 22));
             titleWrap.Children.Add(new TextBlock
             {
                 Text = ag.Name,
@@ -3546,6 +3584,7 @@ public partial class MainWindow : Window
         }
         string resolvedFallbackId = displayProfile?.FallbackBuilderId ?? _reg.UserConfig.GlobalFallbackBuilderId ?? "";
 
+        var rosterLiveMap = AutoDispatchService.ReadMergedGlobalWorkStatesWithDesktopLive();
         var detectedOrCustom = visibleList
             .OrderByDescending(GetSnapEnabled)
             .ThenByDescending(a => !string.IsNullOrWhiteSpace(resolvedMasterId) && string.Equals(resolvedMasterId, a.Id, StringComparison.OrdinalIgnoreCase))
@@ -3590,11 +3629,16 @@ public partial class MainWindow : Window
             rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
             // Col 0: 品牌头像
+            int rosterTaskCount = 0;
+            if (dispEnabled && rosterLiveMap.TryGetValue(agent.Id, out var rosterLive))
+                rosterTaskCount = rosterLive.ActiveTaskCount;
+            double rosterAvatarSize = dispEnabled ? 26 : 22;
             var rosterAvatar = OfficialBrandIconService.CreateCircularAvatarVisual(
-                agent.Id, dispEnabled ? 26 : 22, agent, isMaster && dispEnabled ? "#8B5CF6" : (dispEnabled ? "#3B82F6" : "#475569"), 1.2);
+                agent.Id, rosterAvatarSize, agent, isMaster && dispEnabled ? "#8B5CF6" : (dispEnabled ? "#3B82F6" : "#475569"), 1.2);
             rosterAvatar.Margin = new Thickness(0, 1, 12, 0);
             rosterAvatar.VerticalAlignment = VerticalAlignment.Center;
-            Grid.SetColumn(rosterAvatar, 0);
+            var rosterAvatarHost = DecorateAvatarWithTaskCount(rosterAvatar, rosterTaskCount, rosterAvatarSize);
+            Grid.SetColumn(rosterAvatarHost, 0);
 
             var infoStack = new StackPanel { Margin = new Thickness(0, 0, 12, 0), VerticalAlignment = VerticalAlignment.Center };
             var titleLine = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
@@ -3928,7 +3972,7 @@ public partial class MainWindow : Window
             }
             Grid.SetColumn(rightWrap, 2);
 
-            rowGrid.Children.Add(rosterAvatar);
+            rowGrid.Children.Add(rosterAvatarHost);
             rowGrid.Children.Add(infoStack);
             rowGrid.Children.Add(rightWrap);
             if (cliDrawer.Children.Count > 0)

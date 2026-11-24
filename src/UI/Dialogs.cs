@@ -2491,6 +2491,7 @@ public static partial class Dialogs
     public static string? PromptTextInputDialog(Window? owner, string title, string promptCaption, string initialText)
     {
         var promptWin = CreateBaseDialog(owner, title, 450, 155);
+        AttachModalLightbox(promptWin, owner);
         var sp = new StackPanel { Margin = new Thickness(16, 12, 16, 12) };
         sp.Children.Add(new TextBlock
         {
@@ -2742,6 +2743,43 @@ public static partial class Dialogs
         return (win, () => appliedAny);
     }
 
+    private static readonly HashSet<Window> LightboxWired = new();
+
+    /// <summary>二级模态打开时给主界面叠灯箱暗幕，关闭时按引用计数收回。</summary>
+    public static void AttachModalLightbox(Window dialog, Window? owner)
+    {
+        if (!LightboxWired.Add(dialog)) return;
+        var host = FindLightboxHost(owner) ?? FindLightboxHost(dialog.Owner);
+        if (host == null)
+        {
+            LightboxWired.Remove(dialog);
+            return;
+        }
+
+        void OnLoaded(object sender, RoutedEventArgs e)
+        {
+            try { host.PushModalBackdrop(); } catch { }
+        }
+        void OnClosed(object? sender, EventArgs e)
+        {
+            try { host.PopModalBackdrop(); } catch { }
+            dialog.Loaded -= OnLoaded;
+            dialog.Closed -= OnClosed;
+            LightboxWired.Remove(dialog);
+        }
+        dialog.Loaded += OnLoaded;
+        dialog.Closed += OnClosed;
+    }
+
+    private static MainWindow? FindLightboxHost(Window? owner)
+    {
+        for (Window? cur = owner; cur != null; cur = cur.Owner)
+        {
+            if (cur is MainWindow main) return main;
+        }
+        return Application.Current?.MainWindow as MainWindow;
+    }
+
     public static Window CreateBaseDialog(Window? owner, string title, double width, double height)
     {
         var w = new Window
@@ -2752,7 +2790,7 @@ public static partial class Dialogs
             Height = height + 36,
             WindowStartupLocation = owner != null ? WindowStartupLocation.CenterOwner : WindowStartupLocation.CenterScreen,
             WindowStyle = WindowStyle.None,
-            Background = BrushHex("#131924"),
+            Background = BrushHex("#131D2E"),
             Foreground = BrushHex("#E6EDF7"),
             FontFamily = new FontFamily("Microsoft YaHei UI, Segoe UI"),
             UseLayoutRounding = true,
@@ -2765,23 +2803,29 @@ public static partial class Dialogs
             CaptionHeight = 0,
             ResizeBorderThickness = new Thickness(0),
             GlassFrameThickness = new Thickness(0),
-            CornerRadius = new CornerRadius(8),
+            CornerRadius = new CornerRadius(10),
             UseAeroCaptionButtons = false
         });
 
         var template = new ControlTemplate(typeof(Window));
         var outerBorder = new FrameworkElementFactory(typeof(Border));
-        outerBorder.SetValue(Border.BackgroundProperty, BrushHex("#131924"));
-        outerBorder.SetValue(Border.BorderBrushProperty, BrushHex("#28354B"));
-        outerBorder.SetValue(Border.BorderThicknessProperty, new Thickness(1));
-        outerBorder.SetValue(Border.CornerRadiusProperty, new CornerRadius(8));
+        outerBorder.SetValue(Border.BackgroundProperty, BrushHex("#131D2E"));
+        outerBorder.SetValue(Border.BorderBrushProperty, BrushHex("#5B84BA"));
+        outerBorder.SetValue(Border.BorderThicknessProperty, new Thickness(1.8));
+        outerBorder.SetValue(Border.CornerRadiusProperty, new CornerRadius(10));
 
         var dock = new FrameworkElementFactory(typeof(DockPanel));
 
+        var topGlow = new FrameworkElementFactory(typeof(Border));
+        topGlow.SetValue(DockPanel.DockProperty, Dock.Top);
+        topGlow.SetValue(FrameworkElement.HeightProperty, 2.0);
+        topGlow.SetValue(Border.BackgroundProperty, BrushHex("#38BDF8"));
+        topGlow.SetValue(UIElement.IsHitTestVisibleProperty, false);
+
         var titleBar = new FrameworkElementFactory(typeof(Border));
         titleBar.SetValue(DockPanel.DockProperty, Dock.Top);
-        titleBar.SetValue(Border.BackgroundProperty, BrushHex("#161E2C"));
-        titleBar.SetValue(Border.BorderBrushProperty, BrushHex("#222D40"));
+        titleBar.SetValue(Border.BackgroundProperty, BrushHex("#1A273D"));
+        titleBar.SetValue(Border.BorderBrushProperty, BrushHex("#334E73"));
         titleBar.SetValue(Border.BorderThicknessProperty, new Thickness(0, 0, 0, 1));
         titleBar.SetValue(Border.PaddingProperty, new Thickness(14, 6, 8, 6));
         titleBar.AddHandler(UIElement.MouseLeftButtonDownEvent, new System.Windows.Input.MouseButtonEventHandler((s, e) =>
@@ -2828,6 +2872,7 @@ public static partial class Dialogs
         titleBar.AppendChild(headerGrid);
 
         var contentHost = new FrameworkElementFactory(typeof(ContentPresenter));
+        dock.AppendChild(topGlow);
         dock.AppendChild(titleBar);
         dock.AppendChild(contentHost);
         outerBorder.AppendChild(dock);
@@ -2836,6 +2881,7 @@ public static partial class Dialogs
 
         TextOptions.SetTextFormattingMode(w, TextFormattingMode.Display);
         TextOptions.SetTextRenderingMode(w, TextRenderingMode.ClearType);
+        AttachModalLightbox(w, owner);
         return w;
     }
 

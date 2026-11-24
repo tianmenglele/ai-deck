@@ -102,7 +102,7 @@ public sealed class OnboardingWizardDialog : Window
         WindowStyle = WindowStyle.None;
         ResizeMode = ResizeMode.NoResize;
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
-        Background = Brush("#0E141D");
+        Background = Brush("#131D2E");
         Foreground = Brush("#E6EDF7");
         FontFamily = new FontFamily("Microsoft YaHei UI");
         UseLayoutRounding = true;
@@ -132,6 +132,7 @@ public sealed class OnboardingWizardDialog : Window
         _floatChk.IsChecked = _reg.UserConfig.FloatingWindowVisible;
 
         Content = BuildShell();
+        Dialogs.AttachModalLightbox(this, _hostMain);
         AttachHostIfReady();
         RebuildAgentLists();
         RebuildStep2();
@@ -276,7 +277,36 @@ public sealed class OnboardingWizardDialog : Window
         var footer = BuildFooter();
         Grid.SetRow(footer, 3);
         root.Children.Add(footer);
-        return root;
+
+        var glow = new LinearGradientBrush
+        {
+            StartPoint = new Point(0, 0.5),
+            EndPoint = new Point(1, 0.5)
+        };
+        glow.GradientStops.Add(new GradientStop((Color)ColorConverter.ConvertFromString("#38BDF8")!, 0));
+        glow.GradientStops.Add(new GradientStop((Color)ColorConverter.ConvertFromString("#6366F1")!, 1));
+        var shell = new DockPanel();
+        var topGlow = new Border
+        {
+            Height = 2,
+            Background = glow,
+            IsHitTestVisible = false
+        };
+        DockPanel.SetDock(topGlow, Dock.Top);
+        shell.Children.Add(topGlow);
+        shell.Children.Add(root);
+        var frame = new Border
+        {
+            Name = "WizardOuterFrame",
+            Background = Brush("#131D2E"),
+            BorderBrush = Brush("#5B84BA"),
+            BorderThickness = new Thickness(2),
+            CornerRadius = new CornerRadius(12),
+            ClipToBounds = true,
+            Child = shell
+        };
+        RegisterName("WizardOuterFrame", frame);
+        return frame;
     }
 
     private UIElement BuildHeader()

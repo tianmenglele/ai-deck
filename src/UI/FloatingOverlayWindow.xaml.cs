@@ -46,6 +46,7 @@ public partial class FloatingOverlayWindow : Window
     private FileSystemWatcher? _liveMapWatcher;
     private string _lastStateSignature = "";
     private string _lastRowStructureSig = "";
+    private string _lastCapsuleAvatarSig = "";
     private readonly Dictionary<string, string> _rowStructSigs = new(StringComparer.OrdinalIgnoreCase);
     private bool _appExitShutdown;
     private bool _lastDiskFloatingCollapsed;
@@ -134,12 +135,13 @@ public partial class FloatingOverlayWindow : Window
         return Math.Clamp(Math.Min(configured, 1000), 500, 10000);
     }
 
-    /// <summary>异步桌面忙碌探测：防重入，间隔 >= DesktopLiveProbeCacheTtlMs，变化时立即刷新悬浮窗。</summary>
+    /// <summary>异步桌面忙碌探测：防重入，间隔为 max(800, 探测缓存 TTL-350)，变化时立即刷新悬浮窗。</summary>
     private async Task TriggerDesktopBusyRefreshAsync()
     {
         if (AppPaths.IsIsolatedTest || !IsVisible) return;
         long nowTicks = Environment.TickCount64;
-        if (nowTicks - _lastDesktopBusyRefreshTicks < AutoDispatchService.DesktopLiveProbeCacheTtlMs)
+        int busyGapMs = Math.Max(800, AutoDispatchService.DesktopLiveProbeCacheTtlMs - 350);
+        if (nowTicks - _lastDesktopBusyRefreshTicks < busyGapMs)
             return;
         if (System.Threading.Interlocked.CompareExchange(ref _desktopBusyRefreshGate, 1, 0) != 0)
             return;
@@ -437,7 +439,7 @@ public partial class FloatingOverlayWindow : Window
         ApplyAdaptiveContentLayout();
     }
 
-    public void RefreshOverlayData(bool force = false)
+    public void RefreshOverlayData(bool force = false, bool forceRebuildRows = false)
     {
         if (_reg.ReloadUserConfigFromDiskIfNeeded())
         {
@@ -486,7 +488,8 @@ public partial class FloatingOverlayWindow : Window
             if (liveMap.TryGetValue(ag.Id, out var lv))
             {
                 sigBuilder.Append(lv.Status).Append(':').Append(lv.WorkflowPhase).Append(':').Append(lv.LastFailureBadge).Append(':').Append(lv.SessionId).Append(':').Append(lv.UpdatedAt)
-                          .Append(':').Append(lv.TaskSummary).Append(':').Append(lv.LatestLogTail?.Length ?? 0).Append(';');
+                          .Append(':').Append(lv.TaskSummary).Append(':').Append(lv.LatestLogTail?.Length ?? 0)
+                          .Append(':').Append(lv.ActiveTaskCount).Append(':').Append(lv.SelectedEffortTier).Append(';');
             }
         }
 
@@ -569,7 +572,7 @@ public partial class FloatingOverlayWindow : Window
             }
         }
         var activeStructSig = $"{(int)_compactMode}|{wfOn}|{_reg.UserConfig.FloatingThemeStyle}|{string.Join(",", enabledAgents.Select(a => a.Id))}";
-        bool needFullRowRebuild = force
+        bool needFullRowRebuild = forceRebuildRows
             || !string.Equals(activeStructSig, _lastRowStructureSig, StringComparison.Ordinal)
             || FloatingAgentsStack.Children.Count != enabledAgents.Count;
         bool anyRowReplaced = false;
@@ -660,19 +663,44 @@ public partial class FloatingOverlayWindow : Window
         Dictionary<string, (bool IsRunning, int Pid, string WindowBadge)> winStates,
         List<LiveAgentWorkState> workingEntries)
     {
-        CapsuleAvatarsPanel.Children.Clear();
         FloatingRichStatus? briefRich = null;
+        int briefTaskCount = 0;
         var tipLines = new List<string>();
+        var avatarSig = new StringBuilder();
+        var avatarSlots = new List<(AgentRosterEntry Agent, FloatingRichStatus Rich, int TaskCount, bool IsLast)>();
         for (int idx = 0; idx < enabledAgents.Count; idx++)
         {
             var ag = enabledAgents[idx];
             liveMap.TryGetValue(ag.Id, out var lv);
             winStates.TryGetValue(ag.Id, out var ws);
             var rich = ResolveRichStatus(ag, lv, ws.IsRunning, liveMap);
-            CapsuleAvatarsPanel.Children.Add(BuildRichAvatarWithFx(ag, 20, 6.5, rich,
-                marginRight: idx == enabledAgents.Count - 1 ? 0 : 2));
-            if (rich.IsActiveWork && briefRich == null) briefRich = rich;
-            tipLines.Add($"{ShortAgentName(ag.Name)} · {rich.BadgeText} · {rich.StatusLine}");
+            int taskCount = lv?.ActiveTaskCount ?? 0;
+            bool isLast = idx == enabledAgents.Count - 1;
+            avatarSig.Append(ag.Id).Append(':').Append((int)rich.Kind).Append(':')
+                .Append(rich.BadgeText).Append(':').Append(lv?.Status ?? "").Append(':')
+                .Append(taskCount).Append(';');
+            avatarSlots.Add((ag, rich, taskCount, isLast));
+            if (rich.IsActiveWork && briefRich == null)
+            {
+                briefRich = rich;
+                briefTaskCount = taskCount;
+            }
+            tipLines.Add(AppendParallelTaskHint(
+                $"{ShortAgentName(ag.Name)} · {rich.BadgeText} · {rich.StatusLine}", taskCount));
+        }
+
+        string avatarSigText = avatarSig.ToString();
+        if (!string.Equals(avatarSigText, _lastCapsuleAvatarSig, StringComparison.Ordinal))
+        {
+            CapsuleAvatarsPanel.Children.Clear();
+            foreach (var slot in avatarSlots)
+            {
+                CapsuleAvatarsPanel.Children.Add(BuildRichAvatarWithFx(
+                    slot.Agent, 20, 6.5, slot.Rich,
+                    marginRight: slot.IsLast ? 0 : 2,
+                    activeTaskCount: slot.TaskCount));
+            }
+            _lastCapsuleAvatarSig = avatarSigText;
         }
 
         string briefText;
@@ -691,7 +719,9 @@ public partial class FloatingOverlayWindow : Window
             var rich = agEntry != null
                 ? ResolveRichStatus(agEntry, w, true, liveMap)
                 : ResolveWorkerRich(w, true);
-            briefText = $"{shortAg} · {CompactCapsuleStage(rich.Kind)}「{taskTitle}」";
+            briefText = AppendParallelTaskHint(
+                $"{shortAg} · {CompactCapsuleStage(rich.Kind)}「{taskTitle}」",
+                w.ActiveTaskCount);
             briefFg = Hex(rich.TextHex);
         }
         else
@@ -709,7 +739,8 @@ public partial class FloatingOverlayWindow : Window
             }
             else if (briefRich != null)
             {
-                briefText = $"进行中 · {CompactCapsuleStage(briefRich.Value.Kind)}";
+                briefText = AppendParallelTaskHint(
+                    $"进行中 · {CompactCapsuleStage(briefRich.Value.Kind)}", briefTaskCount);
                 briefFg = Hex(briefRich.Value.TextHex);
             }
             else
@@ -783,9 +814,44 @@ public partial class FloatingOverlayWindow : Window
             ag.PreferredEffortTier,
             agLive?.SelectedEffortTier ?? "",
             agLive?.SelectedModel ?? "",
+            ResolveTierShortTag(ag, agLive, rich.IsActiveWork),
+            agLive?.ActiveTaskCount ?? 0,
             canResume,
             hasError,
             hasSession);
+    }
+
+    private static string ResolveTierShortTag(AgentRosterEntry ag, LiveAgentWorkState? agLive, bool isActiveWork)
+    {
+        if (!LocalModelCatalogService.SupportsModelSelection(ag.Id))
+            return "🔒默认托管";
+        if (isActiveWork && agLive != null && !string.IsNullOrWhiteSpace(agLive.SelectedEffortTier))
+        {
+            return agLive.SelectedEffortTier switch
+            {
+                "high" => "🔥高档",
+                "low" => "🚀低档",
+                _ => "⚡中档"
+            };
+        }
+        if (!string.IsNullOrWhiteSpace(ag.PreferredEffortTier) && !ag.PreferredEffortTier.Equals("auto", StringComparison.OrdinalIgnoreCase))
+        {
+            return ag.PreferredEffortTier.ToLowerInvariant() switch
+            {
+                "high" => "🔥优先高档",
+                "low" => "🚀优先低档",
+                _ => "⚡优先中档"
+            };
+        }
+        return "★自动选档";
+    }
+
+    private static string AppendParallelTaskHint(string line, int activeTaskCount)
+    {
+        if (activeTaskCount < 2) return line;
+        string hint = $"并行任务数 {activeTaskCount}";
+        if (line.Contains(hint, StringComparison.Ordinal)) return line;
+        return string.IsNullOrWhiteSpace(line) ? hint : $"{line} · {hint}";
     }
 
     private void UpdateRowDynamicContentInPlace(
@@ -798,7 +864,7 @@ public partial class FloatingOverlayWindow : Window
         var statusTb = FindNamedDescendant<TextBlock>(rowBorder, "TaskStatusLine");
         if (statusTb != null)
         {
-            statusTb.Text = rich.StatusLine;
+            statusTb.Text = AppendParallelTaskHint(rich.StatusLine, agLive?.ActiveTaskCount ?? 0);
             statusTb.Foreground = Hex(rich.TextHex);
         }
         var timeTb = FindNamedDescendant<TextBlock>(rowBorder, "UpdatedTimeText");
@@ -825,7 +891,7 @@ public partial class FloatingOverlayWindow : Window
     {
         var rich = precomputedRich ?? ResolveRichStatus(ag, agLive, winSt.IsRunning, liveMap);
         var pal = ThemeService.Resolve(_reg.UserConfig.FloatingThemeStyle);
-        string statusLine = rich.StatusLine;
+        string statusLine = AppendParallelTaskHint(rich.StatusLine, agLive?.ActiveTaskCount ?? 0);
         string ringHex = rich.AccentHex;
         string textHex = rich.TextHex;
         bool isWorking = rich.IsActiveWork;
@@ -887,38 +953,12 @@ public partial class FloatingOverlayWindow : Window
         // 头像 + 细分状态微动效环（Ultra/Compact 自动缩尺寸保证极低高度仍完整可见）
         double avatarSize = isUltra ? 18 : (isFull ? 30 : 24);
         double dotSize = isUltra ? 6 : (isFull ? 9 : 7.5);
-        var avatar = BuildRichAvatarWithFx(ag, avatarSize, dotSize, rich, marginRight: isUltra ? 4 : (isFull ? 8 : 7));
+        var avatar = BuildRichAvatarWithFx(ag, avatarSize, dotSize, rich, marginRight: isUltra ? 4 : (isFull ? 8 : 7), activeTaskCount: agLive?.ActiveTaskCount ?? 0);
         Grid.SetColumn(avatar, 1);
         grid.Children.Add(avatar);
 
         // 模型与高中低档位微标
-        string tierShortTag;
-        if (!LocalModelCatalogService.SupportsModelSelection(ag.Id))
-        {
-            tierShortTag = "🔒默认托管";
-        }
-        else if (agLive != null && agLive.Status == "working" && !string.IsNullOrWhiteSpace(agLive.SelectedEffortTier))
-        {
-            tierShortTag = agLive.SelectedEffortTier switch
-            {
-                "high" => "🔥高档",
-                "low" => "🚀低档",
-                _ => "⚡中档"
-            };
-        }
-        else if (!string.IsNullOrWhiteSpace(ag.PreferredEffortTier) && !ag.PreferredEffortTier.Equals("auto", StringComparison.OrdinalIgnoreCase))
-        {
-            tierShortTag = ag.PreferredEffortTier.ToLowerInvariant() switch
-            {
-                "high" => "🔥优先高档",
-                "low" => "🚀优先低档",
-                _ => "⚡优先中档"
-            };
-        }
-        else
-        {
-            tierShortTag = "★自动选档";
-        }
+        string tierShortTag = ResolveTierShortTag(ag, agLive, rich.IsActiveWork);
         string modelTip = agLive != null && !string.IsNullOrWhiteSpace(agLive.SelectedModel)
             ? $"当前任务适配模型：{agLive.SelectedModel} ({agLive.SelectedTierBadge})"
             : $"高档：{ag.HighTierModel} | 中档：{ag.MediumTierModel} | 低档：{ag.LowTierModel}";
@@ -1509,6 +1549,8 @@ public partial class FloatingOverlayWindow : Window
         AddPill(ag.Permissions.AllowDirectSourceWrite ? "可改工程" : "只读", "#1E293B", ag.Permissions.AllowDirectSourceWrite ? "#86EFAC" : "#CBD5E1");
         if (ag.Permissions.AllowShellBuild) AddPill("可构建测试", "#1E293B", "#CBD5E1");
         if (ag.Permissions.HasPreviewMcp) AddPill("MCP验收", "#1E293B", "#C4B5FD");
+        if (agLive != null && agLive.ActiveTaskCount >= 2)
+            AddPill($"并行任务数 {agLive.ActiveTaskCount}", "#7C2D12", "#FFEDD5");
         root.Children.Add(metaWrap);
 
         // 3. 若有当前任务状态，结构化呈现核心信息（自动剥离 Markdown 杂音）
