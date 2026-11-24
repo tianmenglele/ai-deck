@@ -13,10 +13,10 @@
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <PublishSingleFile>true</PublishSingleFile>
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
-    <Version>1.9.16</Version>
-    <AssemblyVersion>1.9.16.0</AssemblyVersion>
-    <FileVersion>1.9.16.0</FileVersion>
-    <InformationalVersion>1.9.16</InformationalVersion>
+    <Version>1.9.17</Version>
+    <AssemblyVersion>1.9.17.0</AssemblyVersion>
+    <FileVersion>1.9.17.0</FileVersion>
+    <InformationalVersion>1.9.17</InformationalVersion>
     <Product>AIDeck · 多 AI 协同配置中心</Product>
     <Description>AIDeck（推荐 Git 仓库名 ai-deck）：Windows 通用多项目 AI 协同检测、分工路由、规则技能零拷贝同步与桌面置顶悬浮窗工具</Description>
     <NeutralLanguage>zh-CN</NeutralLanguage>
