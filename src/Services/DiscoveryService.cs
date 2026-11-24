@@ -78,6 +78,7 @@ public sealed class DiscoveryService
         IndexExecutableDirs(idx);
         IndexUninstallRegistry(idx);
         IndexStartMenuShortcuts(idx);
+        IndexAppPathsRegistry(idx);
         IndexStandardRootsAndMsix(idx);
         IndexIdeExtensions(idx);
         IndexRunningProcesses(idx);
@@ -671,6 +672,11 @@ public sealed class DiscoveryService
             dirs.Add(Path.Combine(userProfile, ".uv", "bin"));
             dirs.Add(Path.Combine(localApp, "uv"));
             dirs.Add(Path.Combine(userProfile, ".local", "pipx", "venvs"));
+            dirs.Add(Path.Combine(userProfile, ".bun", "bin"));
+            dirs.Add(Path.Combine(localApp, "Volta", "bin"));
+            dirs.Add(Path.Combine(appData, "nvm"));
+            dirs.Add(@"C:\ProgramData\chocolatey\bin");
+            dirs.Add(Path.Combine(localApp, "Programs", "Antigravity"));
 
             // pipx 各 venv 的 Scripts
             try
@@ -781,7 +787,9 @@ public sealed class DiscoveryService
         var roots = new[]
         {
             Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), @"Microsoft\Windows\Start Menu\Programs"),
-            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), @"Microsoft\Windows\Start Menu\Programs")
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), @"Microsoft\Windows\Start Menu\Programs"),
+            Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory),
+            Environment.GetFolderPath(Environment.SpecialFolder.CommonDesktopDirectory)
         };
 
         Type? shellType = null;
@@ -797,10 +805,14 @@ public sealed class DiscoveryService
         {
             try
             {
-                if (!Directory.Exists(root)) continue;
+                if (string.IsNullOrWhiteSpace(root) || !Directory.Exists(root)) continue;
                 idx.ScannedDirCount++;
                 idx.ExistingDirs.Add(root);
-                foreach (var lnk in Directory.EnumerateFiles(root, "*.lnk", SearchOption.AllDirectories))
+                // 桌面只扫顶层快捷方式；开始菜单保持递归
+                var opt = root.Contains("Start Menu", StringComparison.OrdinalIgnoreCase)
+                    ? SearchOption.AllDirectories
+                    : SearchOption.TopDirectoryOnly;
+                foreach (var lnk in Directory.EnumerateFiles(root, "*.lnk", opt))
                 {
                     try
                     {
@@ -825,6 +837,62 @@ public sealed class DiscoveryService
         try
         {
             if (shell is IDisposable d) d.Dispose();
+        }
+        catch { }
+    }
+
+    /// <summary>
+    /// 读取 HKLM / HKCU 的 App Paths，把任意盘符安装的 AI IDE / 工具可执行文件写入索引。
+    /// </summary>
+    private static void IndexAppPathsRegistry(LocalEnvIndex idx)
+    {
+        void ScanHive(RegistryKey? root)
+        {
+            try
+            {
+                using var key = root?.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths");
+                if (key == null) return;
+                idx.ScannedDirCount++;
+                foreach (var subName in key.GetSubKeyNames())
+                {
+                    try
+                    {
+                        using var sk = key.OpenSubKey(subName);
+                        if (sk == null) continue;
+                        var exePath = (sk.GetValue(null) as string ?? "").Trim().Trim('"');
+                        if (string.IsNullOrWhiteSpace(exePath)) continue;
+                        try { exePath = Environment.ExpandEnvironmentVariables(exePath); } catch { }
+                        if (!File.Exists(exePath)) continue;
+
+                        idx.ExistingFiles.Add(exePath);
+                        var baseName = Path.GetFileNameWithoutExtension(exePath);
+                        var fileName = Path.GetFileName(exePath);
+                        if (!string.IsNullOrWhiteSpace(baseName) && !idx.CommandHits.ContainsKey(baseName))
+                            idx.CommandHits[baseName] = exePath;
+                        if (!string.IsNullOrWhiteSpace(fileName) && !idx.CommandHits.ContainsKey(fileName))
+                            idx.CommandHits[fileName] = exePath;
+                        if (!string.IsNullOrWhiteSpace(subName))
+                        {
+                            var linkName = Path.GetFileNameWithoutExtension(subName);
+                            if (string.IsNullOrWhiteSpace(linkName)) linkName = subName;
+                            idx.Shortcuts.Add((linkName, exePath));
+                        }
+                        var parent = Path.GetDirectoryName(exePath);
+                        if (!string.IsNullOrWhiteSpace(parent))
+                            idx.ExistingDirs.Add(parent);
+                    }
+                    catch { }
+                }
+            }
+            catch { }
+        }
+
+        ScanHive(Registry.CurrentUser);
+        ScanHive(Registry.LocalMachine);
+        try
+        {
+            using var wow = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry32);
+            ScanHive(wow);
         }
         catch { }
     }

@@ -34,4 +34,14 @@
     <EmbeddedResource Include="Assets\Sounds\task_completed.wav" LogicalName="AICollabHub.Assets.Sounds.task_completed.wav" />
     <EmbeddedResource Include="Assets\Sounds\verify_passed.wav" LogicalName="AICollabHub.Assets.Sounds.verify_passed.wav" />
   </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="..\registry\detectors.json" LogicalName="AICollabHub.Embedded.registry.detectors.json" />
+    <EmbeddedResource Include="..\registry\adapters.json" LogicalName="AICollabHub.Embedded.registry.adapters.json" />
+    <EmbeddedResource Include="..\registry\capability_tags.json" LogicalName="AICollabHub.Embedded.registry.capability_tags.json" />
+    <EmbeddedResource Include="..\registry\workflows.json" LogicalName="AICollabHub.Embedded.registry.workflows.json" />
+    <EmbeddedResource Include="..\registry\project_presets.json" LogicalName="AICollabHub.Embedded.registry.project_presets.json" />
+    <EmbeddedResource Include="..\plugins\export_config_digest.ps1" LogicalName="AICollabHub.Embedded.plugins.export_config_digest.ps1" />
+    <EmbeddedResource Include="..\启动协同中心.ps1" LogicalName="AICollabHub.Embedded.启动协同中心.ps1" />
+  </ItemGroup>
 </Project>

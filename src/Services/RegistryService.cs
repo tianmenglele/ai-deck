@@ -1,4 +1,5 @@
 using System.IO;
+using System.Reflection;
 using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
@@ -15,6 +16,15 @@ public sealed class RegistryService
         Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
     };
 
+    private static readonly string[] EmbeddedRegistryFiles =
+    {
+        "detectors.json",
+        "adapters.json",
+        "capability_tags.json",
+        "workflows.json",
+        "project_presets.json"
+    };
+
     public DetectorRegistryFile Detectors { get; private set; } = new();
     public TagRegistryFile Tags { get; private set; } = new();
     public AdapterRegistryFile Adapters { get; private set; } = new();
@@ -27,13 +37,26 @@ public sealed class RegistryService
 
     public void LoadAll()
     {
-        Detectors = LoadJsonOrDefault<DetectorRegistryFile>(Path.Combine(AppPaths.RegistryDir, "detectors.json"));
+        EnsureEmbeddedRegistryFilesMaterialized();
+        EnsureEmbeddedPluginScriptMaterialized();
+
+        Detectors = LoadJsonWithEmbeddedFallback<DetectorRegistryFile>(
+            Path.Combine(AppPaths.RegistryDir, "detectors.json"),
+            "AICollabHub.Embedded.registry.detectors.json");
         EnsureBuiltinDetectorsPresent();
-        Tags = LoadJsonOrDefault<TagRegistryFile>(Path.Combine(AppPaths.RegistryDir, "capability_tags.json"));
+        Tags = LoadJsonWithEmbeddedFallback<TagRegistryFile>(
+            Path.Combine(AppPaths.RegistryDir, "capability_tags.json"),
+            "AICollabHub.Embedded.registry.capability_tags.json");
         EnsureBuiltinCapabilityTagsPresent();
-        Adapters = LoadJsonOrDefault<AdapterRegistryFile>(Path.Combine(AppPaths.RegistryDir, "adapters.json"));
-        Workflows = LoadJsonOrDefault<WorkflowRegistryFile>(Path.Combine(AppPaths.RegistryDir, "workflows.json"));
-        Presets = LoadJsonOrDefault<PresetRegistryFile>(Path.Combine(AppPaths.RegistryDir, "project_presets.json"));
+        Adapters = LoadJsonWithEmbeddedFallback<AdapterRegistryFile>(
+            Path.Combine(AppPaths.RegistryDir, "adapters.json"),
+            "AICollabHub.Embedded.registry.adapters.json");
+        Workflows = LoadJsonWithEmbeddedFallback<WorkflowRegistryFile>(
+            Path.Combine(AppPaths.RegistryDir, "workflows.json"),
+            "AICollabHub.Embedded.registry.workflows.json");
+        Presets = LoadJsonWithEmbeddedFallback<PresetRegistryFile>(
+            Path.Combine(AppPaths.RegistryDir, "project_presets.json"),
+            "AICollabHub.Embedded.registry.project_presets.json");
         ConfigFileExistedAtLoad = File.Exists(AppPaths.UserConfigPath);
         UserConfig = LoadJsonOrDefault<UserHubConfig>(AppPaths.UserConfigFile);
         if (File.Exists(AppPaths.UserConfigFile))
@@ -49,6 +72,145 @@ public sealed class RegistryService
         }
         SyncGlobalRoutesAndAgentRoleConsistency(persistIfChanged: true);
         EnsureDefaultTeamProfiles();
+    }
+
+    /// <summary>若 registry 目录缺少内置 JSON，从程序集内嵌资源释放到磁盘。</summary>
+    public static void EnsureEmbeddedRegistryFilesMaterialized()
+    {
+        try
+        {
+            Directory.CreateDirectory(AppPaths.RegistryDir);
+            foreach (var name in EmbeddedRegistryFiles)
+            {
+                var dest = Path.Combine(AppPaths.RegistryDir, name);
+                if (File.Exists(dest))
+                {
+                    try
+                    {
+                        var txt = File.ReadAllText(dest, Encoding.UTF8);
+                        if (!string.IsNullOrWhiteSpace(txt) && txt.TrimStart().StartsWith('{'))
+                            continue;
+                    }
+                    catch { /* 损坏则覆盖 */ }
+                }
+                TryMaterializeEmbeddedResource($"AICollabHub.Embedded.registry.{name}", dest);
+            }
+        }
+        catch { }
+    }
+
+    /// <summary>PluginsDir 缺少 export_config_digest.ps1 时按需释放内嵌脚本。</summary>
+    public static void EnsureEmbeddedPluginScriptMaterialized()
+    {
+        try
+        {
+            var dest = Path.Combine(AppPaths.PluginsDir, "export_config_digest.ps1");
+            if (File.Exists(dest)) return;
+            TryMaterializeEmbeddedResource("AICollabHub.Embedded.plugins.export_config_digest.ps1", dest);
+        }
+        catch { }
+    }
+
+    private static bool TryMaterializeEmbeddedResource(string logicalName, string destPath)
+    {
+        try
+        {
+            using var stream = OpenEmbeddedResourceStream(logicalName);
+            if (stream == null) return false;
+            var dir = Path.GetDirectoryName(destPath);
+            if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
+            using var fs = File.Create(destPath);
+            stream.CopyTo(fs);
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static Stream? OpenEmbeddedResourceStream(string logicalName)
+    {
+        var asm = Assembly.GetExecutingAssembly();
+        return asm.GetManifestResourceStream(logicalName);
+    }
+
+    private static string? ReadEmbeddedResourceText(string logicalName)
+    {
+        try
+        {
+            using var stream = OpenEmbeddedResourceStream(logicalName);
+            if (stream == null) return null;
+            using var reader = new StreamReader(stream, Encoding.UTF8);
+            return reader.ReadToEnd();
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// 磁盘 JSON 缺失、损坏或核心集合为空时，从内嵌资源释放并加载；写盘失败时仍可直接从流反序列化。
+    /// </summary>
+    private static T LoadJsonWithEmbeddedFallback<T>(string path, string embeddedLogicalName) where T : new()
+    {
+        T? fromDisk = default;
+        bool diskOk = false;
+        try
+        {
+            if (File.Exists(path))
+            {
+                var txt = File.ReadAllText(path, Encoding.UTF8);
+                if (!string.IsNullOrWhiteSpace(txt))
+                {
+                    fromDisk = JsonSerializer.Deserialize<T>(txt, JsonOpts);
+                    diskOk = fromDisk != null && !IsCoreCollectionEmpty(fromDisk);
+                }
+            }
+        }
+        catch
+        {
+            diskOk = false;
+        }
+
+        if (diskOk && fromDisk != null)
+            return fromDisk;
+
+        var embeddedTxt = ReadEmbeddedResourceText(embeddedLogicalName);
+        if (!string.IsNullOrWhiteSpace(embeddedTxt))
+        {
+            try
+            {
+                TryMaterializeEmbeddedResource(embeddedLogicalName, path);
+            }
+            catch { }
+
+            try
+            {
+                var fromEmb = JsonSerializer.Deserialize<T>(embeddedTxt, JsonOpts);
+                if (fromEmb != null && !IsCoreCollectionEmpty(fromEmb))
+                    return fromEmb;
+                if (fromEmb != null)
+                    return fromEmb;
+            }
+            catch { }
+        }
+
+        return fromDisk ?? new T();
+    }
+
+    private static bool IsCoreCollectionEmpty<T>(T obj)
+    {
+        return obj switch
+        {
+            DetectorRegistryFile d => d.Detectors == null || d.Detectors.Count == 0,
+            TagRegistryFile t => t.Tags == null || t.Tags.Count == 0,
+            AdapterRegistryFile a => a.Adapters == null || a.Adapters.Count == 0,
+            WorkflowRegistryFile w => w.Workflows == null || w.Workflows.Count == 0,
+            PresetRegistryFile p => p.Presets == null || p.Presets.Count == 0,
+            _ => false
+        };
     }
 
     private void EnsureBuiltinCapabilityTagsPresent()
@@ -70,47 +232,122 @@ public sealed class RegistryService
         }
     }
 
-    /// <summary>确保内置主流 AI 探测目录齐全（>=40），缺失项按内置默认补齐；不覆盖用户已有条目；无个人硬编码路径。</summary>
+    /// <summary>
+    /// 从内嵌 detectors.json 补齐缺失项；对磁盘已有但探测字段全空/残缺的条目补全探测字段。
+    /// 绝不再创建 ProbePaths/ProbeCommands/ProbeProcessNames 全空的空壳 DetectorSpec。
+    /// </summary>
     private void EnsureBuiltinDetectorsPresent()
     {
         Detectors.Detectors ??= new List<DetectorSpec>();
-        var requiredIds = new[]
+        var embedded = LoadEmbeddedDetectorRegistry();
+        if (embedded == null || embedded.Detectors == null || embedded.Detectors.Count == 0)
+            return;
+
+        var byId = new Dictionary<string, DetectorSpec>(StringComparer.OrdinalIgnoreCase);
+        foreach (var d in embedded.Detectors)
         {
-            "antigravity", "cursor", "windsurf", "trae", "kiro", "zed", "codebuddy", "qoder", "void", "pearai",
-            "jetbrains_ai", "vscode_copilot", "cline", "roo_code", "continue_dev", "lingma", "augment", "marscode",
-            "grok_bot", "codex_cli", "claude_desktop", "chatgpt_desktop", "cherry_studio", "chatbox", "doubao",
-            "kimi_desktop", "yuanbao", "anythingllm", "jan", "perplexity",
-            "claude_code", "gemini_cli", "opencode", "aider", "qwen_code", "goose", "amp", "amazon_q", "copilot_cli",
-            "openclaw", "droid", "ollama_local", "lm_studio", "takt_vps_bridge"
-        };
-        // 仅当目录严重缺失时从磁盘 detectors.json 再读一遍（通常 LoadAll 已加载完整文件）
-        if (Detectors.Detectors.Count >= 40) return;
+            if (d == null || string.IsNullOrWhiteSpace(d.Id)) continue;
+            byId[d.Id] = d;
+        }
+
+        foreach (var builtin in byId.Values)
+        {
+            var existing = Detectors.Detectors.FirstOrDefault(x =>
+                string.Equals(x.Id, builtin.Id, StringComparison.OrdinalIgnoreCase));
+            if (existing == null)
+            {
+                Detectors.Detectors.Add(CloneDetectorSpec(builtin));
+                continue;
+            }
+            MergeMissingProbeFields(existing, builtin);
+        }
+    }
+
+    private static DetectorRegistryFile? LoadEmbeddedDetectorRegistry()
+    {
         try
         {
-            var path = Path.Combine(AppPaths.RegistryDir, "detectors.json");
-            if (!File.Exists(path)) return;
-            var fresh = LoadJsonOrDefault<DetectorRegistryFile>(path);
-            foreach (var d in fresh.Detectors)
+            var txt = ReadEmbeddedResourceText("AICollabHub.Embedded.registry.detectors.json");
+            if (string.IsNullOrWhiteSpace(txt))
             {
-                if (Detectors.Detectors.Any(x => string.Equals(x.Id, d.Id, StringComparison.OrdinalIgnoreCase))) continue;
-                Detectors.Detectors.Add(d);
+                var path = Path.Combine(AppPaths.RegistryDir, "detectors.json");
+                if (File.Exists(path))
+                    txt = File.ReadAllText(path, Encoding.UTF8);
+            }
+            if (string.IsNullOrWhiteSpace(txt)) return null;
+            return JsonSerializer.Deserialize<DetectorRegistryFile>(txt, JsonOpts);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static DetectorSpec CloneDetectorSpec(DetectorSpec src)
+    {
+        var json = JsonSerializer.Serialize(src, JsonOpts);
+        return JsonSerializer.Deserialize<DetectorSpec>(json, JsonOpts) ?? new DetectorSpec
+        {
+            Id = src.Id,
+            Name = src.Name,
+            Category = src.Category,
+            Description = src.Description,
+            DefaultAdapter = src.DefaultAdapter,
+            ProbePaths = new List<string>(src.ProbePaths ?? new List<string>()),
+            ProbeCommands = new List<string>(src.ProbeCommands ?? new List<string>()),
+            ProbeProcessNames = new List<string>(src.ProbeProcessNames ?? new List<string>()),
+            ProbeDisplayNames = new List<string>(src.ProbeDisplayNames ?? new List<string>()),
+            ProbePorts = new List<int>(src.ProbePorts ?? new List<int>()),
+            ProbeExtensionIds = new List<string>(src.ProbeExtensionIds ?? new List<string>())
+        };
+    }
+
+    private static void MergeMissingProbeFields(DetectorSpec target, DetectorSpec builtin)
+    {
+        static void MergeList(List<string> dest, List<string>? src)
+        {
+            if (src == null || src.Count == 0) return;
+            dest ??= new List<string>();
+            foreach (var s in src)
+            {
+                if (string.IsNullOrWhiteSpace(s)) continue;
+                if (!dest.Contains(s, StringComparer.OrdinalIgnoreCase))
+                    dest.Add(s);
             }
         }
-        catch { }
 
-        // 最少保证核心旧 ID 仍在
-        foreach (var id in requiredIds.Take(8))
+        target.ProbePaths ??= new List<string>();
+        target.ProbeCommands ??= new List<string>();
+        target.ProbeProcessNames ??= new List<string>();
+        target.ProbeDisplayNames ??= new List<string>();
+        target.ProbePorts ??= new List<int>();
+        target.ProbeExtensionIds ??= new List<string>();
+
+        bool probesEmpty = target.ProbePaths.Count == 0 &&
+                           target.ProbeCommands.Count == 0 &&
+                           target.ProbeProcessNames.Count == 0;
+        if (probesEmpty || target.ProbePaths.Count == 0)
+            MergeList(target.ProbePaths, builtin.ProbePaths);
+        if (probesEmpty || target.ProbeCommands.Count == 0)
+            MergeList(target.ProbeCommands, builtin.ProbeCommands);
+        if (probesEmpty || target.ProbeProcessNames.Count == 0)
+            MergeList(target.ProbeProcessNames, builtin.ProbeProcessNames);
+        if (target.ProbeDisplayNames.Count == 0)
+            MergeList(target.ProbeDisplayNames, builtin.ProbeDisplayNames);
+        if (target.ProbeExtensionIds.Count == 0)
+            MergeList(target.ProbeExtensionIds, builtin.ProbeExtensionIds);
+        if ((target.ProbePorts == null || target.ProbePorts.Count == 0) &&
+            builtin.ProbePorts != null && builtin.ProbePorts.Count > 0)
         {
-            if (Detectors.Detectors.Any(d => string.Equals(d.Id, id, StringComparison.OrdinalIgnoreCase))) continue;
-            Detectors.Detectors.Add(new DetectorSpec
-            {
-                Id = id,
-                Name = id,
-                Category = id is "ollama_local" or "lm_studio" ? "local_llm" : "local_agent",
-                Description = $"内置探测项 {id}",
-                DefaultAdapter = "markdown_anchor"
-            });
+            target.ProbePorts = new List<int>(builtin.ProbePorts);
         }
+
+        if (string.IsNullOrWhiteSpace(target.Name) && !string.IsNullOrWhiteSpace(builtin.Name))
+            target.Name = builtin.Name;
+        if (string.IsNullOrWhiteSpace(target.Category) && !string.IsNullOrWhiteSpace(builtin.Category))
+            target.Category = builtin.Category;
+        if (string.IsNullOrWhiteSpace(target.DefaultAdapter) && !string.IsNullOrWhiteSpace(builtin.DefaultAdapter))
+            target.DefaultAdapter = builtin.DefaultAdapter;
     }
 
     public sealed class WorkflowToggleResult

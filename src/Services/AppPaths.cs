@@ -46,13 +46,7 @@ public static class AppPaths
                     return cand;
             }
 
-            // 当用户将独立单文件 AI协同中心.exe 直接放在桌面或任意位置运行时，自动优先关联主工程 registry 或 UserDataDir\registry，绝不在桌面生成杂乱文件夹
-            const string knownRepoRegistry = @"C:\Project\Godot\配套工具\tools\ai-collab-hub\registry";
-            if (!IsIsolatedTest && Directory.Exists(knownRepoRegistry))
-            {
-                return knownRepoRegistry;
-            }
-
+            // 独立单文件模式：回落到用户数据目录下的 registry，绝不在桌面生成杂乱文件夹，也不硬编码私人仓库路径
             var fallbackReg = Path.Combine(UserDataDir, "registry");
             Directory.CreateDirectory(fallbackReg);
             return fallbackReg;

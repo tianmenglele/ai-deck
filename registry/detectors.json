@@ -6,7 +6,7 @@
       "name": "Antigravity",
       "category": "local_agent",
       "description": "总包工头 / 主理人：跨目录自主闭环、自动调度其他 AI 与构建截图验收",
-      "probe_paths": ["%USERPROFILE%\\.gemini\\antigravity", "%USERPROFILE%\\.gemini\\config"],
+      "probe_paths": ["%USERPROFILE%\\.gemini\\antigravity", "%USERPROFILE%\\.gemini\\config", "%LOCALAPPDATA%\\Programs\\Antigravity"],
       "probe_commands": ["agy"],
       "probe_process_names": ["Antigravity", "antigravity"],
       "probe_display_names": ["Antigravity"],

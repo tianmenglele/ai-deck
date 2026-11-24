@@ -913,16 +913,65 @@ public sealed class SyncService
             var launcher = Path.Combine(dir.FullName, "启动协同中心.ps1");
             var outputsSub = Path.Combine(dir.FullName, "outputs");
             if (File.Exists(launcher) && Directory.Exists(outputsSub))
-            {
                 return MakeForwardSlashPath(launcher);
-            }
             dir = dir.Parent;
         }
 
         var localLauncher = Path.Combine(AppPaths.AppBaseDir, "启动协同中心.ps1");
         if (File.Exists(localLauncher)) return MakeForwardSlashPath(localLauncher);
 
-        return "c:/Project/Godot/配套工具/tools/ai-collab-hub/启动协同中心.ps1";
+        // 独立单文件模式：在用户数据目录生成/刷新便携启动脚本（调用当前运行的 exe）
+        return MakeForwardSlashPath(EnsurePortableHubLauncherScript());
+    }
+
+    /// <summary>
+    /// 在 UserDataDir 生成便携版「启动协同中心.ps1」：无参启动界面，有参透传 --cli。
+    /// </summary>
+    private static string EnsurePortableHubLauncherScript()
+    {
+        var path = Path.Combine(AppPaths.UserDataDir, "启动协同中心.ps1");
+        var exe = Environment.ProcessPath;
+        if (string.IsNullOrWhiteSpace(exe))
+            exe = Path.Combine(AppPaths.AppBaseDir, "AI协同中心.exe");
+        exe = Path.GetFullPath(exe);
+        var exeLiteral = exe.Replace("'", "''");
+        var script =
+            "$ErrorActionPreference = 'Stop'\n" +
+            "try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch {}\n" +
+            "$CliArgs = @($args)\n" +
+            $"$exePath = '{exeLiteral}'\n" +
+            "if (-not (Test-Path -LiteralPath $exePath)) {\n" +
+            "    throw \"未找到 AI协同中心.exe：$exePath\"\n" +
+            "}\n" +
+            "if ($CliArgs.Count -gt 0) {\n" +
+            "    $pass = @('--cli') + @($CliArgs | Where-Object { $_ -ne '-Cli' -and $_ -ne '--cli' })\n" +
+            "    & $exePath @pass\n" +
+            "    exit $LASTEXITCODE\n" +
+            "}\n" +
+            "Start-Process -FilePath $exePath\n";
+        try
+        {
+            Directory.CreateDirectory(AppPaths.UserDataDir);
+            bool needWrite = true;
+            if (File.Exists(path))
+            {
+                try
+                {
+                    var existing = File.ReadAllText(path);
+                    if (existing.Contains(exe, StringComparison.OrdinalIgnoreCase) &&
+                        existing.Contains("--cli", StringComparison.Ordinal))
+                        needWrite = false;
+                }
+                catch { needWrite = true; }
+            }
+            if (needWrite)
+                File.WriteAllText(path, script, new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+        }
+        catch
+        {
+            // 写失败仍返回目标路径，调用方可感知
+        }
+        return path;
     }
 
     private static string NormalizeRel(string rel) => rel.Replace('/', Path.DirectorySeparatorChar).TrimStart(Path.DirectorySeparatorChar);
