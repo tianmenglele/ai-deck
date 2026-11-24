@@ -905,8 +905,11 @@ public sealed class SyncService
         });
     }
 
-    private static string ResolveStableHubLauncherPath()
+    public static string ResolveStableHubLauncherPath(bool standaloneSingleFile = false)
     {
+        if (standaloneSingleFile)
+            return MakeForwardSlashPath(EnsurePortableHubLauncherScript());
+
         var dir = new DirectoryInfo(AppPaths.AppBaseDir);
         while (dir != null)
         {

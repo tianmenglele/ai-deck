@@ -2462,7 +2462,7 @@ public static partial class Dialogs
                 MinHeight = 400,
                 WindowStartupLocation = WindowStartupLocation.CenterOwner,
                 Owner = win,
-                Background = BrushHex("#0D131D"),
+                Background = BrushHex("#131D2E"),
                 Foreground = BrushHex("#E2E8F0"),
                 FontFamily = new System.Windows.Media.FontFamily("Microsoft YaHei UI"),
                 WindowStyle = WindowStyle.None,
@@ -2474,23 +2474,41 @@ public static partial class Dialogs
                 CaptionHeight = 36,
                 ResizeBorderThickness = new Thickness(5),
                 GlassFrameThickness = new Thickness(0),
-                CornerRadius = new CornerRadius(8)
+                CornerRadius = new CornerRadius(10)
             });
 
             bool confirmed = false;
             var outerBorder = new Border
             {
-                Background = BrushHex("#0D131D"),
-                BorderBrush = BrushHex("#243248"),
-                BorderThickness = new Thickness(1)
+                Background = BrushHex("#131D2E"),
+                BorderBrush = BrushHex("#5B84BA"),
+                BorderThickness = new Thickness(1.8),
+                CornerRadius = new CornerRadius(10),
+                ClipToBounds = true
             };
             var dock = new DockPanel();
+            var topGlow = new Border
+            {
+                Height = 2,
+                Background = BrushHex("#38BDF8"),
+                IsHitTestVisible = false
+            };
+            DockPanel.SetDock(topGlow, Dock.Top);
+            dock.Children.Add(topGlow);
 
             // 标题栏
-            var titleBar = new Grid { Height = 38, Background = BrushHex("#111824") };
-            titleBar.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            titleBar.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            titleBar.Children.Add(new TextBlock
+            var titleGrid = new Grid { Height = 36 };
+            var titleBar = new Border
+            {
+                Height = 38,
+                Background = BrushHex("#1A273D"),
+                BorderBrush = BrushHex("#334E73"),
+                BorderThickness = new Thickness(0, 0, 0, 1),
+                Child = titleGrid
+            };
+            titleGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            titleGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            titleGrid.Children.Add(new TextBlock
             {
                 Text = $"确认应用推荐配置 · {selectedProfile.Name}",
                 FontSize = 13,
@@ -2513,7 +2531,7 @@ public static partial class Dialogs
             System.Windows.Shell.WindowChrome.SetIsHitTestVisibleInChrome(btnX, true);
             btnX.Click += (_, _) => confirmWin.Close();
             Grid.SetColumn(btnX, 1);
-            titleBar.Children.Add(btnX);
+            titleGrid.Children.Add(btnX);
             DockPanel.SetDock(titleBar, Dock.Top);
             dock.Children.Add(titleBar);
 
@@ -2670,6 +2688,7 @@ public static partial class Dialogs
             dock.Children.Add(new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Content = listStack });
             outerBorder.Child = dock;
             confirmWin.Content = outerBorder;
+            AttachModalLightbox(confirmWin, win);
             confirmWin.ShowDialog();
 
             if (!confirmed)

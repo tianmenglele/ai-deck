@@ -889,19 +889,19 @@ public static class Program
 
         AssertTrue(
             win.FindName("HeaderVersionText") is TextBlock verText &&
-            verText.Text == "v1.9.15" &&
+            verText.Text == "v1.9.16" &&
             verText.Text == AppUpdateService.GetCurrentVersionDisplay() &&
             win.FindName("HeaderVersionBtn") is Button &&
             win.FindName("HeaderUpdateBadgeBtn") is Button updateBadge &&
             updateBadge.Visibility == Visibility.Collapsed &&
             win.FindName("TextAboutCurrentVersion") is TextBlock aboutVer &&
-            aboutVer.Text.Contains("v1.9.15", StringComparison.Ordinal) &&
+            aboutVer.Text.Contains("v1.9.16", StringComparison.Ordinal) &&
             win.FindName("TextAppUpdateStatus") is TextBlock &&
             win.FindName("TextUpdateRepoUrl") is TextBox &&
             win.FindName("ChkAutoCheckAppUpdate") is CheckBox autoUpdateChk &&
             autoUpdateChk.IsChecked == true &&
             win.FindName("BtnCheckAppUpdate") is Button,
-            "顶栏版本徽标显示 v1.9.15，新版本按钮默认折叠，设置页更新卡片已挂上");
+            "顶栏版本徽标显示 v1.9.16，新版本按钮默认折叠，设置页更新卡片已挂上");
         AssertTrue(
             win.FindName("LblUpdateRepoUrl") is TextBlock updateRepoLabel &&
             updateRepoLabel.Visibility == Visibility.Collapsed &&
@@ -922,7 +922,7 @@ public static class Program
         if (headerBadge != null)
         {
             headerBadge.Visibility = Visibility.Visible;
-            headerBadge.Content = "发现新版本 v1.9.16";
+            headerBadge.Content = "发现新版本 v1.9.17";
         }
         win.UpdateLayout();
         double headerUsed = 0;
@@ -938,7 +938,7 @@ public static class Program
         bool headerBrandOk = brandBlock != null &&
             brandBlock.Text.Contains("AIDeck", StringComparison.Ordinal) &&
             brandBlock.ActualWidth > 40;
-        bool headerVersionOk = versionBlock != null && versionBlock.Text == "v1.9.15" && versionBlock.ActualWidth > 20;
+        bool headerVersionOk = versionBlock != null && versionBlock.Text == "v1.9.16" && versionBlock.ActualWidth > 20;
         bool headerBadgeOk = headerBadge != null &&
             headerBadge.Visibility == Visibility.Visible &&
             headerBadge.ActualWidth > 20;
@@ -966,10 +966,10 @@ public static class Program
         }
         AssertTrue(
             brandTitle.Contains("AIDeck", StringComparison.Ordinal) &&
-            brandTitle.Contains("v1.9.15", StringComparison.Ordinal) &&
+            brandTitle.Contains("v1.9.16", StringComparison.Ordinal) &&
             headerBrandOk && headerVersionOk && headerBadgeOk && headerFits &&
             brandFits && versionFits && badgeFits && onboardOk && onboardFits,
-            $"主窗口标题包含 AIDeck 且 HeaderVersionText 仍为 v1.9.15，顶栏不截断 (Title={brandTitle}, Ver={versionBlock?.Text}, BrandW={brandW:0}, VerW={verW:0}, BadgeW={badgeW:0}, OnboardW={onboardBtn?.ActualWidth:0}, HeaderUsed={headerUsed:0}, HeaderW={headerGrid?.ActualWidth:0}, brandFits={brandFits}, versionFits={versionFits}, badgeFits={badgeFits}, onboardFits={onboardFits}, headerFits={headerFits})");
+            $"主窗口标题包含 AIDeck 且 HeaderVersionText 仍为 v1.9.16，顶栏不截断 (Title={brandTitle}, Ver={versionBlock?.Text}, BrandW={brandW:0}, VerW={verW:0}, BadgeW={badgeW:0}, OnboardW={onboardBtn?.ActualWidth:0}, HeaderUsed={headerUsed:0}, HeaderW={headerGrid?.ActualWidth:0}, brandFits={brandFits}, versionFits={versionFits}, badgeFits={badgeFits}, onboardFits={onboardFits}, headerFits={headerFits})");
 
         navAdv!.IsExpanded = false;
         win.SwitchToTabForTest(3);
@@ -1790,7 +1790,7 @@ public static class Program
                 FloatingOverlayWindow.CompactWidthDefault == 356 &&
                 hLo == 165 && hHi == 760 && cLo == 128 && cHi == 680 &&
                 dynCap3 >= 174 && dynCap3 <= 186 && dynCap4 >= 204 && dynCap4 <= 216 &&
-                AppPaths.AppVersion == "1.9.15",
+                AppPaths.AppVersion == "1.9.16",
                 $"悬浮窗尺寸上下限与版本号校验通过 (W={limits}~{limitsHi}, Ultra={uLo}~{uHi}/def={FloatingOverlayWindow.UltraWidthDefault}, H={hLo}~{hHi}, Capsule={cLo}~{cHi}, Dyn3={dynCap3}, Dyn4={dynCap4}, Ver={AppPaths.AppVersion})");
 
             // v1.9.7/1.9.11：5 款内嵌正圆官方 PNG + 发送验证辅助（跨目录根提取/签名）
@@ -1824,7 +1824,7 @@ public static class Program
                 extRoots.Count >= 1 &&
                 extRoots.Any(r => r.Contains("ai-collab-hub", StringComparison.OrdinalIgnoreCase)) &&
                 !string.IsNullOrWhiteSpace(extSig) &&
-                AppPaths.AppVersion == "1.9.15",
+                AppPaths.AppVersion == "1.9.16",
                 $"内嵌正圆图标与发送验证辅助校验通过 (Icons128={brandOk}/5, Circles={circleOk}/5, ExtRoots={extRoots.Count}, ExtSigLen={extSig.Length}, StatusFxRoute={wtStatusFx}, Ver={AppPaths.AppVersion})");
 
             // v1.9.9/1.9.10：官方 CLI 优先配置默认、ResolveCursorAgent 排除 cursor.cmd、渐进尝试与桌面会话索引
@@ -4731,20 +4731,20 @@ public static class Program
         {
             var current = AppUpdateService.GetCurrentVersion();
             var display = AppUpdateService.GetCurrentVersionDisplay();
-            var parsed = AppUpdateService.ParseNormalizedVersion("v1.9.15");
+            var parsed = AppUpdateService.ParseNormalizedVersion("v1.9.16");
             AssertTrue(
-                current == "1.9.15" && current == AppPaths.AppVersion &&
-                display == "v1.9.15" &&
-                parsed.HasValue && parsed.Value.Major == 1 && parsed.Value.Minor == 9 && parsed.Value.Patch == 15 &&
+                current == "1.9.16" && current == AppPaths.AppVersion &&
+                display == "v1.9.16" &&
+                parsed.HasValue && parsed.Value.Major == 1 && parsed.Value.Minor == 9 && parsed.Value.Patch == 16 &&
                 AppUpdateService.ParseNormalizedVersion("不是版本") == null,
                 $"版本展示读取程序集规范版本 (current={current}, display={display})");
 
             AssertTrue(
-                AppUpdateService.IsNewerVersion("1.9.16", "1.9.15") &&
+                AppUpdateService.IsNewerVersion("1.9.17", "1.9.16") &&
                 AppUpdateService.IsNewerVersion("v1.10.0", "1.9.99") &&
-                AppUpdateService.IsNewerVersion("2.0.0", "v1.9.15") &&
-                !AppUpdateService.IsNewerVersion("v1.9.15", "1.9.15") &&
-                !AppUpdateService.IsNewerVersion("1.9.14", "1.9.15") &&
+                AppUpdateService.IsNewerVersion("2.0.0", "v1.9.16") &&
+                !AppUpdateService.IsNewerVersion("v1.9.16", "1.9.16") &&
+                !AppUpdateService.IsNewerVersion("1.9.14", "1.9.16") &&
                 !AppUpdateService.IsNewerVersion("v1.8.20", "1.9.0"),
                 "SemVer 主次修订号比较通过");
 
@@ -4770,10 +4770,10 @@ public static class Program
                 $"更新端点解析通过 (gh={gh.Kind}/{gh.ApiUrl}, gitee={ge.Kind}, custom={custom.Kind})");
 
             const string githubJson = """
-                {"tag_name":"v1.9.16","html_url":"https://github.com/acme/ai-collab-hub/releases/tag/v1.9.16","body":"修复更新","assets":[{"name":"notes.txt","browser_download_url":"https://example.com/notes.txt"},{"name":"AIHub.exe","browser_download_url":"https://example.com/hub.exe"}]}
+                {"tag_name":"v1.9.17","html_url":"https://github.com/acme/ai-collab-hub/releases/tag/v1.9.17","body":"修复更新","assets":[{"name":"notes.txt","browser_download_url":"https://example.com/notes.txt"},{"name":"AIHub.exe","browser_download_url":"https://example.com/hub.exe"}]}
                 """;
             const string giteeJson = """
-                {"tag_name":"v1.9.16","body":"码云说明","html_url":"https://gitee.com/acme/ai-collab-hub/releases/v1.9.16","assets":[{"name":"app.exe","browser_download_url":"https://gitee.com/acme/app.exe"}]}
+                {"tag_name":"v1.9.17","body":"码云说明","html_url":"https://gitee.com/acme/ai-collab-hub/releases/v1.9.17","assets":[{"name":"app.exe","browser_download_url":"https://gitee.com/acme/app.exe"}]}
                 """;
             const string customJson = """
                 {"version":"1.9.20","changelog":"自定义日志","html_url":"https://example.com/rel","download_url":"https://example.com/a.exe"}
@@ -4786,11 +4786,11 @@ public static class Program
             var customRel = AppUpdateService.ParseReleaseJson(customJson);
             var tagRel = AppUpdateService.ParseReleaseJson(tagsJson);
             AssertTrue(
-                ghRel != null && ghRel.Version == "1.9.16" &&
+                ghRel != null && ghRel.Version == "1.9.17" &&
                 ghRel.AssetDownloadUrl == "https://example.com/hub.exe" &&
                 ghRel.Notes.Contains("修复更新", StringComparison.Ordinal) &&
-                ghRel.HtmlUrl.Contains("/releases/tag/v1.9.16", StringComparison.Ordinal) &&
-                geRel != null && geRel.Version == "1.9.16" && geRel.AssetName == "app.exe" &&
+                ghRel.HtmlUrl.Contains("/releases/tag/v1.9.17", StringComparison.Ordinal) &&
+                geRel != null && geRel.Version == "1.9.17" && geRel.AssetName == "app.exe" &&
                 geRel.Notes.Contains("码云说明", StringComparison.Ordinal) &&
                 customRel != null && customRel.Version == "1.9.20" &&
                 customRel.Notes.Contains("自定义日志", StringComparison.Ordinal) &&
@@ -4881,8 +4881,63 @@ public static class Program
             !OnboardingWizardDialog.ShouldAutoShowOnboarding(new UserHubConfig(), configFileExistedBeforeLoad: false, isIsolatedTest: true),
             "隔离测试 ShouldAutoShowOnboarding 返回 false");
 
+        string blankBundle = Path.Combine(Path.GetTempPath(), "aideck-blank-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var bundle = RegistryService.ReleaseEmbeddedBundleToBlankDirectory(blankBundle);
+            AssertTrue(
+                bundle.ReleasedFileCount >= 6 && bundle.DetectorCount >= 40 && bundle.ProbeFieldsPresent,
+                $"空白目录释放 5 份 registry JSON 与脚本并可加载 (files={bundle.ReleasedFileCount}, detectors={bundle.DetectorCount}, probes={bundle.ProbeFieldsPresent})");
+        }
+        finally
+        {
+            try { if (Directory.Exists(blankBundle)) Directory.Delete(blankBundle, true); } catch { }
+        }
+
+        string prevLauncherData = AppPaths.UserDataDir;
+        string launcherScratch = Path.Combine(Path.GetTempPath(), "aideck-single-" + Guid.NewGuid().ToString("N"));
+        AppPaths.SetDataDirOverride(launcherScratch);
+        try
+        {
+            string launcher = SyncService.ResolveStableHubLauncherPath(standaloneSingleFile: true);
+            string nativeLauncher = launcher.Replace('/', Path.DirectorySeparatorChar);
+            AssertTrue(
+                !launcher.Contains("Godot", StringComparison.OrdinalIgnoreCase) &&
+                !launcher.Contains("配套工具", StringComparison.Ordinal) &&
+                File.Exists(nativeLauncher),
+                $"单文件独立模式启动脚本不指向开发仓库且真实存在 ({launcher})");
+        }
+        finally
+        {
+            AppPaths.SetDataDirOverride(prevLauncherData);
+        }
+
+        AssertTrue(AutoDispatchService.DesktopLiveProbeDisplayStaleMs >= 10000, $"桌面忙碌展示保鲜期不少于 10 秒 (ms={AutoDispatchService.DesktopLiveProbeDisplayStaleMs})");
+        AutoDispatchService.SetDesktopBusyOverrideForTest(
+            "cursor",
+            new DesktopBusyProbeResult(true, "长任务", "XX", DateTime.UtcNow.AddMilliseconds(-2500), ActiveTaskCount: 2));
+        try
+        {
+            var staleMap = AutoDispatchService.ReadMergedGlobalWorkStatesWithDesktopLive();
+            AssertTrue(
+                staleMap.TryGetValue("cursor", out var staleCursor) &&
+                staleCursor.Status == "working" &&
+                staleCursor.ActiveTaskCount >= 1,
+                $"2500ms 忙碌缓存不掉回空闲 (status={ (staleMap.TryGetValue("cursor", out var s2) ? s2.Status : "missing") }, count={ (staleMap.TryGetValue("cursor", out var s3) ? s3.ActiveTaskCount : -1) })");
+        }
+        finally
+        {
+            AutoDispatchService.SetDesktopBusyOverrideForTest("cursor", null);
+        }
+
         var wizReg = new RegistryService();
         wizReg.LoadAll();
+        if ((wizReg.UserConfig.Agents?.Count ?? 0) == 0)
+        {
+            wizReg.UserConfig.Agents ??= new List<AgentRosterEntry>();
+            wizReg.UserConfig.Agents.Add(new AgentRosterEntry { Id = "antigravity", Name = "Antigravity", Detected = true, Enabled = true, Category = "local_agent", Evidence = "自检种子" });
+            wizReg.UserConfig.Agents.Add(new AgentRosterEntry { Id = "cursor", Name = "Cursor", Detected = true, Enabled = true, Category = "local_ide", Evidence = "自检种子" });
+        }
         var wiz = new OnboardingWizardDialog(wizReg, new DiscoveryService())
         {
             WindowStartupLocation = WindowStartupLocation.Manual,
@@ -4892,7 +4947,22 @@ public static class Program
         };
         wiz.Show();
         wiz.SwitchStepForTest(1);
+        wiz.UpdateLayout();
+        int step1Tiles = CountToolIconTiles(wiz);
         wiz.SwitchStepForTest(2);
+        wiz.UpdateLayout();
+        var wizFrame = wiz.FindName("WizardOuterFrame") as Border;
+        int step2Tiles = CountToolIconTiles(wiz);
+        int step2Tips = CountToolIconTilesWithTooltip(wiz);
+        AssertTrue(
+            wizFrame != null &&
+            wizFrame.BorderThickness.Left >= 1.8 &&
+            wizFrame.BorderThickness.Top >= 1.8 &&
+            step1Tiles >= 1 &&
+            step2Tiles >= 1 &&
+            step2Tips == step2Tiles &&
+            !string.IsNullOrWhiteSpace(wiz.SelectedMasterIdForTest),
+            $"新手引导亮边框、图标瓷砖与主脑自动选中 (frame={wizFrame?.BorderThickness.Left}, step1={step1Tiles}, step2={step2Tiles}, tips={step2Tips}, master={wiz.SelectedMasterIdForTest})");
         wiz.SwitchStepForTest(3);
         AssertTrue(wiz.GetCurrentStepForTest() == 3, "新手向导可切换到第 3 步");
         wiz.CompleteForTest(skip: false);
@@ -4940,14 +5010,197 @@ public static class Program
         }
         AssertTrue(
             probeBrand != null && probeBrand.Text.Contains("AIDeck", StringComparison.Ordinal) && probeBrand.ActualWidth > 40 &&
-            probeVer != null && probeVer.Text == "v1.9.15" && probeVer.ActualWidth > 20 &&
+            probeVer != null && probeVer.Text == "v1.9.16" && probeVer.ActualWidth > 20 &&
             probeOnboard != null && probeOnboard.IsVisible && probeOnboard.ActualWidth >= 24 &&
             ((System.Windows.Automation.AutomationProperties.GetName(probeOnboard) ?? "").Contains("新手向导")
              || (probeOnboard.ToolTip as string ?? "").Contains("新手向导")) &&
             probeFloat != null && probeFloat.IsVisible && probeFloat.ActualWidth >= 24 &&
             probeSettingsBtn != null && probeSettingsBtn.IsVisible && probeSettingsBtn.ActualWidth >= 24 &&
             probeHeader != null && probeUsed <= probeHeader.ActualWidth + 1.0,
-            $"960 宽顶栏 AIDeck、v1.9.15、新手向导、悬浮窗、设置均可见且不截断 (Used={probeUsed:0}, HeaderW={probeHeader?.ActualWidth:0}, OnboardW={probeOnboard?.ActualWidth:0}, FloatW={probeFloat?.ActualWidth:0}, SettingsW={probeSettingsBtn?.ActualWidth:0})");
+            $"960 宽顶栏 AIDeck、v1.9.16、新手向导、悬浮窗、设置均可见且不截断 (Used={probeUsed:0}, HeaderW={probeHeader?.ActualWidth:0}, OnboardW={probeOnboard?.ActualWidth:0}, FloatW={probeFloat?.ActualWidth:0}, SettingsW={probeSettingsBtn?.ActualWidth:0})");
+
+        AssertTrue(!navProbe.IsModalBackdropVisibleForTest, "灯箱默认关闭");
+        navProbe.PushModalBackdrop();
+        navProbe.PushModalBackdrop();
+        AssertTrue(navProbe.IsModalBackdropVisibleForTest, "连续推入灯箱后暗幕可见");
+        navProbe.PopModalBackdrop();
+        AssertTrue(navProbe.IsModalBackdropVisibleForTest, "引用计数未归零时灯箱保持");
+        navProbe.PopModalBackdrop();
+        AssertTrue(!navProbe.IsModalBackdropVisibleForTest, "引用计数归零后灯箱关闭");
+
+        var ringProbe = new FloatingOverlayWindow(reg, navProbe)
+        {
+            WindowStartupLocation = WindowStartupLocation.Manual,
+            Left = -14000,
+            Top = -14000,
+            ShowActivated = false
+        };
+        ringProbe.Show();
+        ringProbe.ApplyCollapsedVisual(false, preserveRightAnchor: false);
+        ringProbe.RefreshOverlayData(force: true, forceRebuildRows: true);
+        var rowBefore = ringProbe.CaptureAgentRowIdentitiesForTest();
+        ringProbe.RefreshOverlayData(force: true);
+        var rowAfter = ringProbe.CaptureAgentRowIdentitiesForTest();
+        bool rowsKept = rowBefore.Length > 0 && rowBefore.Length == rowAfter.Length;
+        for (int i = 0; i < rowBefore.Length && rowsKept; i++)
+            rowsKept = ReferenceEquals(rowBefore[i], rowAfter[i]);
+        var codingAgent = new AgentRosterEntry { Id = "cursor", Name = "Cursor", Enabled = true };
+        var codingRich = FloatingOverlayWindow.ResolveRichStatusForTest(
+            codingAgent,
+            new LiveAgentWorkState
+            {
+                AgentId = "cursor",
+                Status = "working",
+                WorkflowPhase = "executing",
+                TaskSummary = "改码",
+                LatestLogTail = "Editing FloatingOverlayWindow.StatusFx.cs"
+            },
+            true, true, false);
+        var codingAvatar = ringProbe.BuildRichAvatarForTest(codingAgent, codingRich, 32, 1);
+        var codingRing = FindTaggedEllipse(codingAvatar, "avatar_fx_ring");
+        var codingRot = codingRing?.RenderTransform as RotateTransform;
+        var badge1 = ringProbe.BuildRichAvatarForTest(codingAgent, codingRich, 32, 1);
+        var badge3 = ringProbe.BuildRichAvatarForTest(codingAgent, codingRich, 32, 3);
+        var badge12 = ringProbe.BuildRichAvatarForTest(codingAgent, codingRich, 32, 12);
+        var mark1 = FindTaggedBorder(badge1, "task_count:1");
+        var mark3 = FindTaggedBorder(badge3, "task_count:3");
+        var mark12 = FindTaggedBorder(badge12, "task_count:12");
+        AssertTrue(
+            codingRich.Kind == FloatingRichFxKind.Coding &&
+            codingRing != null &&
+            codingRing.RenderTransformOrigin.X == 0.5 &&
+            codingRing.RenderTransformOrigin.Y == 0.5 &&
+            codingRot != null && codingRot.CenterX == 0 && codingRot.CenterY == 0 &&
+            rowsKept &&
+            mark1 != null && mark1.Visibility == Visibility.Collapsed &&
+            mark3 != null && mark3.Visibility == Visibility.Visible && (mark3.Child as TextBlock)?.Text == "3" &&
+            mark12 != null && mark12.Visibility == Visibility.Visible && (mark12.Child as TextBlock)?.Text == "9+",
+            $"Coding 圆环原点、强制刷新不重建行、多任务角标 (kind={codingRich.Kind}, origin={codingRing?.RenderTransformOrigin}, center={codingRot?.CenterX},{codingRot?.CenterY}, rows={rowBefore.Length}/{rowsKept}, t1={mark1?.Visibility}, t3={(mark3?.Child as TextBlock)?.Text}, t12={(mark12?.Child as TextBlock)?.Text})");
+        var masterBusy = FloatingOverlayWindow.ResolveRichStatusForTest(
+            new AgentRosterEntry { Id = "antigravity", Name = "Antigravity", Enabled = true },
+            new LiveAgentWorkState { AgentId = "antigravity", Status = "working", WorkflowPhase = "executing", TaskSummary = "拆解任务" },
+            true, true, true, activeWorkerOrNull: null);
+        AssertTrue(
+            masterBusy.Kind == FloatingRichFxKind.MasterAnalyzing && masterBusy.IsActiveWork,
+            $"主脑 working 且无子执行者时保持深度分析 (kind={masterBusy.Kind}, badge={masterBusy.BadgeText})");
+
+        var inplaceAgent = reg.UserConfig.Agents.FirstOrDefault(a => a.Enabled && a.Id == "cursor")
+                           ?? reg.UserConfig.Agents.FirstOrDefault(a => a.Enabled);
+        byte[]? inplaceMapBackup = File.Exists(AutoDispatchService.LiveStateMapPath)
+            ? File.ReadAllBytes(AutoDispatchService.LiveStateMapPath)
+            : null;
+        try
+        {
+            if (inplaceAgent != null)
+            {
+                var inplaceMap = new Dictionary<string, LiveAgentWorkState>(StringComparer.OrdinalIgnoreCase)
+                {
+                    [inplaceAgent.Id] = new LiveAgentWorkState
+                    {
+                        AgentId = inplaceAgent.Id,
+                        AgentName = inplaceAgent.Name,
+                        Status = "working",
+                        WorkflowPhase = "executing",
+                        TaskSummary = "原地增量刷新验收",
+                        ProjectName = "XX",
+                        UpdatedAt = "10:00:01",
+                        UpdatedUtcTicks = 10_000,
+                        DispatcherPid = Environment.ProcessId
+                    }
+                };
+                RegistryService.WriteJsonAtomic(AutoDispatchService.LiveStateMapPath, inplaceMap);
+                AutoDispatchService.SetDesktopBusyOverrideForTest(inplaceAgent.Id, null);
+                ringProbe.RefreshOverlayData(force: true);
+                ringProbe.UpdateLayout();
+                var badgeHost = ringProbe.FindName("HeaderProjBadgeHost") as FrameworkElement;
+                var badgeText = ringProbe.FindName("HeaderProjBadge") as TextBlock;
+                AssertTrue(
+                    badgeHost != null && badgeHost.Visibility == Visibility.Collapsed &&
+                    (badgeText == null || string.IsNullOrEmpty(badgeText.Text)),
+                    $"working 且 ProjectName=XX 时顶栏项目徽标保持隐藏 (vis={badgeHost?.Visibility}, text={badgeText?.Text})");
+
+                navProbe.SwitchToTabForTest(1);
+                navProbe.RefreshAllViews();
+                navProbe.UpdateLayout();
+                object? cardBefore = navProbe.OverviewAgentsCards.Children.Count > 0
+                    ? navProbe.OverviewAgentsCards.Children[0]
+                    : null;
+                Border? nodeBefore = null;
+                if (navProbe.WorkflowDiagramCanvas != null)
+                {
+                    foreach (UIElement child in navProbe.WorkflowDiagramCanvas.Children)
+                    {
+                        if (child is Border node && (node.Tag as string) == "MindMapNode:master")
+                        {
+                            nodeBefore = node;
+                            break;
+                        }
+                    }
+                }
+                Border? rowBeforeCount = ringProbe.CaptureAgentRowIdentitiesForTest()
+                    .OfType<Border>()
+                    .FirstOrDefault(b => (b.Tag as string) == inplaceAgent.Id);
+
+                inplaceMap[inplaceAgent.Id].UpdatedAt = "10:00:02";
+                inplaceMap[inplaceAgent.Id].UpdatedUtcTicks = 20_000;
+                RegistryService.WriteJsonAtomic(AutoDispatchService.LiveStateMapPath, inplaceMap);
+                navProbe.RefreshAllViews();
+                navProbe.UpdateLayout();
+                object? cardAfter = navProbe.OverviewAgentsCards.Children.Count > 0
+                    ? navProbe.OverviewAgentsCards.Children[0]
+                    : null;
+                Border? nodeAfter = null;
+                if (navProbe.WorkflowDiagramCanvas != null)
+                {
+                    foreach (UIElement child in navProbe.WorkflowDiagramCanvas.Children)
+                    {
+                        if (child is Border node && (node.Tag as string) == "MindMapNode:master")
+                        {
+                            nodeAfter = node;
+                            break;
+                        }
+                    }
+                }
+                AssertTrue(
+                    cardBefore != null && ReferenceEquals(cardBefore, cardAfter) &&
+                    nodeBefore != null && ReferenceEquals(nodeBefore, nodeAfter),
+                    $"仅 UpdatedAt 变化时总览卡片与脑图节点引用保持不变 (card={cardBefore != null && ReferenceEquals(cardBefore, cardAfter)}, node={nodeBefore != null && ReferenceEquals(nodeBefore, nodeAfter)})");
+
+                AutoDispatchService.SetDesktopBusyOverrideForTest(
+                    inplaceAgent.Id,
+                    new DesktopBusyProbeResult(
+                        true,
+                        "任务乙",
+                        "XX",
+                        DateTime.UtcNow,
+                        ActiveTaskCount: 2,
+                        ActiveTaskTitles: new[] { "任务甲", "任务乙" }));
+                ringProbe.RefreshOverlayData(force: true);
+                ringProbe.UpdateLayout();
+                Border? rowAfterCount = ringProbe.CaptureAgentRowIdentitiesForTest()
+                    .OfType<Border>()
+                    .FirstOrDefault(b => (b.Tag as string) == inplaceAgent.Id);
+                Border? countBadge = rowAfterCount == null ? null : FindNamedBorder(rowAfterCount, "AvatarTaskCountBadge");
+                string tipDump = DumpTooltipText(rowAfterCount?.ToolTip);
+                AssertTrue(
+                    rowBeforeCount != null && ReferenceEquals(rowBeforeCount, rowAfterCount) &&
+                    countBadge != null && countBadge.Visibility == Visibility.Visible &&
+                    (countBadge.Child as TextBlock)?.Text == "2" &&
+                    (countBadge.Tag as string) == "task_count:2" &&
+                    tipDump.Contains("任务甲", StringComparison.Ordinal) &&
+                    tipDump.Contains("任务乙", StringComparison.Ordinal) &&
+                    tipDump.Contains("并行任务", StringComparison.Ordinal),
+                    $"并发 1→2 原地刷新 (same={rowBeforeCount != null && ReferenceEquals(rowBeforeCount, rowAfterCount)}, badge={(countBadge?.Child as TextBlock)?.Text}/{countBadge?.Visibility}, tip={tipDump.Replace('\n', '|')})");
+            }
+        }
+        finally
+        {
+            if (inplaceAgent != null)
+                AutoDispatchService.SetDesktopBusyOverrideForTest(inplaceAgent.Id, null);
+            if (inplaceMapBackup != null) File.WriteAllBytes(AutoDispatchService.LiveStateMapPath, inplaceMapBackup);
+            else if (File.Exists(AutoDispatchService.LiveStateMapPath)) File.Delete(AutoDispatchService.LiveStateMapPath);
+        }
+        ringProbe.Close();
         navProbe.Close();
 
         var reportPath = Path.Combine(outDir, "self_test_report.txt");
@@ -5246,6 +5499,26 @@ public static class Program
             floatWin.UpdateLayout();
             int allStatesH = Math.Max(340, (int)Math.Ceiling(((UIElement)floatWin.Content).DesiredSize.Height) + 12);
             CaptureElementPng(floatWin, 450, allStatesH, Path.Combine(outDir, "live_07d_floating_all_states.png"));
+
+            AutoDispatchService.SetDesktopBusyOverrideForTest(
+                "cursor",
+                new DesktopBusyProbeResult(true, "并行会话", "多任务", DateTime.UtcNow, ActiveTaskCount: 3,
+                    ActiveTaskTitles: new[] { "并行会话", "增量刷新", "角标验收" }));
+            AutoDispatchService.SetDesktopBusyOverrideForTest(
+                "antigravity",
+                new DesktopBusyProbeResult(true, "并行分析", "多任务", DateTime.UtcNow, ActiveTaskCount: 2,
+                    ActiveTaskTitles: new[] { "主脑拆解", "并行分析" }));
+            try
+            {
+                floatWin.RefreshOverlayData(force: true);
+                floatWin.UpdateLayout();
+                CaptureElementPng(floatWin, 450, allStatesH, Path.Combine(outDir, "live_07e_floating_multitask_badge.png"));
+            }
+            finally
+            {
+                AutoDispatchService.SetDesktopBusyOverrideForTest("cursor", null);
+                AutoDispatchService.SetDesktopBusyOverrideForTest("antigravity", null);
+            }
 
             // 还原真实 Agents 与状态后再拍透明度弹窗与折叠胶囊态
             reg.UserConfig.Agents = origAgentsSnapshot;
@@ -5566,6 +5839,13 @@ public static class Program
         onboardLive.SwitchStepForTest(2);
         onboardLive.UpdateLayout();
         CaptureElementPng(onboardLive, 760, 560, Path.Combine(outDir, "live_18b_onboarding_step2.png"));
+        win.PushModalBackdrop();
+        win.UpdateLayout();
+        CaptureLightboxCompositePng(
+            win, 1220, 760,
+            onboardLive, 760, 560,
+            Path.Combine(outDir, "live_18d_onboarding_lightbox_on_main.png"));
+        win.PopModalBackdrop();
         onboardLive.SwitchStepForTest(3);
         onboardLive.UpdateLayout();
         CaptureElementPng(onboardLive, 760, 560, Path.Combine(outDir, "live_18c_onboarding_step3.png"));
@@ -5659,6 +5939,124 @@ public static class Program
         if (first >= 0 && last >= first)
             activeSec = (last - first + 1) / (double)sampleRate;
         return true;
+    }
+
+    private static int CountToolIconTiles(DependencyObject root) =>
+        CollectTaggedElements(root, "tool_icon_tile").Count;
+
+    private static int CountToolIconTilesWithTooltip(DependencyObject root) =>
+        CollectTaggedElements(root, "tool_icon_tile").Count(fe => fe.ToolTip != null);
+
+    private static List<FrameworkElement> CollectTaggedElements(DependencyObject root, string tag)
+    {
+        var found = new List<FrameworkElement>();
+        var seen = new HashSet<DependencyObject>();
+        void Walk(DependencyObject node)
+        {
+            if (!seen.Add(node)) return;
+            if (node is FrameworkElement fe && Equals(fe.Tag, tag))
+                found.Add(fe);
+            int count = 0;
+            try { count = VisualTreeHelper.GetChildrenCount(node); } catch { }
+            for (int i = 0; i < count; i++)
+                Walk(VisualTreeHelper.GetChild(node, i));
+            foreach (var child in LogicalTreeHelper.GetChildren(node))
+            {
+                if (child is DependencyObject dep) Walk(dep);
+            }
+        }
+        Walk(root);
+        return found;
+    }
+
+    private static System.Windows.Shapes.Ellipse? FindTaggedEllipse(DependencyObject root, string tag)
+    {
+        foreach (var fe in CollectTaggedElements(root, tag))
+        {
+            if (fe is System.Windows.Shapes.Ellipse ellipse) return ellipse;
+        }
+        return null;
+    }
+
+    private static Border? FindNamedBorder(DependencyObject root, string name)
+    {
+        if (root is Border border && string.Equals(border.Name, name, StringComparison.Ordinal))
+            return border;
+        if (root is Panel panel)
+        {
+            foreach (UIElement child in panel.Children)
+            {
+                if (child is not DependencyObject dep) continue;
+                var hit = FindNamedBorder(dep, name);
+                if (hit != null) return hit;
+            }
+            return null;
+        }
+        if (root is Decorator decorator && decorator.Child is DependencyObject childDep)
+            return FindNamedBorder(childDep, name);
+        return null;
+    }
+
+    private static string DumpTooltipText(object? tip)
+    {
+        if (tip is string s) return s;
+        if (tip is not ToolTip tool || tool.Content is not DependencyObject content) return "";
+        var sb = new StringBuilder();
+        void Walk(DependencyObject d)
+        {
+            if (d is TextBlock tb && !string.IsNullOrWhiteSpace(tb.Text))
+                sb.AppendLine(tb.Text);
+            if (d is Panel panel)
+            {
+                foreach (UIElement kid in panel.Children)
+                {
+                    if (kid is DependencyObject dep) Walk(dep);
+                }
+                return;
+            }
+            if (d is Decorator decorator && decorator.Child is DependencyObject child)
+                Walk(child);
+        }
+        Walk(content);
+        return sb.ToString();
+    }
+
+    private static Border? FindTaggedBorder(DependencyObject root, string tag)
+    {
+        foreach (var fe in CollectTaggedElements(root, tag))
+        {
+            if (fe is Border border) return border;
+        }
+        return null;
+    }
+
+    private static void CaptureLightboxCompositePng(
+        Window main, int mainW, int mainH,
+        Window dialog, int dialogW, int dialogH,
+        string filePath)
+    {
+        var mainRoot = VisualTreeHelper.GetChildrenCount(main) > 0 && VisualTreeHelper.GetChild(main, 0) is UIElement mainChild
+            ? mainChild
+            : (UIElement)main.Content;
+        var dialogRoot = VisualTreeHelper.GetChildrenCount(dialog) > 0 && VisualTreeHelper.GetChild(dialog, 0) is UIElement dialogChild
+            ? dialogChild
+            : (UIElement)dialog.Content;
+        var mainBmp = RenderVisualBrush(mainRoot, mainW, mainH);
+        var dialogBmp = RenderVisualBrush(dialogRoot, dialogW, dialogH);
+        int left = Math.Max(0, (mainW - dialogW) / 2);
+        int top = Math.Max(0, (mainH - dialogH) / 2);
+        var rtb = new RenderTargetBitmap(mainW, mainH, 96, 96, PixelFormats.Pbgra32);
+        var dv = new DrawingVisual();
+        using (var dc = dv.RenderOpen())
+        {
+            dc.DrawImage(mainBmp, new Rect(0, 0, mainW, mainH));
+            dc.DrawImage(dialogBmp, new Rect(left, top, dialogW, dialogH));
+        }
+        rtb.Render(dv);
+        var encoder = new PngBitmapEncoder();
+        encoder.Frames.Add(BitmapFrame.Create(rtb));
+        using var fs = File.Create(filePath);
+        encoder.Save(fs);
     }
 
     private static RenderTargetBitmap RenderVisualBrush(UIElement element, int width, int height)

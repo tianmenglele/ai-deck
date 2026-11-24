@@ -55,7 +55,7 @@
                             FontSize="11.5"
                             ToolTip="AIDeck 当前版本，点击检查更新"
                             Click="HeaderVersionBtn_Click">
-                        <TextBlock x:Name="HeaderVersionText" Text="v1.9.15" FontSize="11.5" FontWeight="SemiBold" Foreground="#7DD3FC"/>
+                        <TextBlock x:Name="HeaderVersionText" Text="v1.9.16" FontSize="11.5" FontWeight="SemiBold" Foreground="#7DD3FC"/>
                     </Button>
                     <Button x:Name="HeaderUpdateBadgeBtn"
                             Visibility="Collapsed"
@@ -1385,7 +1385,7 @@
                                         </Grid>
                                         <Border Background="{DynamicResource BgInputBrush}" BorderBrush="{DynamicResource BorderSectionBrush}" BorderThickness="1" CornerRadius="6" Padding="12,9">
                                             <StackPanel>
-                                                <TextBlock x:Name="TextAboutCurrentVersion" Text="AIDeck · 多 AI 协同中心 v1.9.15" FontSize="13" FontWeight="SemiBold" Foreground="#E0F2FE" Margin="0,0,0,4"/>
+                                                <TextBlock x:Name="TextAboutCurrentVersion" Text="AIDeck · 多 AI 协同中心 v1.9.16" FontSize="13" FontWeight="SemiBold" Foreground="#E0F2FE" Margin="0,0,0,4"/>
                                                 <TextBlock x:Name="TextAppUpdateStatus" Text="尚未检查更新" FontSize="12" Foreground="#94A3B8" TextWrapping="Wrap" Margin="0,0,0,8"
                                                            ToolTip="可手动检查，或等待启动后的后台静默检查。只有发现新版本才提示。"/>
                                                 <TextBlock x:Name="LblUpdateRepoUrl" Text="更新源" Foreground="#CBD5E1" FontSize="12" Margin="0,0,0,4" Visibility="Collapsed"

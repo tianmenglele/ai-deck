@@ -5,6 +5,7 @@ using System.Text;
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Media;
 using AICollabHub.Models;
 using AICollabHub.Services;
@@ -85,8 +86,8 @@ public static partial class Dialogs
             if (!string.IsNullOrEmpty(picked))
             {
                 primaryBox.Text = picked;
-                if (draft.Name is "新工程档案" or "") nameBox.Text = Path.GetFileName(picked);
-                if (File.Exists(Path.Combine(picked, "project.godot")))
+                if (draft.Name is "新工程档案" or "") nameBox.Text = System.IO.Path.GetFileName(picked);
+                if (File.Exists(System.IO.Path.Combine(picked, "project.godot")))
                 {
                     foreach (ComboBoxItem item in presetCombo.Items)
                         if ((string)item.Tag == "godot_project") presetCombo.SelectedItem = item;
@@ -165,7 +166,7 @@ public static partial class Dialogs
                 System.Windows.MessageBox.Show(win, "请填写有效的主工程目录路径。", "提示", MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
-            draft.Name = string.IsNullOrWhiteSpace(nameBox.Text) ? Path.GetFileName(primaryBox.Text.Trim()) : nameBox.Text.Trim();
+            draft.Name = string.IsNullOrWhiteSpace(nameBox.Text) ? System.IO.Path.GetFileName(primaryBox.Text.Trim()) : nameBox.Text.Trim();
             draft.PrimaryRoot = primaryBox.Text.Trim();
             draft.PresetId = (presetCombo.SelectedItem as ComboBoxItem)?.Tag as string ?? "general_code";
             draft.CompanionRoots = compBox.Text
@@ -2412,7 +2413,7 @@ public static partial class Dialogs
                     return;
                 }
                 imported.SourceKind = "user";
-                if (string.IsNullOrWhiteSpace(imported.Name)) imported.Name = Path.GetFileNameWithoutExtension(dlg.FileName);
+                if (string.IsNullOrWhiteSpace(imported.Name)) imported.Name = System.IO.Path.GetFileNameWithoutExtension(dlg.FileName);
                 imported.PresetId = "user_" + Guid.NewGuid().ToString("N")[..8];
                 imported.UpdatedAt = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
                 if (!canSelectModels)
@@ -2741,6 +2742,235 @@ public static partial class Dialogs
         }
         win.Content = root;
         return (win, () => appliedAny);
+    }
+
+    public static Border BuildToolIconTile(
+        AgentRosterEntry agent,
+        bool selected,
+        bool singleSelectMaster,
+        bool interactive,
+        Action<bool>? onSelectedChanged,
+        ToggleButton? linkedToggle = null)
+    {
+        bool on = selected;
+        var icon = OfficialBrandIconService.CreateCircularAvatarVisual(
+            agent.Id, 33, agent, OfficialBrandIconService.GetBrandColor(agent.Id), 1.15);
+        icon.HorizontalAlignment = HorizontalAlignment.Center;
+        icon.IsHitTestVisible = false;
+
+        var name = new TextBlock
+        {
+            Text = ShortToolTileName(agent),
+            FontSize = 11,
+            FontWeight = FontWeights.SemiBold,
+            Foreground = BrushHex(interactive ? "#E6EDF7" : "#94A3B8"),
+            TextAlignment = TextAlignment.Center,
+            TextTrimming = TextTrimming.CharacterEllipsis,
+            TextWrapping = TextWrapping.NoWrap,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            Margin = new Thickness(2, 6, 2, 0),
+            IsHitTestVisible = false
+        };
+        var body = new StackPanel
+        {
+            VerticalAlignment = VerticalAlignment.Center,
+            HorizontalAlignment = HorizontalAlignment.Stretch
+        };
+        body.Children.Add(icon);
+        body.Children.Add(name);
+
+        var mark = BuildTileSelectionMark(singleSelectMaster);
+        var grid = new Grid();
+        grid.Children.Add(body);
+        grid.Children.Add(mark);
+        if (linkedToggle != null)
+        {
+            linkedToggle.Visibility = Visibility.Collapsed;
+            grid.Children.Add(linkedToggle);
+        }
+
+        var tile = new Border
+        {
+            Tag = "tool_icon_tile",
+            Width = 104,
+            Height = 96,
+            Margin = new Thickness(0, 0, 8, 8),
+            CornerRadius = new CornerRadius(10),
+            Padding = new Thickness(6, 8, 6, 6),
+            Cursor = interactive ? System.Windows.Input.Cursors.Hand : System.Windows.Input.Cursors.Arrow,
+            Child = grid,
+            ToolTip = BuildToolDetailTooltip(agent, singleSelectMaster),
+            Opacity = interactive ? 1 : 0.72
+        };
+        ToolTipService.SetInitialShowDelay(tile, 180);
+        ToolTipService.SetShowDuration(tile, 14000);
+
+        void ApplyChrome(bool selectedNow)
+        {
+            on = selectedNow;
+            if (!selectedNow)
+            {
+                tile.Background = BrushHex("#101826");
+                tile.BorderBrush = BrushHex("#24344D");
+                tile.BorderThickness = new Thickness(1);
+                mark.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            mark.Visibility = Visibility.Visible;
+            if (singleSelectMaster)
+            {
+                tile.Background = BrushHex("#1F1A4B");
+                tile.BorderBrush = BrushHex("#A78BFA");
+            }
+            else
+            {
+                tile.Background = BrushHex("#152847");
+                tile.BorderBrush = BrushHex("#38BDF8");
+            }
+            tile.BorderThickness = new Thickness(1.6);
+        }
+
+        ApplyChrome(selected);
+        if (linkedToggle != null)
+        {
+            linkedToggle.Checked += (_, _) => ApplyChrome(true);
+            linkedToggle.Unchecked += (_, _) => ApplyChrome(linkedToggle.IsChecked == true);
+            if (interactive)
+            {
+                tile.MouseLeftButtonUp += (_, e) =>
+                {
+                    linkedToggle.IsChecked = linkedToggle.IsChecked != true;
+                    e.Handled = true;
+                };
+            }
+        }
+        else if (interactive)
+        {
+            tile.MouseLeftButtonUp += (_, e) =>
+            {
+                if (singleSelectMaster)
+                {
+                    onSelectedChanged?.Invoke(true);
+                }
+                else
+                {
+                    ApplyChrome(!on);
+                    onSelectedChanged?.Invoke(on);
+                }
+                e.Handled = true;
+            };
+        }
+
+        return tile;
+    }
+
+    public static Border BuildToolDetailTooltip(AgentRosterEntry agent, bool singleSelectMaster)
+    {
+        string full = string.IsNullOrWhiteSpace(agent.Name) ? agent.Id : agent.Name;
+        string category = OfficialBrandIconService.GetCategoryZh(agent.Id, agent.Category);
+        string evidence = !string.IsNullOrWhiteSpace(agent.Evidence)
+            ? agent.Evidence.Trim()
+            : (!string.IsNullOrWhiteSpace(agent.GuiExePath) ? agent.GuiExePath.Trim() : "尚未记录安装路径或探测依据");
+        string caps = string.Join(" · ", (agent.TagScores ?? new Dictionary<string, int>())
+            .Where(kv => kv.Value > 0)
+            .OrderByDescending(kv => kv.Value)
+            .Take(6)
+            .Select(kv => WorkSpecialtyCatalog.Items.TryGetValue(kv.Key, out var lb) ? lb : kv.Key));
+        if (string.IsNullOrWhiteSpace(caps)) caps = "未标注能力";
+        string models = !LocalModelCatalogService.SupportsModelSelection(agent.Id)
+            ? "模型档位：默认托管"
+            : $"高档 {Dash(agent.HighTierModel)} · 中档 {Dash(agent.MediumTierModel)} · 低档 {Dash(agent.LowTierModel)}";
+        string hint = singleSelectMaster ? "点击设为总控主脑" : "点击整张瓷砖切换是否参与";
+
+        var stack = new StackPanel();
+        void Line(string text, string hex, double size, bool bold = false, Thickness? margin = null)
+        {
+            stack.Children.Add(new TextBlock
+            {
+                Text = text,
+                Foreground = BrushHex(hex),
+                FontSize = size,
+                FontWeight = bold ? FontWeights.SemiBold : FontWeights.Normal,
+                TextWrapping = TextWrapping.Wrap,
+                Margin = margin ?? new Thickness(0, 2, 0, 0)
+            });
+        }
+        Line(full, "#F8FAFC", 13, true, new Thickness(0));
+        Line(category, "#7DD3FC", 11.5);
+        Line(evidence, "#CBD5E1", 11.5);
+        Line("能力：" + caps, "#C4B5FD", 11.5);
+        Line(models, "#93C5FD", 11.5);
+        Line(hint, "#94A3B8", 11);
+        return new Border
+        {
+            Background = BrushHex("#101826"),
+            BorderBrush = BrushHex("#334E73"),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(8),
+            Padding = new Thickness(10, 8, 10, 8),
+            MaxWidth = 320,
+            Child = stack
+        };
+    }
+
+    private static string ShortToolTileName(AgentRosterEntry agent)
+    {
+        string raw = string.IsNullOrWhiteSpace(agent.Name) ? agent.Id : agent.Name;
+        raw = raw.Replace(" (桌面端)", "", StringComparison.Ordinal)
+            .Replace(" (总包工头)", "", StringComparison.Ordinal)
+            .Replace(" CLI", "", StringComparison.Ordinal)
+            .Trim();
+        return raw;
+    }
+
+    private static string Dash(string? value) => string.IsNullOrWhiteSpace(value) ? "—" : value.Trim();
+
+    private static Border BuildTileSelectionMark(bool master)
+    {
+        var mark = new Border
+        {
+            Width = 16,
+            Height = 16,
+            CornerRadius = new CornerRadius(8),
+            HorizontalAlignment = HorizontalAlignment.Right,
+            VerticalAlignment = VerticalAlignment.Top,
+            Margin = new Thickness(0, 1, 1, 0),
+            IsHitTestVisible = false,
+            Visibility = Visibility.Collapsed
+        };
+        if (master)
+        {
+            mark.Background = BrushHex("#A78BFA");
+            mark.Child = new TextBlock
+            {
+                Text = "★",
+                FontSize = 9,
+                FontWeight = FontWeights.Bold,
+                Foreground = Brushes.White,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, -1, 0, 0)
+            };
+        }
+        else
+        {
+            mark.Background = BrushHex("#38BDF8");
+            mark.Child = new System.Windows.Shapes.Path
+            {
+                Data = Geometry.Parse("M 2.2,8 L 6.2,11.6 L 13.2,4.2"),
+                Stroke = Brushes.White,
+                StrokeThickness = 1.7,
+                StrokeStartLineCap = PenLineCap.Round,
+                StrokeEndLineCap = PenLineCap.Round,
+                Width = 14,
+                Height = 14,
+                Stretch = Stretch.None,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+        }
+        return mark;
     }
 
     private static readonly HashSet<Window> LightboxWired = new();

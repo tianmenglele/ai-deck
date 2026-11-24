@@ -60,6 +60,7 @@ public partial class MainWindow : Window
 
     // 性能优化与防卡顿缓存（避免 UI 线程每 1.5s 重建卡片树、遍历全系统进程或同步扫 100+ 对话）
     private string _lastOverviewSignature = "";
+    private string _lastOverviewCardStructSig = "";
     private Dictionary<string, (bool IsRunning, int Pid, string WindowBadge)> _cachedWindowStates = new(StringComparer.OrdinalIgnoreCase);
     private Dictionary<string, bool> _cachedDesktopBusyFlags = new(StringComparer.OrdinalIgnoreCase);
     private DateTime _lastWindowProbeUtc = DateTime.MinValue;
@@ -1129,10 +1130,11 @@ public partial class MainWindow : Window
     public bool IsModalBackdropVisibleForTest =>
         ModalBackdropOverlay != null && ModalBackdropOverlay.Visibility == Visibility.Visible;
 
-    private static FrameworkElement DecorateAvatarWithTaskCount(FrameworkElement avatar, int activeTaskCount, double avatarSize)
+    private static FrameworkElement DecorateAvatarWithTaskCount(FrameworkElement avatar, int activeTaskCount, double avatarSize, string? agentId = null)
     {
         var badge = FloatingOverlayWindow.TryBuildAvatarTaskCountBadge(activeTaskCount, avatarSize);
         if (badge == null) return avatar;
+        if (!string.IsNullOrWhiteSpace(agentId)) badge.Uid = agentId;
         var host = new Grid
         {
             Width = avatarSize,
@@ -1147,6 +1149,40 @@ public partial class MainWindow : Window
         host.Children.Add(avatar);
         host.Children.Add(badge);
         return host;
+    }
+
+    private static T? FindOverviewNamed<T>(DependencyObject? root, string name) where T : FrameworkElement
+    {
+        if (root == null) return null;
+        if (root is T typed && string.Equals(typed.Name, name, StringComparison.Ordinal))
+            return typed;
+        if (root is Panel panel)
+        {
+            foreach (UIElement child in panel.Children)
+            {
+                var hit = FindOverviewNamed<T>(child, name);
+                if (hit != null) return hit;
+            }
+            return null;
+        }
+        if (root is Decorator decorator)
+            return FindOverviewNamed<T>(decorator.Child, name);
+        return null;
+    }
+
+    private static void CollectOverviewNamedBorders(DependencyObject? root, string name, List<Border> into)
+    {
+        if (root == null) return;
+        if (root is Border border && string.Equals(border.Name, name, StringComparison.Ordinal))
+            into.Add(border);
+        if (root is Panel panel)
+        {
+            foreach (UIElement child in panel.Children)
+                CollectOverviewNamedBorders(child, name, into);
+            return;
+        }
+        if (root is Decorator decorator && decorator.Child != null)
+            CollectOverviewNamedBorders(decorator.Child, name, into);
     }
 
     private void SetStatus(string msg)
@@ -1426,7 +1462,6 @@ public partial class MainWindow : Window
                     _lastSummaryStatsTime = DateTime.MinValue;
                     if (IsLoaded && NavOverview.IsChecked == true)
                     {
-                        _lastOverviewSignature = "";
                         RenderOverviewPage(fastPoll: true);
                     }
                     if (IsLoaded && NavDialogs.IsChecked == true)
@@ -1445,6 +1480,53 @@ public partial class MainWindow : Window
 
     // ==================== PAGE 1: 协同总览与实时状态 ====================
 
+    private void UpdateOverviewCardsInPlace(
+        List<AgentRosterEntry> enabledAgents,
+        Dictionary<string, LiveAgentWorkState> liveMap)
+    {
+        int n = Math.Min(enabledAgents.Count, OverviewAgentsCards.Children.Count);
+        for (int i = 0; i < n; i++)
+        {
+            if (OverviewAgentsCards.Children[i] is not Border card) continue;
+            var ag = enabledAgents[i];
+            liveMap.TryGetValue(ag.Id, out var agLive);
+            CloudRecommendationService.EnsureAgentModelTiersPopulated(ag);
+            string activeModelBrief = (agLive != null && !string.IsNullOrWhiteSpace(agLive.SelectedModel))
+                ? agLive.SelectedModel
+                : (ag.PreferredEffortTier == "auto" ? $"自动选档 ({ag.HighTierModel})" : ag.HighTierModel);
+            activeModelBrief = TruncateOneLine(activeModelBrief, 36);
+            string stateWord = agLive?.Status switch
+            {
+                "working" => "正在执行",
+                "error" => "待处理",
+                "done" => "刚完成",
+                _ => "空闲待命"
+            };
+            var modelShort = TruncateOneLine(activeModelBrief, 18);
+            string taskBrief = agLive == null ? "" : AutoDispatchService.ExtractCleanTaskBrief(agLive.TaskSummary, 28);
+            var statusTb = FindOverviewNamed<TextBlock>(card, "OverviewStatusLine");
+            if (statusTb != null)
+            {
+                statusTb.Text = string.IsNullOrWhiteSpace(taskBrief)
+                    ? $"{modelShort} · {stateWord}"
+                    : $"{modelShort} · {stateWord} · {taskBrief}";
+                statusTb.Foreground = agLive?.Status switch
+                {
+                    "working" => Hex("#FCD34D"),
+                    "error" => Hex("#FCA5A5"),
+                    "done" => Hex("#A7F3D0"),
+                    _ => Hex("#94A3B8")
+                };
+            }
+            card.ToolTip = $"{ag.Name}\n{activeModelBrief}\n{stateWord}" +
+                           (string.IsNullOrWhiteSpace(agLive?.UpdatedAt) ? "" : $"\n{agLive.UpdatedAt}") +
+                           (string.IsNullOrWhiteSpace(taskBrief) ? "" : $"\n{taskBrief}");
+            var badge = FindOverviewNamed<Border>(card, "AvatarTaskCountBadge");
+            if (badge != null)
+                FloatingOverlayWindow.ApplyAvatarTaskCountBadge(badge, agLive?.ActiveTaskCount ?? 0, playPopIfIncreased: false);
+        }
+    }
+
     private void RenderOverviewPage(bool fastPoll = false)
     {
         var proj = _reg.GetActiveProject();
@@ -1454,31 +1536,48 @@ public partial class MainWindow : Window
         bool wfOn = _reg.UserConfig.WorkflowEngineEnabled;
         var interruptedCp = NetworkResilienceService.LoadInterruptedCheckpoint(proj);
 
-        var sigBuilder = new StringBuilder();
-        sigBuilder.Append(proj?.Id ?? "").Append('|').Append(wfOn).Append('|').Append(masterAg?.Id ?? "");
+        var structBuilder = new StringBuilder();
+        structBuilder.Append(string.Join(",", enabledAgents.Select(a => a.Id)));
+        structBuilder.Append('|').Append(wfOn).Append('|').Append(masterAg?.Id ?? "");
+        foreach (var ag in enabledAgents)
+        {
+            structBuilder.Append(';').Append(ag.Id).Append(':').Append(ag.PreferredEffortTier);
+            liveMap.TryGetValue(ag.Id, out var structLive);
+            structBuilder.Append(':').Append(structLive?.Status ?? "");
+            structBuilder.Append(':').Append(structLive?.WorkflowPhase ?? "");
+            bool running = _cachedWindowStates.TryGetValue(ag.Id, out var structWs) && structWs.IsRunning;
+            structBuilder.Append(':').Append(running ? "1" : "0");
+        }
+        var structSig = structBuilder.ToString();
+
+        var sigBuilder = new StringBuilder(structSig);
+        sigBuilder.Append("|dyn|").Append(proj?.Id ?? "");
         sigBuilder.Append('|').Append(interruptedCp?.ChainId ?? "").Append(':').Append(interruptedCp?.UpdatedAt ?? "").Append(':').Append(_isResumingCheckpointInBackground);
         foreach (var ag in enabledAgents)
         {
-            sigBuilder.Append(';').Append(ag.Id).Append(':').Append(ag.PreferredEffortTier);
-            if (liveMap.TryGetValue(ag.Id, out var lv))
-            {
-                sigBuilder.Append(':').Append(lv.Status).Append(':').Append(lv.WorkflowPhase).Append(':').Append(lv.LastFailureBadge).Append(':').Append(lv.UpdatedAt).Append(':').Append(lv.CurrentRound).Append(':').Append(lv.SessionId);
-            }
-            if (_cachedWindowStates.TryGetValue(ag.Id, out var ws))
-            {
-                sigBuilder.Append(':').Append(ws.IsRunning ? "1" : "0");
-            }
+            if (!liveMap.TryGetValue(ag.Id, out var lv)) continue;
+            sigBuilder.Append(';').Append(ag.Id)
+                .Append(':').Append(lv.UpdatedAt)
+                .Append(':').Append(lv.TaskSummary)
+                .Append(':').Append(lv.ActiveTaskCount)
+                .Append(':').Append(lv.CurrentRound)
+                .Append(':').Append(lv.SelectedModel)
+                .Append(':').Append(lv.LastFailureBadge);
         }
         var currentSig = sigBuilder.ToString();
-        if (fastPoll && string.Equals(_lastOverviewSignature, currentSig, StringComparison.Ordinal))
+        bool summaryDirty = _lastSummaryStatsTime == DateTime.MinValue;
+        bool sameStruct = string.Equals(_lastOverviewCardStructSig, structSig, StringComparison.Ordinal);
+        bool sameDynamic = string.Equals(_lastOverviewSignature, currentSig, StringComparison.Ordinal);
+        if (fastPoll && sameStruct && sameDynamic && !summaryDirty &&
+            OverviewAgentsCards.Children.Count == enabledAgents.Count)
         {
-            // 签名未变时仍轻量刷新流程图动画闸门（阶段可能仅由全局态驱动）
             SyncWorkflowDiagramAfterOverviewRender();
             return;
         }
+        _lastOverviewCardStructSig = structSig;
         _lastOverviewSignature = currentSig;
 
-        OverviewAgentsCards.Children.Clear();
+        bool rebuildOverviewCards = !sameStruct || OverviewAgentsCards.Children.Count != enabledAgents.Count;
 
         if (OverviewModeBadge != null && OverviewModeBadgeText != null && OverviewMasterBrainText != null)
         {
@@ -1509,6 +1608,12 @@ public partial class MainWindow : Window
             }
         }
 
+        if (!rebuildOverviewCards)
+            UpdateOverviewCardsInPlace(enabledAgents, liveMap);
+        else
+            OverviewAgentsCards.Children.Clear();
+
+        if (rebuildOverviewCards)
         for (int i = 0; i < enabledAgents.Count; i++)
         {
             var ag = enabledAgents[i];
@@ -1721,10 +1826,14 @@ public partial class MainWindow : Window
                 _ => "空闲待命"
             };
             var modelShort = TruncateOneLine(activeModelBrief, 18);
-            summaryLine = $"{modelShort} · {stateWord}";
+            string taskBrief = agLive == null ? "" : AutoDispatchService.ExtractCleanTaskBrief(agLive.TaskSummary, 28);
+            summaryLine = string.IsNullOrWhiteSpace(taskBrief)
+                ? $"{modelShort} · {stateWord}"
+                : $"{modelShort} · {stateWord} · {taskBrief}";
             rowBorder.ToolTip ??= $"{ag.Name}\n{activeModelBrief}\n{stateWord}";
             stack.Children.Add(new TextBlock
             {
+                Name = "OverviewStatusLine",
                 Text = summaryLine,
                 FontSize = 12,
                 Foreground = summaryBrush,

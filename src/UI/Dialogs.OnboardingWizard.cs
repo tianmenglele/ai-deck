@@ -24,8 +24,8 @@ public sealed class OnboardingWizardDialog : Window
     private readonly TextBlock[] _stepTitles = new TextBlock[3];
     private readonly Border[] _stepDots = new Border[3];
 
-    private readonly StackPanel _detectedList = new() { Margin = new Thickness(0) };
-    private readonly StackPanel _missingList = new() { Margin = new Thickness(0, 8, 0, 0) };
+    private readonly WrapPanel _detectedList = new() { Margin = new Thickness(0) };
+    private readonly WrapPanel _missingList = new() { Margin = new Thickness(0, 8, 0, 0) };
     private readonly TextBlock _scanHint = new()
     {
         Text = "",
@@ -47,13 +47,10 @@ public sealed class OnboardingWizardDialog : Window
         Cursor = Cursors.Hand
     };
 
-    private readonly ComboBox _masterCombo = new()
-    {
-        Height = 36,
-        FontSize = 14,
-        Margin = new Thickness(0, 6, 0, 0)
-    };
+    private readonly WrapPanel _masterWrap = new() { Margin = new Thickness(0, 6, 0, 0) };
     private readonly WrapPanel _workerWrap = new() { Margin = new Thickness(0, 4, 0, 0) };
+    private string _selectedMasterId = "";
+    public string SelectedMasterIdForTest => _selectedMasterId;
     private readonly TextBlock _step2Note = new()
     {
         Text = "主脑派活，勾选的人来做",
@@ -305,6 +302,8 @@ public sealed class OnboardingWizardDialog : Window
             ClipToBounds = true,
             Child = shell
         };
+        if (NameScope.GetNameScope(this) == null)
+            NameScope.SetNameScope(this, new NameScope());
         RegisterName("WizardOuterFrame", frame);
         return frame;
     }
@@ -472,7 +471,7 @@ public sealed class OnboardingWizardDialog : Window
             Foreground = Brush("#F8FAFC"),
             Margin = new Thickness(0, 10, 0, 0)
         });
-        stack.Children.Add(_masterCombo);
+        stack.Children.Add(_masterWrap);
         stack.Children.Add(new TextBlock
         {
             Text = "谁参与后台干活",
@@ -485,16 +484,6 @@ public sealed class OnboardingWizardDialog : Window
         stack.Children.Add(_step2Note);
         scroll.Content = stack;
         _page2.Children.Add(scroll);
-
-        _masterCombo.SelectionChanged += (_, _) =>
-        {
-            if (_building) return;
-            if (_masterCombo.SelectedItem is not ComboBoxItem item || item.Tag is not string id || id.Length == 0) return;
-            AssignMaster(id);
-            var ag = _reg.UserConfig.Agents.FirstOrDefault(a => string.Equals(a.Id, id, StringComparison.OrdinalIgnoreCase));
-            if (ag != null) ag.Enabled = true;
-            RefreshSummary();
-        };
     }
 
     private void BuildPage3()
@@ -627,76 +616,16 @@ public sealed class OnboardingWizardDialog : Window
         else
         {
             foreach (var ag in detected)
-                _detectedList.Children.Add(BuildAgentCard(ag, interactive: true));
+            {
+                var captured = ag;
+                _detectedList.Children.Add(Dialogs.BuildToolIconTile(
+                    captured, captured.Enabled, singleSelectMaster: false, interactive: true,
+                    on => captured.Enabled = on));
+            }
         }
 
         foreach (var ag in missing)
-            _missingList.Children.Add(BuildAgentCard(ag, interactive: false));
-    }
-
-    private UIElement BuildAgentCard(AgentRosterEntry ag, bool interactive)
-    {
-        var card = Card();
-        card.Padding = new Thickness(14, 10, 14, 10);
-        card.Margin = new Thickness(0, 0, 0, 8);
-        card.Opacity = interactive ? 1 : 0.72;
-
-        var grid = new Grid();
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-
-        var icon = new Image
-        {
-            Width = 32,
-            Height = 32,
-            Margin = new Thickness(0, 0, 12, 0),
-            VerticalAlignment = VerticalAlignment.Center
-        };
-        try { icon.Source = OfficialBrandIconService.GetOfficialIcon(ag.Id, ag); }
-        catch { /* 没有图标时只留名字 */ }
-        grid.Children.Add(icon);
-
-        var name = new TextBlock
-        {
-            Text = string.IsNullOrWhiteSpace(ag.Name) ? ag.Id : ag.Name,
-            FontSize = 15,
-            FontWeight = FontWeights.SemiBold,
-            Foreground = Brush("#F8FAFC"),
-            VerticalAlignment = VerticalAlignment.Center,
-            TextTrimming = TextTrimming.CharacterEllipsis
-        };
-        Grid.SetColumn(name, 1);
-        grid.Children.Add(name);
-
-        var toggle = new CheckBox
-        {
-            IsChecked = ag.Enabled,
-            IsEnabled = interactive,
-            VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(12, 0, 2, 0),
-            LayoutTransform = new ScaleTransform(1.25, 1.25)
-        };
-        if (interactive)
-        {
-            toggle.Checked += (_, _) => ag.Enabled = true;
-            toggle.Unchecked += (_, _) => ag.Enabled = false;
-        }
-        Grid.SetColumn(toggle, 2);
-        grid.Children.Add(toggle);
-
-        var body = new StackPanel();
-        body.Children.Add(grid);
-        body.Children.Add(new TextBlock
-        {
-            Text = ShortRole(ag),
-            FontSize = 12.5,
-            Foreground = Brush("#8EA0B8"),
-            Margin = new Thickness(44, 6, 0, 0),
-            TextTrimming = TextTrimming.CharacterEllipsis
-        });
-        card.Child = body;
-        return card;
+            _missingList.Children.Add(Dialogs.BuildToolIconTile(ag, false, singleSelectMaster: false, interactive: false, null));
     }
 
     private void RebuildStep2()
@@ -704,55 +633,74 @@ public sealed class OnboardingWizardDialog : Window
         _building = true;
         try
         {
-            _masterCombo.Items.Clear();
+            _masterWrap.Children.Clear();
             _workerWrap.Children.Clear();
             var agents = CandidateAgents();
-            string current = _reg.UserConfig.GlobalMasterPlannerId ?? "";
-            ComboBoxItem? selected = null;
-            foreach (var ag in agents)
+            string picked = ResolveWizardMasterId(agents);
+            _selectedMasterId = picked;
+            if (!string.IsNullOrEmpty(picked))
             {
-                var item = new ComboBoxItem
-                {
-                    Content = string.IsNullOrWhiteSpace(ag.Name) ? ag.Id : ag.Name,
-                    Tag = ag.Id
-                };
-                _masterCombo.Items.Add(item);
-                if (string.Equals(ag.Id, current, StringComparison.OrdinalIgnoreCase))
-                    selected = item;
+                string current = _reg.UserConfig.GlobalMasterPlannerId ?? "";
+                if (!current.Equals(picked, StringComparison.OrdinalIgnoreCase))
+                    AssignMaster(picked);
+                var chosen = agents.FirstOrDefault(a => a.Id.Equals(picked, StringComparison.OrdinalIgnoreCase));
+                if (chosen != null) chosen.Enabled = true;
             }
-            if (selected != null) _masterCombo.SelectedItem = selected;
 
             foreach (var ag in agents)
             {
-                var chip = new CheckBox
-                {
-                    Content = string.IsNullOrWhiteSpace(ag.Name) ? ag.Id : ag.Name,
-                    IsChecked = ag.Enabled,
-                    FontSize = 13,
-                    Foreground = Brush("#E6EDF7"),
-                    Margin = new Thickness(0),
-                    Padding = new Thickness(8, 3, 8, 3)
-                };
                 var captured = ag;
-                chip.Checked += (_, _) => captured.Enabled = true;
-                chip.Unchecked += (_, _) => captured.Enabled = false;
-                var shell = new Border
-                {
-                    CornerRadius = new CornerRadius(16),
-                    Background = Brush("#172233"),
-                    BorderBrush = Brush("#2C415C"),
-                    BorderThickness = new Thickness(1),
-                    Margin = new Thickness(0, 0, 6, 6),
-                    Padding = new Thickness(2, 1, 6, 1),
-                    Child = chip
-                };
-                _workerWrap.Children.Add(shell);
+                bool isMaster = captured.Id.Equals(picked, StringComparison.OrdinalIgnoreCase);
+                _masterWrap.Children.Add(Dialogs.BuildToolIconTile(
+                    captured, isMaster, singleSelectMaster: true, interactive: true,
+                    _ =>
+                    {
+                        if (_building) return;
+                        captured.Enabled = true;
+                        AssignMaster(captured.Id);
+                        _selectedMasterId = captured.Id;
+                        RebuildStep2();
+                        RefreshSummary();
+                    }));
+            }
+
+            foreach (var ag in agents)
+            {
+                var captured = ag;
+                _workerWrap.Children.Add(Dialogs.BuildToolIconTile(
+                    captured, captured.Enabled, singleSelectMaster: false, interactive: true,
+                    on =>
+                    {
+                        captured.Enabled = on;
+                        RefreshSummary();
+                    }));
             }
         }
         finally
         {
             _building = false;
         }
+    }
+
+    private string ResolveWizardMasterId(List<AgentRosterEntry> agents)
+    {
+        if (agents.Count == 0) return "";
+        string configured = _reg.UserConfig.GlobalMasterPlannerId ?? "";
+        if (!string.IsNullOrWhiteSpace(configured) &&
+            !configured.Equals("auto", StringComparison.OrdinalIgnoreCase))
+        {
+            var named = agents.FirstOrDefault(a => a.Id.Equals(configured, StringComparison.OrdinalIgnoreCase));
+            if (named != null) return named.Id;
+        }
+
+        var resolved = RoutingService.ResolveMasterPlanner(_reg, _reg.GetActiveProject());
+        if (resolved != null)
+        {
+            var hit = agents.FirstOrDefault(a => a.Id.Equals(resolved.Id, StringComparison.OrdinalIgnoreCase));
+            if (hit != null) return hit.Id;
+        }
+
+        return (agents.FirstOrDefault(a => a.Enabled) ?? agents[0]).Id;
     }
 
     private void ApplyRecommendedSplit()
@@ -840,29 +788,6 @@ public sealed class OnboardingWizardDialog : Window
         var ag = _reg.UserConfig.Agents.FirstOrDefault(a => string.Equals(a.Id, id, StringComparison.OrdinalIgnoreCase));
         if (ag == null) return "还没选定";
         return string.IsNullOrWhiteSpace(ag.Name) ? ag.Id : ag.Name;
-    }
-
-    private static string ShortRole(AgentRosterEntry ag)
-    {
-        string text = (ag.Id ?? "").ToLowerInvariant() switch
-        {
-            "cursor" => "改项目文件的主力",
-            "antigravity" => "适合做总指挥",
-            "grok_bot" => "适合出主意",
-            "codex_cli" => "后台写代码",
-            "claude_code" => "终端里写代码",
-            "claude_desktop" => "适合深想难题",
-            "chatgpt_desktop" => "聊天和写文案",
-            "gemini_cli" => "终端里帮忙",
-            "windsurf" => "另一个写代码窗",
-            "trae" => "写代码的窗口",
-            "kiro" => "写代码的窗口",
-            "ollama_local" => "本机离线模型",
-            "lm_studio" => "本机离线模型",
-            "vscode_copilot" or "copilot_cli" => "补全和改代码",
-            _ => "本机上的助手"
-        };
-        return text.Length <= 18 ? text : text[..18];
     }
 
     private static Border Card() => new()

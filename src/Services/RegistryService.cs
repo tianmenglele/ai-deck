@@ -99,6 +99,42 @@ public sealed class RegistryService
         catch { }
     }
 
+    /// <summary>把 5 份内嵌 registry JSON 与插件脚本释放到空白目录并加载探测器数量。</summary>
+    public static (int DetectorCount, bool ProbeFieldsPresent, int ReleasedFileCount) ReleaseEmbeddedBundleToBlankDirectory(string blankRoot)
+    {
+        var registryDir = Path.Combine(blankRoot, "registry");
+        var pluginsDir = Path.Combine(blankRoot, "plugins");
+        Directory.CreateDirectory(registryDir);
+        Directory.CreateDirectory(pluginsDir);
+        int released = 0;
+        foreach (var name in EmbeddedRegistryFiles)
+        {
+            var dest = Path.Combine(registryDir, name);
+            if (TryMaterializeEmbeddedResource($"AICollabHub.Embedded.registry.{name}", dest) &&
+                File.Exists(dest) && new FileInfo(dest).Length > 2)
+                released++;
+        }
+        var script = Path.Combine(pluginsDir, "export_config_digest.ps1");
+        if (TryMaterializeEmbeddedResource("AICollabHub.Embedded.plugins.export_config_digest.ps1", script) &&
+            File.Exists(script) && new FileInfo(script).Length > 2)
+            released++;
+
+        var detectorsPath = Path.Combine(registryDir, "detectors.json");
+        var parsed = JsonSerializer.Deserialize<DetectorRegistryFile>(File.ReadAllText(detectorsPath, Encoding.UTF8), JsonOpts);
+        var dets = parsed?.Detectors ?? new List<DetectorSpec>();
+        bool probes = dets.Count > 0 && dets.All(d =>
+            !string.IsNullOrWhiteSpace(d.Id) &&
+            (d.ProbePaths.Any(s => !string.IsNullOrWhiteSpace(s)) ||
+             d.ProbeCommands.Any(s => !string.IsNullOrWhiteSpace(s)) ||
+             d.ProbeProcessNames.Any(s => !string.IsNullOrWhiteSpace(s)) ||
+             d.ProbeDisplayNames.Any(s => !string.IsNullOrWhiteSpace(s)) ||
+             d.ProbeExtensionIds.Any(s => !string.IsNullOrWhiteSpace(s)) ||
+             d.ProbeMsixPrefixes.Any(s => !string.IsNullOrWhiteSpace(s)) ||
+             d.ProbePorts.Count > 0 ||
+             !string.IsNullOrWhiteSpace(d.JsonNodesFile)));
+        return (dets.Count, probes, released);
+    }
+
     /// <summary>PluginsDir 缺少 export_config_digest.ps1 时按需释放内嵌脚本。</summary>
     public static void EnsureEmbeddedPluginScriptMaterialized()
     {

@@ -47,6 +47,7 @@ public partial class FloatingOverlayWindow : Window
     private string _lastStateSignature = "";
     private string _lastRowStructureSig = "";
     private string _lastCapsuleAvatarSig = "";
+    private string? _lastAppliedThemeStyle;
     private readonly Dictionary<string, string> _rowStructSigs = new(StringComparer.OrdinalIgnoreCase);
     private bool _appExitShutdown;
     private bool _lastDiskFloatingCollapsed;
@@ -439,6 +440,14 @@ public partial class FloatingOverlayWindow : Window
         ApplyAdaptiveContentLayout();
     }
 
+    public UIElement[] CaptureAgentRowIdentitiesForTest()
+    {
+        var rows = new UIElement[FloatingAgentsStack.Children.Count];
+        for (int i = 0; i < rows.Length; i++)
+            rows[i] = FloatingAgentsStack.Children[i];
+        return rows;
+    }
+
     public void RefreshOverlayData(bool force = false, bool forceRebuildRows = false)
     {
         if (_reg.ReloadUserConfigFromDiskIfNeeded())
@@ -500,7 +509,9 @@ public partial class FloatingOverlayWindow : Window
         }
         _lastStateSignature = currentSig;
 
-        ApplyThemeVisual();
+        var themeStyle = _reg.UserConfig.FloatingThemeStyle ?? "";
+        if (!string.Equals(_lastAppliedThemeStyle, themeStyle, StringComparison.Ordinal))
+            ApplyThemeVisual();
         bool wfOn = _reg.UserConfig.WorkflowEngineEnabled;
         if (HeaderWorkflowBtn != null)
         {
@@ -511,19 +522,10 @@ public partial class FloatingOverlayWindow : Window
                 : "协同工作流已停用 · 独立模式（点击可重新开启多 AI 协同）";
         }
 
-        var activeWorkingState = liveMap.Values.FirstOrDefault(v => (v.Status == "working" || v.Status == "reworking") && !string.IsNullOrWhiteSpace(v.ProjectName));
         if (HeaderProjBadgeHost != null)
         {
-            if (activeWorkingState != null)
-            {
-                HeaderProjBadge.Text = activeWorkingState.ProjectName.Split(' ')[0];
-                HeaderProjBadgeHost.Visibility = Visibility.Visible;
-            }
-            else
-            {
-                HeaderProjBadge.Text = "";
-                HeaderProjBadgeHost.Visibility = Visibility.Collapsed;
-            }
+            if (HeaderProjBadge != null) HeaderProjBadge.Text = string.Empty;
+            HeaderProjBadgeHost.Visibility = Visibility.Collapsed;
         }
         SyncLayoutModeButtonUi();
         if (HeaderPolicyText != null && HeaderPolicyMetaText != null && ActivePolicyStrip != null)
@@ -677,16 +679,20 @@ public partial class FloatingOverlayWindow : Window
             int taskCount = lv?.ActiveTaskCount ?? 0;
             bool isLast = idx == enabledAgents.Count - 1;
             avatarSig.Append(ag.Id).Append(':').Append((int)rich.Kind).Append(':')
-                .Append(rich.BadgeText).Append(':').Append(lv?.Status ?? "").Append(':')
-                .Append(taskCount).Append(';');
+                .Append(rich.BadgeText).Append(':').Append(lv?.Status ?? "").Append(';');
             avatarSlots.Add((ag, rich, taskCount, isLast));
             if (rich.IsActiveWork && briefRich == null)
             {
                 briefRich = rich;
                 briefTaskCount = taskCount;
             }
-            tipLines.Add(AppendParallelTaskHint(
-                $"{ShortAgentName(ag.Name)} · {rich.BadgeText} · {rich.StatusLine}", taskCount));
+            string tipLine = taskCount >= 2
+                ? $"{ShortAgentName(ag.Name)} · {FormatStableParallelStatus(lv, rich.StatusLine)}"
+                : $"{ShortAgentName(ag.Name)} · {rich.BadgeText} · {rich.StatusLine}";
+            string parallelList = FormatParallelTaskList(lv);
+            if (!string.IsNullOrWhiteSpace(parallelList))
+                tipLine += "\n" + parallelList;
+            tipLines.Add(tipLine);
         }
 
         string avatarSigText = avatarSig.ToString();
@@ -701,6 +707,10 @@ public partial class FloatingOverlayWindow : Window
                     activeTaskCount: slot.TaskCount));
             }
             _lastCapsuleAvatarSig = avatarSigText;
+        }
+        else
+        {
+            UpdateCollapsedAvatarBadgesInPlace(avatarSlots);
         }
 
         string briefText;
@@ -719,9 +729,9 @@ public partial class FloatingOverlayWindow : Window
             var rich = agEntry != null
                 ? ResolveRichStatus(agEntry, w, true, liveMap)
                 : ResolveWorkerRich(w, true);
-            briefText = AppendParallelTaskHint(
-                $"{shortAg} · {CompactCapsuleStage(rich.Kind)}「{taskTitle}」",
-                w.ActiveTaskCount);
+            briefText = w.ActiveTaskCount >= 2
+                ? $"{shortAg} · {FormatStableParallelStatus(w, taskTitle)}"
+                : $"{shortAg} · {CompactCapsuleStage(rich.Kind)}「{taskTitle}」";
             briefFg = Hex(rich.TextHex);
         }
         else
@@ -739,8 +749,9 @@ public partial class FloatingOverlayWindow : Window
             }
             else if (briefRich != null)
             {
-                briefText = AppendParallelTaskHint(
-                    $"进行中 · {CompactCapsuleStage(briefRich.Value.Kind)}", briefTaskCount);
+                briefText = briefTaskCount >= 2
+                    ? $"「最新焦点任务」等 {briefTaskCount} 项并行中"
+                    : $"进行中 · {CompactCapsuleStage(briefRich.Value.Kind)}";
                 briefFg = Hex(briefRich.Value.TextHex);
             }
             else
@@ -815,7 +826,6 @@ public partial class FloatingOverlayWindow : Window
             agLive?.SelectedEffortTier ?? "",
             agLive?.SelectedModel ?? "",
             ResolveTierShortTag(ag, agLive, rich.IsActiveWork),
-            agLive?.ActiveTaskCount ?? 0,
             canResume,
             hasError,
             hasSession);
@@ -846,12 +856,55 @@ public partial class FloatingOverlayWindow : Window
         return "★自动选档";
     }
 
-    private static string AppendParallelTaskHint(string line, int activeTaskCount)
+    private static string FormatStableParallelStatus(LiveAgentWorkState? live, string fallback)
     {
-        if (activeTaskCount < 2) return line;
-        string hint = $"并行任务数 {activeTaskCount}";
-        if (line.Contains(hint, StringComparison.Ordinal)) return line;
-        return string.IsNullOrWhiteSpace(line) ? hint : $"{line} · {hint}";
+        int n = live?.ActiveTaskCount ?? 0;
+        if (n < 2) return fallback;
+        return $"「最新焦点任务」等 {n} 项并行中";
+    }
+
+    private static string FormatParallelTaskList(LiveAgentWorkState? live)
+    {
+        if (live == null || live.ActiveTaskCount < 2) return "";
+        var lines = new List<string>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (live.ActiveTaskTitles != null)
+        {
+            foreach (var raw in live.ActiveTaskTitles)
+            {
+                var title = (raw ?? "").Trim();
+                if (title.Length == 0 || !seen.Add(title)) continue;
+                lines.Add("· " + title);
+            }
+        }
+        if (lines.Count == 0)
+        {
+            var brief = AutoDispatchService.ExtractCleanTaskBrief(live.TaskSummary, 32);
+            if (!string.IsNullOrWhiteSpace(brief) && seen.Add(brief))
+                lines.Add("· " + brief);
+        }
+        if (lines.Count == 0) return "";
+        return "并行任务：\n" + string.Join("\n", lines);
+    }
+
+    private void UpdateCollapsedAvatarBadgesInPlace(
+        List<(AgentRosterEntry Agent, FloatingRichStatus Rich, int TaskCount, bool IsLast)> slots)
+    {
+        if (CapsuleAvatarsPanel == null) return;
+        foreach (var slot in slots)
+        {
+            foreach (UIElement child in CapsuleAvatarsPanel.Children)
+            {
+                if (child is not FrameworkElement fe) continue;
+                if (fe.Tag is not string tag ||
+                    !tag.Equals("avatar:" + slot.Agent.Id, StringComparison.OrdinalIgnoreCase))
+                    continue;
+                var badge = FindNamedDescendant<Border>(fe, "AvatarTaskCountBadge");
+                if (badge != null)
+                    ApplyAvatarTaskCountBadge(badge, slot.TaskCount, playPopIfIncreased: true);
+                break;
+            }
+        }
     }
 
     private void UpdateRowDynamicContentInPlace(
@@ -864,9 +917,12 @@ public partial class FloatingOverlayWindow : Window
         var statusTb = FindNamedDescendant<TextBlock>(rowBorder, "TaskStatusLine");
         if (statusTb != null)
         {
-            statusTb.Text = AppendParallelTaskHint(rich.StatusLine, agLive?.ActiveTaskCount ?? 0);
+            statusTb.Text = FormatStableParallelStatus(agLive, rich.StatusLine);
             statusTb.Foreground = Hex(rich.TextHex);
         }
+        var rowBadge = FindNamedDescendant<Border>(rowBorder, "AvatarTaskCountBadge");
+        if (rowBadge != null)
+            ApplyAvatarTaskCountBadge(rowBadge, agLive?.ActiveTaskCount ?? 0, playPopIfIncreased: true);
         var timeTb = FindNamedDescendant<TextBlock>(rowBorder, "UpdatedTimeText");
         if (timeTb != null && agLive != null)
         {
@@ -891,7 +947,7 @@ public partial class FloatingOverlayWindow : Window
     {
         var rich = precomputedRich ?? ResolveRichStatus(ag, agLive, winSt.IsRunning, liveMap);
         var pal = ThemeService.Resolve(_reg.UserConfig.FloatingThemeStyle);
-        string statusLine = AppendParallelTaskHint(rich.StatusLine, agLive?.ActiveTaskCount ?? 0);
+        string statusLine = FormatStableParallelStatus(agLive, rich.StatusLine);
         string ringHex = rich.AccentHex;
         string textHex = rich.TextHex;
         bool isWorking = rich.IsActiveWork;
@@ -1552,6 +1608,18 @@ public partial class FloatingOverlayWindow : Window
         if (agLive != null && agLive.ActiveTaskCount >= 2)
             AddPill($"并行任务数 {agLive.ActiveTaskCount}", "#7C2D12", "#FFEDD5");
         root.Children.Add(metaWrap);
+        string parallelList = FormatParallelTaskList(agLive);
+        if (!string.IsNullOrWhiteSpace(parallelList))
+        {
+            root.Children.Add(new TextBlock
+            {
+                Text = parallelList,
+                FontSize = 11,
+                Foreground = Hex("#FDBA74"),
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(0, 0, 0, 6)
+            });
+        }
 
         // 3. 若有当前任务状态，结构化呈现核心信息（自动剥离 Markdown 杂音）
         if (agLive != null && !string.IsNullOrWhiteSpace(agLive.TaskSummary))
@@ -1794,7 +1862,11 @@ public partial class FloatingOverlayWindow : Window
 
     private void ApplyThemeVisual()
     {
-        var p = ThemeService.Resolve(_reg.UserConfig.FloatingThemeStyle);
+        var style = _reg.UserConfig.FloatingThemeStyle ?? "";
+        if (string.Equals(_lastAppliedThemeStyle, style, StringComparison.Ordinal))
+            return;
+        _lastAppliedThemeStyle = style;
+        var p = ThemeService.Resolve(style);
         var bgBrush = Hex(p.FloatOuterBgHex);
         Background = System.Windows.Media.Brushes.Transparent;
         OuterFrame.Background = bgBrush;

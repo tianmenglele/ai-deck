@@ -20,7 +20,8 @@ public sealed record DesktopBusyProbeResult(
     DateTime ProbedUtc,
     bool IsInconclusive = false,
     bool ProcessFound = true,
-    int ActiveTaskCount = 0);
+    int ActiveTaskCount = 0,
+    IReadOnlyList<string>? ActiveTaskTitles = null);
 
 public sealed class LiveAgentWorkState
 {
@@ -64,6 +65,10 @@ public sealed class LiveAgentWorkState
     /// <summary>仅内存展示：同 Agent 并发活跃任务数（磁盘跨工程 + 桌面探测汇总）。</summary>
     [System.Text.Json.Serialization.JsonIgnore]
     public int ActiveTaskCount { get; set; }
+
+    /// <summary>仅内存展示：当前并发任务标题（去重，不落盘）。</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public List<string> ActiveTaskTitles { get; set; } = new();
 }
 
 public sealed class AutoDispatchService
@@ -5157,7 +5162,8 @@ Write-Output ('DISPATCHED_CONFIRMED:' + $selectedChatTitle)
                         nowUtc,
                         IsInconclusive: true,
                         ProcessFound: raw.ProcessFound,
-                        ActiveTaskCount: prev.ActiveTaskCount);
+                        ActiveTaskCount: prev.ActiveTaskCount,
+                        ActiveTaskTitles: prev.ActiveTaskTitles);
                     LiveDesktopBusyCache[agentId] = result;
                     DesktopBusyDebounceByAgent[agentId] = new DesktopBusyDebounceTracker(
                         prev.IsWorking,
@@ -5213,7 +5219,8 @@ Write-Output ('DISPATCHED_CONFIRMED:' + $selectedChatTitle)
                     nowUtc,
                     raw.IsInconclusive,
                     raw.ProcessFound,
-                    taskCount);
+                    taskCount,
+                    raw.ActiveTaskTitles);
                 LiveDesktopBusyCache[agentId] = result;
             }
 
@@ -5254,8 +5261,8 @@ Write-Output ('DISPATCHED_CONFIRMED:' + $selectedChatTitle)
                 hDesk = OpenDesktopW("Default", 0, false, 0x01FF);
                 if (hDesk != IntPtr.Zero)
                     SetThreadDesktop(hDesk);
-                var (working, title, inconclusive, processFound, taskCount) = ProbeGlobalDesktopBusyViaInProcessUia(procNames, hDesk);
-                result = new DesktopBusyProbeResult(working, title, "", DateTime.UtcNow, inconclusive, processFound, taskCount);
+                var (working, title, inconclusive, processFound, taskCount, titles) = ProbeGlobalDesktopBusyViaInProcessUia(procNames, hDesk);
+                result = new DesktopBusyProbeResult(working, title, "", DateTime.UtcNow, inconclusive, processFound, taskCount, titles);
             }
             catch
             {
@@ -5279,7 +5286,7 @@ Write-Output ('DISPATCHED_CONFIRMED:' + $selectedChatTitle)
     }
 
     /// <summary>全窗口忙碌：Stop generation / Stop execution / Steer / 侧栏 Working。2200ms 内遍历全部可见窗口并汇总 ActiveTaskCount。</summary>
-    static (bool IsWorking, string ChatTitle, bool IsInconclusive, bool ProcessFound, int ActiveTaskCount) ProbeGlobalDesktopBusyViaInProcessUia(List<string> procNames, IntPtr hDesktop)
+    static (bool IsWorking, string ChatTitle, bool IsInconclusive, bool ProcessFound, int ActiveTaskCount, IReadOnlyList<string> ActiveTaskTitles) ProbeGlobalDesktopBusyViaInProcessUia(List<string> procNames, IntPtr hDesktop)
     {
         var ownedProcs = new List<System.Diagnostics.Process>();
         var sw = System.Diagnostics.Stopwatch.StartNew();
@@ -5302,13 +5309,14 @@ Write-Output ('DISPATCHED_CONFIRMED:' + $selectedChatTitle)
             }
 
             if (ownedProcs.Count == 0)
-                return (false, "", false, false, 0);
+                return (false, "", false, false, 0, Array.Empty<string>());
 
-            bool TryReadWindow(System.Windows.Automation.AutomationElement? el, out bool isWorking, out string chatTitle, out int taskCount)
+            bool TryReadWindow(System.Windows.Automation.AutomationElement? el, out bool isWorking, out string chatTitle, out int taskCount, out IReadOnlyList<string> titles)
             {
                 isWorking = false;
                 chatTitle = "";
                 taskCount = 0;
+                titles = Array.Empty<string>();
                 if (el == null)
                     return false;
                 try
@@ -5319,6 +5327,7 @@ Write-Output ('DISPATCHED_CONFIRMED:' + $selectedChatTitle)
                     isWorking = hit.IsWorking;
                     chatTitle = hit.ChatTitle;
                     taskCount = hit.ActiveTaskCount;
+                    titles = hit.ActiveTaskTitles;
                     return true;
                 }
                 catch
@@ -5327,26 +5336,28 @@ Write-Output ('DISPATCHED_CONFIRMED:' + $selectedChatTitle)
                 }
             }
 
-            void Accumulate(bool working, string title, int taskCount)
+            void Accumulate(bool working, string title, int taskCount, IReadOnlyList<string>? titles)
             {
                 if (!working) return;
                 if (string.IsNullOrWhiteSpace(firstTitle) && !string.IsNullOrWhiteSpace(title))
                     firstTitle = title;
-                if (taskCount > 1)
+                int named = 0;
+                if (titles != null)
                 {
-                    // 单窗口内已去重多个会话
-                    if (!string.IsNullOrWhiteSpace(title))
-                        busyTitles.Add(title);
-                    anonymousBusyWindows += Math.Max(0, taskCount - (string.IsNullOrWhiteSpace(title) ? 0 : 1));
+                    foreach (var raw in titles)
+                    {
+                        var clean = (raw ?? "").Trim();
+                        if (clean.Length == 0 || clean.StartsWith("anon:", StringComparison.OrdinalIgnoreCase)) continue;
+                        if (busyTitles.Add(clean)) named++;
+                    }
                 }
-                else if (!string.IsNullOrWhiteSpace(title))
-                {
-                    busyTitles.Add(title);
-                }
-                else
-                {
+                if (named == 0 && !string.IsNullOrWhiteSpace(title) && busyTitles.Add(title))
+                    named = 1;
+                int unnamed = Math.Max(0, taskCount - named);
+                if (taskCount <= 1 && named == 0 && string.IsNullOrWhiteSpace(title))
                     anonymousBusyWindows++;
-                }
+                else
+                    anonymousBusyWindows += unnamed;
             }
 
             foreach (var proc in ownedProcs)
@@ -5373,8 +5384,8 @@ Write-Output ('DISPATCHED_CONFIRMED:' + $selectedChatTitle)
                                 abortedByBudget = true;
                                 break;
                             }
-                            if (TryReadWindow(topWins[i], out bool working, out string title, out int tc))
-                                Accumulate(working, title, tc);
+                            if (TryReadWindow(topWins[i], out bool working, out string title, out int tc, out var titles))
+                                Accumulate(working, title, tc, titles);
                         }
                     }
                     catch
@@ -5395,8 +5406,8 @@ Write-Output ('DISPATCHED_CONFIRMED:' + $selectedChatTitle)
                     try
                     {
                         var el = System.Windows.Automation.AutomationElement.FromHandle(hwnd);
-                        if (TryReadWindow(el, out bool working, out string title, out int tc))
-                            Accumulate(working, title, tc);
+                        if (TryReadWindow(el, out bool working, out string title, out int tc, out var titles))
+                            Accumulate(working, title, tc, titles);
                     }
                     catch
                     {
@@ -5415,14 +5426,15 @@ Write-Output ('DISPATCHED_CONFIRMED:' + $selectedChatTitle)
         }
 
         int totalTasks = busyTitles.Count + anonymousBusyWindows;
+        var titleList = busyTitles.ToList();
         if (totalTasks > 0)
-            return (true, firstTitle, false, true, totalTasks);
+            return (true, firstTitle, false, true, totalTasks, titleList);
 
         // 无超时且至少完整读完 1 个窗口、又没有忙碌信号：可靠空闲。
         // 预算中止、采样全部失败，或一个窗口都没读到：不确定，不能当成空闲。
         if (!abortedByBudget && windowsReadOk >= 1)
-            return (false, "", false, true, 0);
-        return (false, "", true, true, 0);
+            return (false, "", false, true, 0, Array.Empty<string>());
+        return (false, "", true, true, 0, Array.Empty<string>());
     }
 
     public static (bool IsWorking, string ChatTitle) EvaluateGlobalDesktopBusy(SidebarBusyWindowSnapshot? snap)
@@ -5432,10 +5444,11 @@ Write-Output ('DISPATCHED_CONFIRMED:' + $selectedChatTitle)
     }
 
     /// <summary>统计各分组中命中 Working 的去重会话数；无分组匹配但 Stop/Steer 为真则计为 1。</summary>
-    public static (bool IsWorking, string ChatTitle, int ActiveTaskCount) EvaluateGlobalDesktopBusyDetailed(SidebarBusyWindowSnapshot? snap)
+    public static (bool IsWorking, string ChatTitle, int ActiveTaskCount, IReadOnlyList<string> ActiveTaskTitles) EvaluateGlobalDesktopBusyDetailed(SidebarBusyWindowSnapshot? snap)
     {
         snap ??= new SidebarBusyWindowSnapshot();
         var titles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var ordered = new List<string>();
         string first = "";
         foreach (var g in snap.Groups)
         {
@@ -5444,18 +5457,23 @@ Write-Output ('DISPATCHED_CONFIRMED:' + $selectedChatTitle)
                 if (!SidebarChatButtonIndicatesWorking(bn)) continue;
                 var clean = CleanSidebarChatButtonName(bn);
                 var title = string.IsNullOrWhiteSpace(g.Name) ? clean : g.Name + "/" + clean;
-                if (string.IsNullOrWhiteSpace(first)) first = title;
+                if (string.IsNullOrWhiteSpace(first) && !string.IsNullOrWhiteSpace(title)) first = title;
                 if (!string.IsNullOrWhiteSpace(title))
-                    titles.Add(title);
+                {
+                    if (titles.Add(title)) ordered.Add(title);
+                }
                 else
-                    titles.Add($"anon:{titles.Count}");
+                {
+                    var anon = $"anon:{titles.Count}";
+                    if (titles.Add(anon)) ordered.Add(anon);
+                }
             }
         }
         if (titles.Count > 0)
-            return (true, first, titles.Count);
+            return (true, first, titles.Count, ordered);
         if (snap.HasStopGeneration || snap.HasSteerWithoutInterrupting)
-            return (true, "", 1);
-        return (false, "", 0);
+            return (true, "", 1, Array.Empty<string>());
+        return (false, "", 0, Array.Empty<string>());
     }
 
     private static LiveAgentWorkState CloneLiveWorkStateForDisplay(LiveAgentWorkState src)
@@ -5495,8 +5513,29 @@ Write-Output ('DISPATCHED_CONFIRMED:' + $selectedChatTitle)
             LatestLogTail = src.LatestLogTail,
             OutputInboxFile = src.OutputInboxFile,
             ActiveTaskCount = src.ActiveTaskCount,
+            ActiveTaskTitles = src.ActiveTaskTitles != null ? new List<string>(src.ActiveTaskTitles) : new List<string>(),
             IsDesktopLiveOverlay = src.IsDesktopLiveOverlay
         };
+    }
+
+    private static void MergeActiveTaskTitles(LiveAgentWorkState display, IReadOnlyList<string>? extra)
+    {
+        var merged = new List<string>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        void AddRange(IEnumerable<string>? src)
+        {
+            if (src == null) return;
+            foreach (var raw in src)
+            {
+                var title = (raw ?? "").Trim();
+                if (title.Length == 0 || title.StartsWith("anon:", StringComparison.OrdinalIgnoreCase)) continue;
+                if (!seen.Add(title)) continue;
+                merged.Add(title);
+            }
+        }
+        AddRange(display.ActiveTaskTitles);
+        AddRange(extra);
+        display.ActiveTaskTitles = merged;
     }
 
     /// <summary>
@@ -5537,6 +5576,7 @@ Write-Output ('DISPATCHED_CONFIRMED:' + $selectedChatTitle)
             display.ActiveTaskCount = Math.Max(
                 diskWorkingCount,
                 probe.IsWorking ? Math.Max(1, probe.ActiveTaskCount) : 0);
+            MergeActiveTaskTitles(display, probe.ActiveTaskTitles);
 
             // 桌面端实时忙碌：强制 working/executing，不受跨工程残留 done/error 影响
             bool preserveDispatchTask = display.Status is "working" or "reworking";
@@ -5645,20 +5685,38 @@ Write-Output ('DISPATCHED_CONFIRMED:' + $selectedChatTitle)
             if (!active)
             {
                 display.ActiveTaskCount = 0;
+                display.ActiveTaskTitles = new List<string>();
                 continue;
             }
             int probeCount = 0;
+            IReadOnlyList<string>? probeTitles = null;
             if (LiveDesktopBusyCache.TryGetValue(kv.Key, out var probe) &&
                 probe.IsWorking &&
                 (DateTime.UtcNow - probe.ProbedUtc).TotalMilliseconds <= DesktopLiveProbeDisplayStaleMs)
             {
                 probeCount = Math.Max(1, probe.ActiveTaskCount);
+                probeTitles = probe.ActiveTaskTitles;
             }
             else if (TestDesktopBusyOverrides.TryGetValue(kv.Key, out var tprobe) && tprobe.IsWorking)
             {
                 probeCount = Math.Max(1, tprobe.ActiveTaskCount);
+                probeTitles = tprobe.ActiveTaskTitles;
             }
+            int prevCount = display.ActiveTaskCount;
             display.ActiveTaskCount = Math.Max(diskWorkingCount, probeCount);
+            if (probeTitles != null) MergeActiveTaskTitles(display, probeTitles);
+            if (display.ActiveTaskTitles.Count == 0 && !string.IsNullOrWhiteSpace(display.TaskSummary))
+            {
+                var brief = ExtractCleanTaskBrief(display.TaskSummary, 32);
+                if (!string.IsNullOrWhiteSpace(brief)) display.ActiveTaskTitles.Add(brief);
+            }
+            // 并发从 2 降到 1 仍保持 working，避免界面回闪空闲
+            if (prevCount >= 2 && display.ActiveTaskCount == 1 && display.Status is not ("working" or "reworking"))
+            {
+                display.Status = "working";
+                if (string.IsNullOrWhiteSpace(display.WorkflowPhase) || display.WorkflowPhase is "idle" or "done" or "verified_delivered")
+                    display.WorkflowPhase = "executing";
+            }
         }
 
         return result;
@@ -7530,6 +7588,23 @@ Write-Output ('DISPATCHED_CONFIRMED:' + $selectedChatTitle)
             diskWorkingCounts[item.AgentId] = c + 1;
         }
 
+        var titlesByAgent = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+        foreach (var item in all.Values)
+        {
+            if (string.IsNullOrWhiteSpace(item.AgentId)) continue;
+            if (item.Status is not ("working" or "reworking")) continue;
+            if (!titlesByAgent.TryGetValue(item.AgentId, out var bucket))
+            {
+                bucket = new List<string>();
+                titlesByAgent[item.AgentId] = bucket;
+            }
+            var title = ExtractCleanTaskBrief(item.TaskSummary, 32);
+            if (string.IsNullOrWhiteSpace(title)) title = (item.SessionTitle ?? "").Trim();
+            if (string.IsNullOrWhiteSpace(title)) continue;
+            if (bucket.Any(x => x.Equals(title, StringComparison.OrdinalIgnoreCase))) continue;
+            bucket.Add(title);
+        }
+
         var result = new Dictionary<string, LiveAgentWorkState>(StringComparer.OrdinalIgnoreCase);
         foreach (var item in all.Values)
         {
@@ -7551,6 +7626,9 @@ Write-Output ('DISPATCHED_CONFIRMED:' + $selectedChatTitle)
         {
             diskWorkingCounts.TryGetValue(kv.Key, out int diskWorkingCount);
             kv.Value.ActiveTaskCount = diskWorkingCount;
+            kv.Value.ActiveTaskTitles = titlesByAgent.TryGetValue(kv.Key, out var titles)
+                ? titles
+                : new List<string>();
         }
         return result;
     }

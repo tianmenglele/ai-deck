@@ -478,18 +478,20 @@ public partial class FloatingOverlayWindow
         return host;
     }
 
-    /// <summary>并行任务数 ≥ 2 时在头像右上角叠数字角标，右下角状态点保持可见。</summary>
+    /// <summary>头像右上角任务角标始终预挂；数量 &lt; 2 时折叠，避免增删子元素打断圆环。</summary>
     public static Border? TryBuildAvatarTaskCountBadge(int activeTaskCount, double avatarSize)
     {
-        if (activeTaskCount < 2) return null;
-        string label = activeTaskCount > 9 ? "9+" : activeTaskCount.ToString();
+        int count = Math.Max(0, activeTaskCount);
+        bool show = count >= 2;
+        string label = count > 9 ? "9+" : count.ToString();
         double side = Math.Clamp(avatarSize * 0.42, 11, 16);
-        if (label.Length > 1) side = Math.Clamp(Math.Max(side, avatarSize * 0.5), 13, 18);
+        if (show && label.Length > 1) side = Math.Clamp(Math.Max(side, avatarSize * 0.5), 13, 18);
         double font = label.Length > 1 ? Math.Max(7.0, side * 0.42) : Math.Max(8.0, side * 0.52);
         return new Border
         {
             Name = "AvatarTaskCountBadge",
-            Tag = "task_count:" + activeTaskCount,
+            Tag = "task_count:" + count,
+            Visibility = show ? Visibility.Visible : Visibility.Collapsed,
             Width = side,
             Height = side,
             MinWidth = side,
@@ -503,7 +505,7 @@ public partial class FloatingOverlayWindow
             IsHitTestVisible = false,
             Child = new TextBlock
             {
-                Text = label,
+                Text = show ? label : "",
                 Foreground = Brushes.White,
                 FontWeight = FontWeights.Bold,
                 FontSize = font,
@@ -513,6 +515,51 @@ public partial class FloatingOverlayWindow
                 Padding = new Thickness(0)
             }
         };
+    }
+
+    /// <summary>原地切换角标显隐、数字与 Tag。数量递增且 ≥ 2 时只弹角标本身。</summary>
+    public static void ApplyAvatarTaskCountBadge(Border badge, int activeTaskCount, bool playPopIfIncreased)
+    {
+        int prev = 0;
+        if (badge.Tag is string tag &&
+            tag.StartsWith("task_count:", StringComparison.Ordinal) &&
+            int.TryParse(tag.AsSpan("task_count:".Length), out var parsed))
+        {
+            prev = parsed;
+        }
+        int count = Math.Max(0, activeTaskCount);
+        bool show = count >= 2;
+        string label = count > 9 ? "9+" : count.ToString();
+        double side = show && label.Length > 1 ? 16 : 14;
+        badge.Width = side;
+        badge.Height = side;
+        badge.MinWidth = side;
+        badge.CornerRadius = new CornerRadius(side / 2.0);
+        badge.Tag = "task_count:" + count;
+        badge.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+        if (badge.Child is TextBlock tb)
+        {
+            tb.Text = show ? label : "";
+            tb.FontSize = label.Length > 1 ? 7.5 : 8.5;
+        }
+        if (playPopIfIncreased && count > prev && count >= 2)
+            PlayTaskBadgePop(badge);
+    }
+
+    private static void PlayTaskBadgePop(Border badge)
+    {
+        if (badge.RenderTransform is not ScaleTransform scale)
+        {
+            scale = new ScaleTransform(1, 1);
+            badge.RenderTransform = scale;
+            badge.RenderTransformOrigin = new Point(0.5, 0.5);
+        }
+        var anim = new DoubleAnimationUsingKeyFrames { Duration = TimeSpan.FromMilliseconds(260) };
+        anim.KeyFrames.Add(new LinearDoubleKeyFrame(1.0, KeyTime.FromTimeSpan(TimeSpan.Zero)));
+        anim.KeyFrames.Add(new LinearDoubleKeyFrame(1.26, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(130))));
+        anim.KeyFrames.Add(new LinearDoubleKeyFrame(1.0, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(260))));
+        scale.BeginAnimation(ScaleTransform.ScaleXProperty, anim);
+        scale.BeginAnimation(ScaleTransform.ScaleYProperty, anim);
     }
 
     public static FrameworkElement WrapAvatarWithTaskBadge(FrameworkElement avatar, int activeTaskCount, double avatarSize)

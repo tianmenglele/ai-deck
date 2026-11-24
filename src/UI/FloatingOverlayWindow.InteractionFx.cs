@@ -105,6 +105,8 @@ public partial class FloatingOverlayWindow
     private readonly Dictionary<string, string> _prevPhaseByAgent = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, int> _prevRoundByAgent = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, string> _prevStatusByAgent = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, int> _prevTaskCountByAgent = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, string> _prevTaskKeyByAgent = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, (string Status, string Phase)> _desktopOverlayBaselineByAgent = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, FrameworkElement> _avatarHostsByAgent = new(StringComparer.OrdinalIgnoreCase);
     private bool _interactionBaselineReady;
@@ -717,13 +719,8 @@ public partial class FloatingOverlayWindow
         }
         if (HeaderProjBadgeHost != null)
         {
-            HeaderProjBadgeHost.Margin = ultraNarrow ? new Thickness(0, 0, 3, 0) : new Thickness(6, 0, 0, 0);
-            HeaderProjBadgeHost.MinWidth = ultraNarrow ? 18 : 0;
-            HeaderProjBadgeHost.MaxWidth = ultraNarrow
-                ? Math.Clamp(contentW * 0.22, 32, 48)
-                : (compactHeader
-                    ? Math.Max(110, contentW * 0.34)
-                    : Math.Max(96, contentW * 0.30));
+            HeaderProjBadgeHost.Visibility = Visibility.Collapsed;
+            if (HeaderProjBadge != null) HeaderProjBadge.Text = string.Empty;
         }
         if (DragHeaderBar != null)
         {
@@ -928,6 +925,8 @@ public partial class FloatingOverlayWindow
                 _prevStatusByAgent[ag.Id] = lv?.Status ?? "idle";
                 _prevPhaseByAgent[ag.Id] = lv?.WorkflowPhase ?? "idle";
                 _prevRoundByAgent[ag.Id] = lv?.CurrentRound ?? 1;
+                _prevTaskCountByAgent[ag.Id] = lv?.ActiveTaskCount ?? 0;
+                _prevTaskKeyByAgent[ag.Id] = BuildInteractionTaskKey(lv);
                 if (lv?.IsDesktopLiveOverlay == true)
                 {
                     bareMap ??= AutoDispatchService.ReadLatestGlobalWorkStates();
@@ -950,12 +949,27 @@ public partial class FloatingOverlayWindow
             string curStatus = lv?.Status ?? "idle";
             string curPhase = lv?.WorkflowPhase ?? "idle";
             int curRound = lv?.CurrentRound ?? 1;
+            int curCount = lv?.ActiveTaskCount ?? 0;
+            string curTaskKey = BuildInteractionTaskKey(lv);
             _prevStatusByAgent.TryGetValue(ag.Id, out var prevStatus);
             _prevPhaseByAgent.TryGetValue(ag.Id, out var prevPhase);
             _prevRoundByAgent.TryGetValue(ag.Id, out var prevRound);
+            _prevTaskCountByAgent.TryGetValue(ag.Id, out var prevTaskCount);
+            _prevTaskKeyByAgent.TryGetValue(ag.Id, out var prevTaskKey);
             prevStatus ??= "idle";
             prevPhase ??= "idle";
+            prevTaskKey ??= "";
             if (prevRound <= 0) prevRound = 1;
+
+            // 多任务从 2 降到 1：保持 working，不把特效基线打回空闲
+            if (prevTaskCount >= 2 && curCount == 1 &&
+                prevStatus is "working" or "reworking" &&
+                curStatus is "idle" or "done" or "")
+            {
+                curStatus = prevStatus;
+                if (curPhase is "idle" or "done" or "verified_delivered" or "")
+                    curPhase = string.IsNullOrWhiteSpace(prevPhase) ? "executing" : prevPhase!;
+            }
 
             // 桌面端实时忙碌叠加：记录叠加前的真实基线；叠加结束回落历史态时与基线比较，避免误播验收/派单特效与音效
             bool curIsDesktopOverlay = lv?.IsDesktopLiveOverlay == true;
@@ -974,25 +988,31 @@ public partial class FloatingOverlayWindow
             bool phaseChanged = !string.Equals(prevPhase, curPhase, StringComparison.OrdinalIgnoreCase);
             bool statusChanged = !string.Equals(prevStatus, curStatus, StringComparison.OrdinalIgnoreCase);
             bool roundUp = curRound > prevRound;
+            bool alreadyWorking = prevStatus is "working" or "reworking" && curStatus is "working" or "reworking";
+            bool countIncreasedWhileWorking = alreadyWorking && curCount > prevTaskCount &&
+                                               !ag.Id.Equals(masterId, StringComparison.OrdinalIgnoreCase);
+            bool realNewTask = alreadyWorking && !curIsDesktopOverlay && curCount >= prevTaskCount &&
+                               !string.Equals(curTaskKey, prevTaskKey, StringComparison.Ordinal) &&
+                               !string.IsNullOrWhiteSpace(lv?.TaskSummary) &&
+                               !ag.Id.Equals(masterId, StringComparison.OrdinalIgnoreCase);
 
-            if (!phaseChanged && !statusChanged && !roundUp)
+            if (!phaseChanged && !statusChanged && !roundUp && !countIncreasedWhileWorking && !realNewTask)
             {
-                _prevStatusByAgent[ag.Id] = curStatus;
-                _prevPhaseByAgent[ag.Id] = curPhase;
-                _prevRoundByAgent[ag.Id] = curRound;
+                RememberInteractionTick(ag.Id, curStatus, curPhase, curRound, curCount, curTaskKey);
                 continue;
             }
 
-            // 桌面忙态叠加期间只同步状态，不触发派单/验收特效与音效
+            // 桌面忙态叠加不播验收/派单音；并发数增加时仍从主脑补一束 +1，不重建圆环
             if (curIsDesktopOverlay)
             {
-                _prevStatusByAgent[ag.Id] = curStatus;
-                _prevPhaseByAgent[ag.Id] = curPhase;
-                _prevRoundByAgent[ag.Id] = curRound;
+                if (countIncreasedWhileWorking)
+                    PlayInteractionKind("dispatch", masterId, ag.Id, lv?.TaskSummary);
+                RememberInteractionTick(ag.Id, curStatus, curPhase, curRound, curCount, curTaskKey);
                 continue;
             }
 
-            // 派单：进入 executing / working
+            bool playedBeam = false;
+            // 派单：进入 executing / working。多 AI 并行仅在 FailoverNote 非空时接力，否则一律从主脑发出
             if ((curPhase.Equals("executing", StringComparison.OrdinalIgnoreCase) ||
                  (curStatus.Equals("working", StringComparison.OrdinalIgnoreCase) && curRound <= 1))
                 && (phaseChanged || statusChanged)
@@ -1002,7 +1022,8 @@ public partial class FloatingOverlayWindow
             {
                 if (!string.IsNullOrWhiteSpace(previousWorkingId) &&
                     !previousWorkingId.Equals(ag.Id, StringComparison.OrdinalIgnoreCase) &&
-                    statusChanged)
+                    statusChanged &&
+                    !string.IsNullOrWhiteSpace(lv?.FailoverNote))
                 {
                     PlayInteractionKind("relay", previousWorkingId, ag.Id, lv?.TaskSummary);
                 }
@@ -1010,6 +1031,7 @@ public partial class FloatingOverlayWindow
                 {
                     PlayInteractionKind("dispatch", masterId, ag.Id, lv?.TaskSummary);
                 }
+                playedBeam = true;
             }
             else if (curPhase.Equals("master_verifying", StringComparison.OrdinalIgnoreCase) && phaseChanged)
             {
@@ -1028,6 +1050,9 @@ public partial class FloatingOverlayWindow
             {
                 PlayInteractionKind("relay", previousWorkingId, ag.Id, lv?.TaskSummary);
             }
+
+            if (!playedBeam && (countIncreasedWhileWorking || realNewTask))
+                PlayInteractionKind("dispatch", masterId, ag.Id, lv?.TaskSummary);
 
             // 验收通过庆典（轮询可能跨过短暂 master_verifying，需补播交付包飞行）
             // 桌面忙态结束回落时 prev 已还原为叠加前基线，与历史态一致则不会误触
@@ -1056,9 +1081,7 @@ public partial class FloatingOverlayWindow
                 }
             }
 
-            _prevStatusByAgent[ag.Id] = curStatus;
-            _prevPhaseByAgent[ag.Id] = curPhase;
-            _prevRoundByAgent[ag.Id] = curRound;
+            RememberInteractionTick(ag.Id, curStatus, curPhase, curRound, curCount, curTaskKey);
         }
 
         // 同步未出现在本轮的旧条目
@@ -1067,11 +1090,31 @@ public partial class FloatingOverlayWindow
             if (!_prevStatusByAgent.ContainsKey(ag.Id))
             {
                 liveMap.TryGetValue(ag.Id, out var lv);
-                _prevStatusByAgent[ag.Id] = lv?.Status ?? "idle";
-                _prevPhaseByAgent[ag.Id] = lv?.WorkflowPhase ?? "idle";
-                _prevRoundByAgent[ag.Id] = lv?.CurrentRound ?? 1;
+                RememberInteractionTick(
+                    ag.Id,
+                    lv?.Status ?? "idle",
+                    lv?.WorkflowPhase ?? "idle",
+                    lv?.CurrentRound ?? 1,
+                    lv?.ActiveTaskCount ?? 0,
+                    BuildInteractionTaskKey(lv));
             }
         }
+    }
+
+    private static string BuildInteractionTaskKey(LiveAgentWorkState? lv)
+    {
+        if (lv == null) return "";
+        string titles = lv.ActiveTaskTitles == null ? "" : string.Join("\u001f", lv.ActiveTaskTitles);
+        return (lv.TaskSummary ?? "") + "\u001e" + titles + "\u001e" + lv.ActiveTaskCount;
+    }
+
+    private void RememberInteractionTick(string agentId, string status, string phase, int round, int taskCount, string taskKey)
+    {
+        _prevStatusByAgent[agentId] = status;
+        _prevPhaseByAgent[agentId] = phase;
+        _prevRoundByAgent[agentId] = round;
+        _prevTaskCountByAgent[agentId] = taskCount;
+        _prevTaskKeyByAgent[agentId] = taskKey;
     }
 
     private string ResolveMasterAgentId()

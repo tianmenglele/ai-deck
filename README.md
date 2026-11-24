@@ -7,19 +7,19 @@
 <p>面向 Windows 多工程开发的多 AI 协同调度、特性路由与桌面悬浮监控中心（.NET 8 + WPF 单文件绿色发布）</p>
 
 <p>
-  <a href="https://github.com/tianmenglele/ai-deck/releases"><img src="https://img.shields.io/badge/Version-v1.9.15-blue" alt="Version v1.9.15" /></a>
+  <a href="https://github.com/tianmenglele/ai-deck/releases"><img src="https://img.shields.io/badge/Version-v1.9.16-blue" alt="Version v1.9.16" /></a>
   <img src="https://img.shields.io/badge/Platform-Windows_10%2F11_x64-0078D6" alt="Platform Windows 10/11 x64" />
   <img src="https://img.shields.io/badge/Framework-.NET_8_%2B_WPF-512BD4" alt="Framework .NET 8 + WPF" />
-  <img src="https://img.shields.io/badge/Self--Test-364%2F364_PASS-brightgreen" alt="Self-Test 364/364 PASS" />
+  <img src="https://img.shields.io/badge/Self--Test-375%2F375_PASS-brightgreen" alt="Self-Test 375/375 PASS" />
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow" alt="License MIT" /></a>
 </p>
 
 <p>
   <strong>⬇ <a href="https://github.com/tianmenglele/ai-deck/releases/latest">直接下载开箱即用版</a></strong>
   · 独立免装单文件
-  <code>AIDeck-v1.9.15-win-x64.exe</code>
+  <code>AIDeck-v1.9.16-win-x64.exe</code>
   · 绿色便携包
-  <code>AIDeck-v1.9.15-win-x64-portable.zip</code>
+  <code>AIDeck-v1.9.16-win-x64-portable.zip</code>
 </p>
 
 <p>
@@ -44,7 +44,7 @@
 
 ## 核心特性
 
-当前版本 **v1.9.15**。主脑负责拆解、派单与终验；执行端留在各自桌面会话里完成后台改动，悬浮窗只同步状态，不抢当前焦点。
+当前版本 **v1.9.16**。主脑负责拆解、派单与终验；执行端留在各自桌面会话里完成后台改动，悬浮窗只同步状态，不抢当前焦点。
 
 | 模块 | 说明 |
 | --- | --- |
@@ -53,7 +53,9 @@
 | 桌面置顶悬浮窗全形态锁定 | 折叠胶囊、极简单行、紧凑双行、完整展开。手动切换后永久锁定，任务开始、完成或异常刷新都不会自动弹出抢屏。 |
 | 毫秒/秒级实时状态同步与跨工程防串扰 | 主界面与悬浮窗按毫秒级探测、秒级刷新各 AI 阶段；回执按工程隔离，不串到其他项目。 |
 | 飞行任务单显示具体任务名 | 跨工具派单动画胶囊实时展示提炼后的任务标题，而不是笼统的「处理中」。 |
-| 版本号展示与自主检查更新 | 顶栏版本按钮显示 `v1.9.15`。启动后可对 [Releases](https://github.com/tianmenglele/ai-deck/releases) 做后台静默检查，检查动作带防重入锁。 |
+| 版本号展示与自主检查更新 | 顶栏版本按钮显示 `v1.9.16`。启动后可对 [Releases](https://github.com/tianmenglele/ai-deck/releases) 做后台静默检查，检查动作带防重入锁。 |
+| 悬浮窗动效与多任务角标 | 编码环以单一圆心匀速旋转，状态刷新原地更新不整表闪烁。同一 AI 并行任务达到 2 个时，头像右上角显示数字，超过 9 显示 `9+`。 |
+| 二级灯箱与图标勾选瓷砖 | 模态窗口带高对比亮边框，主界面同步暗幕。新手引导和工作流开关用圆形官方图标瓷砖勾选，悬停再看完整说明。 |
 | Magpie 风格中心辐射工作流脑图 | 工作流以中心辐射拓扑展示主脑与执行端分工，阶段关系一眼可读。 |
 | 3 步首次使用新手向导 | 首次打开按 3 步引导完成上手，之后也可从顶栏再次进入。 |
 | 全站 Crisp 矢量图标与 4 分页独立设置页 | 全站使用 Crisp 矢量图标；设置拆成 4 个独立分页，各自维护互不挤占。 |
@@ -146,12 +148,12 @@ flowchart TD
 
 | 资源 | 说明 |
 | --- | --- |
-| `AIDeck-v1.9.15-win-x64.exe` | **独立免装运行时单文件版**（自包含 .NET 8，双击即可运行） |
-| `AIDeck-v1.9.15-win-x64-portable.zip` | **绿色便携压缩包**（含主程序、`registry/`、`plugins/`、启动脚本与说明） |
-| `AIDeck-v1.9.15-win-x64-lite.zip` | 轻量版（需本机已安装 [.NET 8 桌面运行时](https://dotnet.microsoft.com/download/dotnet/8.0)） |
+| `AIDeck-v1.9.16-win-x64.exe` | **独立免装运行时单文件版**（自包含 .NET 8，双击即可运行） |
+| `AIDeck-v1.9.16-win-x64-portable.zip` | **绿色便携压缩包**（含主程序、`registry/`、`plugins/`、启动脚本与说明） |
+| `AIDeck-v1.9.16-win-x64-lite.zip` | 轻量版（需本机已安装 [.NET 8 桌面运行时](https://dotnet.microsoft.com/download/dotnet/8.0)） |
 | `SHA256SUMS.txt` | 上述产物的 SHA256 校验清单 |
 
-下载后建议对照 `SHA256SUMS.txt` 校验完整性，再启动 `AI协同中心.exe`（便携包内）或直接运行独立单文件 `AIDeck-v1.9.15-win-x64.exe`。
+下载后建议对照 `SHA256SUMS.txt` 校验完整性，再启动 `AI协同中心.exe`（便携包内）或直接运行独立单文件 `AIDeck-v1.9.16-win-x64.exe`。
 
 ### 从源码编译（开发者）
 
@@ -168,16 +170,16 @@ Release 编译：
 dotnet build src/AICollabHub.csproj -c Release --nologo
 ```
 
-单文件发布到 `outputs/v1.9.15/AI协同中心`（依赖本机 .NET 8 桌面运行时，不带安装向导）：
+单文件发布到 `outputs/v1.9.16/AI协同中心`（依赖本机 .NET 8 桌面运行时，不带安装向导）：
 
 ```powershell
-dotnet publish src/AICollabHub.csproj -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -p:DebugType=portable -p:DebugSymbols=true -o outputs/v1.9.15/AI协同中心 --nologo
+dotnet publish src/AICollabHub.csproj -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -p:DebugType=portable -p:DebugSymbols=true -o outputs/v1.9.16/AI协同中心 --nologo
 ```
 
-全量离线自检。v1.9.15 基线为 **364/364 PASS**。命令不改写正在使用的程序，报告写到 `work/self_test_out`（该目录已被 `.gitignore` 忽略）：
+全量离线自检 **375/375 PASS**。v1.9.16 在既有基线上增加灯箱、多任务角标、图标瓷砖与圆环原点硬门限。命令不改写正在使用的程序，报告写到 `work/self_test_out`（该目录已被 `.gitignore` 忽略）：
 
 ```powershell
-.\outputs\v1.9.15\AI协同中心\AI协同中心.exe --self-test .\work\self_test_out
+.\outputs\v1.9.16\AI协同中心\AI协同中心.exe --self-test .\work\self_test_out
 ```
 
 启动：双击发布目录中的 `AI协同中心.exe`，或：
@@ -188,7 +190,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\启动协同中心.ps1
 
 ### 软件内自主检查更新
 
-从 **v1.9.15** 起已内置默认官方仓库地址 `https://github.com/tianmenglele/ai-deck`，检查目标对应 [Releases](https://github.com/tianmenglele/ai-deck/releases)。无需手动填写更新源。默认在启动 4 秒后自动后台检查；顶栏版本按钮显示当前 `v1.9.15`。发现新版本时在顶栏展示提示，并支持一键下载、替换后重启。同一时刻只允许一路检查进入，占用中的重复触发会被防重入锁拒绝，结束后才能再次检查。
+从 **v1.9.16** 起已内置默认官方仓库地址 `https://github.com/tianmenglele/ai-deck`，检查目标对应 [Releases](https://github.com/tianmenglele/ai-deck/releases)。无需手动填写更新源。默认在启动 4 秒后自动后台检查；顶栏版本按钮显示当前 `v1.9.16`。发现新版本时在顶栏展示提示，并支持一键下载、替换后重启。同一时刻只允许一路检查进入，占用中的重复触发会被防重入锁拒绝，结束后才能再次检查。
 
 <a id="开放扩展"></a>
 

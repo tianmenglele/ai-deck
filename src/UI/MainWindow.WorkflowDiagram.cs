@@ -29,6 +29,7 @@ public partial class MainWindow
     private string _workflowDiagramPhaseLabel = "空闲待命";
     private string _workflowDiagramSubFull = "";
     private string _workflowDiagramLayoutSig = "";
+    private string _lastDiagramStructuralSig = "";
     private bool _workflowDiagramPreviewOverride;
     private bool _workflowDiagramHooksWired;
     private Border? _workflowDiagramMasterGlow;
@@ -394,16 +395,26 @@ public partial class MainWindow
         if (WorkflowDiagramCard != null)
             WorkflowDiagramCard.Opacity = paused ? 0.72 : 1.0;
 
+        double w = WorkflowDiagramCanvas.ActualWidth;
+        if (w < 40) w = Math.Max(40, ActualWidth - 80);
+        double h = WorkflowDiagramCanvas.ActualHeight;
+        if (h < 40) h = 226;
+        string activeTarget = ResolveActiveWorkerId(workers) ?? "";
+        string structuralSig =
+            $"{_workflowDiagramMasterId}|{string.Join(",", _workflowDiagramWorkerIds)}|{_workflowDiagramPhase}|{activeTarget}|{paused}|{(int)Math.Round(w)}|{(int)Math.Round(h)}";
+        if (string.Equals(structuralSig, _lastDiagramStructuralSig, StringComparison.Ordinal) &&
+            WorkflowDiagramCanvas.Children.Count > 0)
+        {
+            UpdateDiagramTaskBadgesInPlace();
+            return;
+        }
+        _lastDiagramStructuralSig = structuralSig;
+
         WorkflowDiagramCanvas.Children.Clear();
         _workflowDiagramNodeBorders.Clear();
         _workflowDiagramFlowTracks.Clear();
         _workflowDiagramMasterGlow = null;
         _workflowDiagramAurora = null;
-
-        double w = WorkflowDiagramCanvas.ActualWidth;
-        if (w < 40) w = Math.Max(40, ActualWidth - 80);
-        double h = WorkflowDiagramCanvas.ActualHeight;
-        if (h < 40) h = 226;
 
         double cx = w * 0.5;
         double cy = h * 0.5;
@@ -538,6 +549,21 @@ public partial class MainWindow
 
         _workflowDiagramLayoutSig =
             $"{_workflowDiagramPhase}|{_workflowDiagramRound}|{_workflowDiagramMaxRounds}|{_workflowDiagramActiveWorkerId}|{_reg.UserConfig.WorkflowEngineEnabled}|{string.Join(",", _workflowDiagramWorkerIds)}|{_workflowDiagramDemoMode}";
+    }
+
+    private void UpdateDiagramTaskBadgesInPlace()
+    {
+        if (WorkflowDiagramCanvas == null) return;
+        var liveMap = AutoDispatchService.ReadMergedGlobalWorkStatesWithDesktopLive();
+        var badges = new List<Border>();
+        CollectOverviewNamedBorders(WorkflowDiagramCanvas, "AvatarTaskCountBadge", badges);
+        foreach (var badge in badges)
+        {
+            int count = 0;
+            if (!string.IsNullOrWhiteSpace(badge.Uid) && liveMap.TryGetValue(badge.Uid, out var live))
+                count = live.ActiveTaskCount;
+            FloatingOverlayWindow.ApplyAvatarTaskCountBadge(badge, count, playPopIfIncreased: false);
+        }
     }
 
     private string? ResolveActiveWorkerId(List<AgentRosterEntry> workers)
@@ -748,7 +774,7 @@ public partial class MainWindow
         var avatar = master != null
             ? OfficialBrandIconService.CreateCircularAvatarVisual(master.Id, 32, master, OfficialBrandIconService.GetBrandColor(master.Id), 1.15)
             : MakeMindMapVectorIcon("master", 28, Hex("#C4B5FD"));
-        avatar = DecorateAvatarWithTaskCount(avatar, master != null ? activeTaskCount : 0, 32);
+        avatar = DecorateAvatarWithTaskCount(avatar, master != null ? activeTaskCount : 0, 32, master?.Id);
         avatar.VerticalAlignment = VerticalAlignment.Center;
         avatar.Margin = new Thickness(0, 0, 10, 0);
         Grid.SetColumn(avatar, 0);
@@ -950,7 +976,7 @@ public partial class MainWindow
         {
             avatar = OfficialBrandIconService.CreateCircularAvatarVisual(
                 agent.Id, 24, agent, OfficialBrandIconService.GetBrandColor(agent.Id), 1.05);
-            avatar = DecorateAvatarWithTaskCount(avatar, live?.ActiveTaskCount ?? 0, 24);
+            avatar = DecorateAvatarWithTaskCount(avatar, live?.ActiveTaskCount ?? 0, 24, agent.Id);
             name = agent.Name;
             string tier = !string.IsNullOrWhiteSpace(live?.SelectedTierBadge)
                 ? live!.SelectedTierBadge
@@ -1394,14 +1420,7 @@ public partial class MainWindow
         if (!_workflowDiagramDemoMode && !_workflowDiagramPreviewOverride)
             ResolveWorkflowDiagramLivePhase();
 
-        var workers = ResolveWorkflowDiagramWorkers();
-        string sig = $"{_workflowDiagramPhase}|{_workflowDiagramRound}|{_workflowDiagramMaxRounds}|{_workflowDiagramActiveWorkerId}|{_reg.UserConfig.WorkflowEngineEnabled}|{string.Join(",", workers.Select(w => w.Id))}|{_workflowDiagramDemoMode}";
-        if (!string.Equals(sig, _workflowDiagramLayoutSig, StringComparison.Ordinal) ||
-            WorkflowDiagramCanvas?.Children.Count == 0)
-        {
-            _workflowDiagramLayoutSig = sig;
-            RebuildWorkflowDiagramCanvas();
-        }
+        RebuildWorkflowDiagramCanvas();
         UpdateWorkflowDiagramAnimationGate();
     }
 }

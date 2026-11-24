@@ -170,6 +170,7 @@ public static partial class Dialogs
                 .ToList();
 
             string? lastGroup = null;
+            WrapPanel? wrap = null;
             foreach (var agent in agents)
             {
                 string g = GroupKey(agent.Category);
@@ -184,55 +185,12 @@ public static partial class Dialogs
                         Foreground = BrushHex("#E2E8F0"),
                         Margin = new Thickness(0, 10, 0, 6)
                     });
+                    wrap = new WrapPanel { Margin = new Thickness(0, 0, 0, 4) };
+                    listHost.Children.Add(wrap);
                 }
 
                 bool isOn = pending.TryGetValue(agent.Id, out var pe) ? pe : agent.Enabled;
                 bool canToggle = agent.Detected || string.IsNullOrEmpty(agent.DetectorId);
-                var row = new Border
-                {
-                    Background = BrushHex(agent.Detected ? "#121824" : "#0E131D"),
-                    BorderBrush = BrushHex("#1E293B"),
-                    BorderThickness = new Thickness(1),
-                    CornerRadius = new CornerRadius(6),
-                    Padding = new Thickness(10, 8, 10, 8),
-                    Margin = new Thickness(0, 0, 0, 6),
-                    Opacity = canToggle ? 1.0 : 0.72
-                };
-                var grid = new Grid();
-                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-
-                var avatar = OfficialBrandIconService.CreateCircularAvatarVisual(
-                    agent.Id, 28, agent, OfficialBrandIconService.GetBrandColor(agent.Id), 1.2);
-                avatar.Margin = new Thickness(0, 0, 10, 0);
-                Grid.SetColumn(avatar, 0);
-
-                var info = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
-                info.Children.Add(new TextBlock
-                {
-                    Text = agent.Name + (agent.Detected ? "" : "（未安装）"),
-                    FontSize = 13,
-                    FontWeight = FontWeights.SemiBold,
-                    Foreground = BrushHex(agent.Detected ? "#F1F5F9" : "#64748B")
-                });
-                string caps = string.Join(" · ", (agent.TagScores ?? new Dictionary<string, int>())
-                    .Where(kv => kv.Value > 0)
-                    .OrderByDescending(kv => kv.Value)
-                    .Take(3)
-                    .Select(kv => WorkSpecialtyCatalog.Items.TryGetValue(kv.Key, out var lb) ? lb : kv.Key));
-                string evidence = string.IsNullOrWhiteSpace(agent.Evidence) ? "" : agent.Evidence.Trim();
-                if (evidence.Length > 72) evidence = evidence[..72] + "…";
-                info.Children.Add(new TextBlock
-                {
-                    Text = evidence + (string.IsNullOrEmpty(caps) ? "" : $"  |  {caps}"),
-                    FontSize = 11,
-                    Foreground = BrushHex("#64748B"),
-                    TextTrimming = TextTrimming.CharacterEllipsis,
-                    ToolTip = agent.Evidence
-                });
-                Grid.SetColumn(info, 1);
-
                 var toggle = CreateWorkflowPillToggle(agent.Id, isOn, canToggle);
                 toggle.IsEnabled = canToggle;
                 string capturedId = agent.Id;
@@ -254,13 +212,8 @@ public static partial class Dialogs
                     pending[capturedId] = false;
                     statusHint.Text = "";
                 };
-                Grid.SetColumn(toggle, 2);
-
-                grid.Children.Add(avatar);
-                grid.Children.Add(info);
-                grid.Children.Add(toggle);
-                row.Child = grid;
-                listHost.Children.Add(row);
+                wrap!.Children.Add(BuildToolIconTile(
+                    agent, isOn, singleSelectMaster: false, interactive: canToggle, onSelectedChanged: null, linkedToggle: toggle));
             }
         }
 
