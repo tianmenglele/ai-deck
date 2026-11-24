@@ -1,11 +1,13 @@
 using System.Collections.Concurrent;
 using System.Globalization;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Interop;
 using System.Windows.Media;
 using AICollabHub.Models;
 using AICollabHub.Services;
@@ -32,7 +34,59 @@ public static class UiBrushPool
 
 public static partial class Dialogs
 {
+    private const int DwmwaWindowCornerPreference = 33;
+    private const int DwmwcpRound = 2;
+
+    [DllImport("dwmapi.dll")]
+    private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int attrValue, int attrSize);
+
     private static Brush BrushHex(string hex) => UiBrushPool.Get(hex);
+
+    private static readonly Dictionary<string, string> BuiltinCapabilityZh = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["deep_bug_hunt"] = "深度排障",
+        ["adversarial_review"] = "对抗审查",
+        ["cross_repo_impl"] = "跨目录实装",
+        ["build_delivery"] = "编译交付",
+        ["visual_gate"] = "视觉验收",
+        ["ide_live_tweak"] = "IDE微操",
+        ["ui_frontend"] = "前端界面",
+        ["config_tables"] = "配表配置",
+        ["perf_opt"] = "性能优化",
+        ["refactor_arch"] = "架构重构"
+    };
+
+    public static void ApplyModalDwmRoundedCorners(Window w)
+    {
+        w.SourceInitialized += (_, _) =>
+        {
+            try
+            {
+                var hwnd = new WindowInteropHelper(w).Handle;
+                if (hwnd == IntPtr.Zero) return;
+                int preference = DwmwcpRound;
+                DwmSetWindowAttribute(hwnd, DwmwaWindowCornerPreference, ref preference, sizeof(int));
+            }
+            catch
+            {
+                /* 旧系统没有 DWM 圆角偏好时仍保留 WPF 圆角 */
+            }
+        };
+    }
+
+    public static LinearGradientBrush CreateModalSeamlessBorderBrush()
+    {
+        var brush = new LinearGradientBrush
+        {
+            StartPoint = new Point(0.5, 0),
+            EndPoint = new Point(0.5, 1)
+        };
+        brush.GradientStops.Add(new GradientStop((Color)ColorConverter.ConvertFromString("#7DD3FC")!, 0));
+        brush.GradientStops.Add(new GradientStop((Color)ColorConverter.ConvertFromString("#5B84BA")!, 0.5));
+        brush.GradientStops.Add(new GradientStop((Color)ColorConverter.ConvertFromString("#3E5C85")!, 1));
+        if (brush.CanFreeze) brush.Freeze();
+        return brush;
+    }
 
     // 1. 项目档案新建 / 编辑窗口（支持主工程 + 任意多个关联子目录 + 预设类型选择）
     public static ProjectProfile? ShowProjectEditor(Window? owner, RegistryService reg, ProjectProfile? existing)
@@ -2865,18 +2919,20 @@ public static partial class Dialogs
         return tile;
     }
 
-    public static Border BuildToolDetailTooltip(AgentRosterEntry agent, bool singleSelectMaster)
+    public static ToolTip BuildToolDetailTooltip(AgentRosterEntry agent, bool singleSelectMaster)
     {
         string full = string.IsNullOrWhiteSpace(agent.Name) ? agent.Id : agent.Name;
         string category = OfficialBrandIconService.GetCategoryZh(agent.Id, agent.Category);
         string evidence = !string.IsNullOrWhiteSpace(agent.Evidence)
             ? agent.Evidence.Trim()
             : (!string.IsNullOrWhiteSpace(agent.GuiExePath) ? agent.GuiExePath.Trim() : "尚未记录安装路径或探测依据");
+        evidence = EllipsizeMiddle(evidence, 44, 16, 22);
         string caps = string.Join(" · ", (agent.TagScores ?? new Dictionary<string, int>())
             .Where(kv => kv.Value > 0)
             .OrderByDescending(kv => kv.Value)
             .Take(6)
-            .Select(kv => WorkSpecialtyCatalog.Items.TryGetValue(kv.Key, out var lb) ? lb : kv.Key));
+            .Select(kv => CapabilityLabel(kv.Key))
+            .OfType<string>());
         if (string.IsNullOrWhiteSpace(caps)) caps = "未标注能力";
         string models = !LocalModelCatalogService.SupportsModelSelection(agent.Id)
             ? "模型档位：默认托管"
@@ -2892,7 +2948,8 @@ public static partial class Dialogs
                 Foreground = BrushHex(hex),
                 FontSize = size,
                 FontWeight = bold ? FontWeights.SemiBold : FontWeights.Normal,
-                TextWrapping = TextWrapping.Wrap,
+                TextWrapping = TextWrapping.WrapWithOverflow,
+                MaxWidth = 286,
                 Margin = margin ?? new Thickness(0, 2, 0, 0)
             });
         }
@@ -2902,16 +2959,43 @@ public static partial class Dialogs
         Line("能力：" + caps, "#C4B5FD", 11.5);
         Line(models, "#93C5FD", 11.5);
         Line(hint, "#94A3B8", 11);
-        return new Border
+        var card = new Border
         {
+            Width = 310,
             Background = BrushHex("#101826"),
             BorderBrush = BrushHex("#334E73"),
             BorderThickness = new Thickness(1),
             CornerRadius = new CornerRadius(8),
             Padding = new Thickness(10, 8, 10, 8),
-            MaxWidth = 320,
             Child = stack
         };
+        return new ToolTip
+        {
+            Background = Brushes.Transparent,
+            BorderThickness = new Thickness(0),
+            Padding = new Thickness(0),
+            HasDropShadow = true,
+            Width = 310,
+            Content = card
+        };
+    }
+
+    private static string? CapabilityLabel(string key)
+    {
+        if (WorkSpecialtyCatalog.Items.TryGetValue(key, out var catalog) && !string.IsNullOrWhiteSpace(catalog))
+            return catalog;
+        if (BuiltinCapabilityZh.TryGetValue(key, out var builtin))
+            return builtin;
+        return null;
+    }
+
+    private static string EllipsizeMiddle(string text, int limit, int head, int tail)
+    {
+        if (string.IsNullOrEmpty(text) || text.Length <= limit) return text;
+        if (head < 0) head = 0;
+        if (tail < 0) tail = 0;
+        if (head + tail >= text.Length) return text;
+        return text.Substring(0, head) + "..." + text.Substring(text.Length - tail, tail);
     }
 
     private static string ShortToolTileName(AgentRosterEntry agent)
@@ -3033,30 +3117,26 @@ public static partial class Dialogs
             CaptionHeight = 0,
             ResizeBorderThickness = new Thickness(0),
             GlassFrameThickness = new Thickness(0),
-            CornerRadius = new CornerRadius(10),
+            CornerRadius = new CornerRadius(8),
             UseAeroCaptionButtons = false
         });
 
         var template = new ControlTemplate(typeof(Window));
         var outerBorder = new FrameworkElementFactory(typeof(Border));
         outerBorder.SetValue(Border.BackgroundProperty, BrushHex("#131D2E"));
-        outerBorder.SetValue(Border.BorderBrushProperty, BrushHex("#5B84BA"));
+        outerBorder.SetValue(Border.BorderBrushProperty, CreateModalSeamlessBorderBrush());
         outerBorder.SetValue(Border.BorderThicknessProperty, new Thickness(1.8));
-        outerBorder.SetValue(Border.CornerRadiusProperty, new CornerRadius(10));
+        outerBorder.SetValue(Border.CornerRadiusProperty, new CornerRadius(8));
+        outerBorder.SetValue(UIElement.ClipToBoundsProperty, true);
 
         var dock = new FrameworkElementFactory(typeof(DockPanel));
-
-        var topGlow = new FrameworkElementFactory(typeof(Border));
-        topGlow.SetValue(DockPanel.DockProperty, Dock.Top);
-        topGlow.SetValue(FrameworkElement.HeightProperty, 2.0);
-        topGlow.SetValue(Border.BackgroundProperty, BrushHex("#38BDF8"));
-        topGlow.SetValue(UIElement.IsHitTestVisibleProperty, false);
 
         var titleBar = new FrameworkElementFactory(typeof(Border));
         titleBar.SetValue(DockPanel.DockProperty, Dock.Top);
         titleBar.SetValue(Border.BackgroundProperty, BrushHex("#1A273D"));
         titleBar.SetValue(Border.BorderBrushProperty, BrushHex("#334E73"));
         titleBar.SetValue(Border.BorderThicknessProperty, new Thickness(0, 0, 0, 1));
+        titleBar.SetValue(Border.CornerRadiusProperty, new CornerRadius(6, 6, 0, 0));
         titleBar.SetValue(Border.PaddingProperty, new Thickness(14, 6, 8, 6));
         titleBar.AddHandler(UIElement.MouseLeftButtonDownEvent, new System.Windows.Input.MouseButtonEventHandler((s, e) =>
         {
@@ -3102,7 +3182,6 @@ public static partial class Dialogs
         titleBar.AppendChild(headerGrid);
 
         var contentHost = new FrameworkElementFactory(typeof(ContentPresenter));
-        dock.AppendChild(topGlow);
         dock.AppendChild(titleBar);
         dock.AppendChild(contentHost);
         outerBorder.AppendChild(dock);
@@ -3111,6 +3190,7 @@ public static partial class Dialogs
 
         TextOptions.SetTextFormattingMode(w, TextFormattingMode.Display);
         TextOptions.SetTextRenderingMode(w, TextRenderingMode.ClearType);
+        ApplyModalDwmRoundedCorners(w);
         AttachModalLightbox(w, owner);
         return w;
     }

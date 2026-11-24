@@ -4969,6 +4969,69 @@ public static class Program
         AssertTrue(wizReg.UserConfig.HasCompletedOnboarding, "CompleteForTest(skip: false) 后 HasCompletedOnboarding 为 true");
         wiz.Close();
 
+        var poolReg = new RegistryService();
+        poolReg.UserConfig.Agents.Add(new AgentRosterEntry { Id = "antigravity", Name = "Antigravity", Detected = true, Enabled = true, Category = "local_agent", Evidence = "种子甲" });
+        poolReg.UserConfig.Agents.Add(new AgentRosterEntry { Id = "cursor", Name = "Cursor", Detected = true, Enabled = true, Category = "local_ide", Evidence = "种子乙" });
+        poolReg.UserConfig.Agents.Add(new AgentRosterEntry { Id = "windsurf", Name = "Windsurf", Detected = true, Enabled = false, Category = "local_ide", Evidence = "种子丙" });
+        poolReg.UserConfig.Agents.Add(new AgentRosterEntry { Id = "grok_bot", Name = "Grok Bot", Detected = true, Enabled = false, Category = "local_agent", Evidence = "种子丁" });
+        var poolWiz = new OnboardingWizardDialog(poolReg, new DiscoveryService())
+        {
+            WindowStartupLocation = WindowStartupLocation.Manual,
+            Left = -32000,
+            Top = -32000,
+            ShowActivated = false
+        };
+        poolWiz.Show();
+        poolWiz.UpdateLayout();
+        var poolNext = FindButtonByContent(poolWiz, "下一步");
+        AssertTrue(poolNext != null && poolWiz.GetCurrentStepForTest() == 1, "过滤探针从 Step 1 出发");
+        poolNext!.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        poolWiz.UpdateLayout();
+        var poolFrame = poolWiz.FindName("WizardOuterFrame") as Border;
+        AssertTrue(
+            poolWiz.GetCurrentStepForTest() == 2 &&
+            poolWiz.Step2MasterTileCountForTest == 2 &&
+            poolWiz.Step2WorkerTileCountForTest == 2 &&
+            poolFrame != null &&
+            poolFrame.CornerRadius.TopLeft == 8 &&
+            poolFrame.BorderThickness.Top >= 1.8 &&
+            !ContainsSquareTopGlow(poolFrame),
+            $"Step 2 只渲染已启用工具且外框无直角顶条 (step={poolWiz.GetCurrentStepForTest()}, master={poolWiz.Step2MasterTileCountForTest}, worker={poolWiz.Step2WorkerTileCountForTest}, radius={poolFrame?.CornerRadius.TopLeft}, thick={poolFrame?.BorderThickness.Top})");
+        foreach (var agent in poolReg.UserConfig.Agents)
+            agent.Enabled = false;
+        poolWiz.SwitchStepForTest(1);
+        poolWiz.UpdateLayout();
+        var blockedNext = FindButtonByContent(poolWiz, "下一步");
+        AssertTrue(blockedNext != null, "回到 Step 1 后仍能找到下一步");
+        blockedNext!.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        poolWiz.UpdateLayout();
+        AssertTrue(
+            poolWiz.GetCurrentStepForTest() == 1 &&
+            VisualTreeContainsText(poolWiz, "请至少勾选 1 个要启用的 AI 工具"),
+            $"Step 1 全不选时停留并提示 (step={poolWiz.GetCurrentStepForTest()})");
+        poolWiz.Close();
+
+        var tipAgent = new AgentRosterEntry
+        {
+            Id = "probe_tip",
+            Name = "提示探针",
+            Evidence = @"C:\VeryLong\Install\Path\That\Exceeds\FortyFour\Characters\tool.exe",
+            TagScores = new Dictionary<string, int>
+            {
+                ["deep_bug_hunt"] = 5,
+                ["cross_repo_impl"] = 4
+            }
+        };
+        var detailTip = Dialogs.BuildToolDetailTooltip(tipAgent, false);
+        string tipText = DumpTooltipText(detailTip);
+        AssertTrue(
+            detailTip.Width <= 310 &&
+            tipText.Contains("深度排障", StringComparison.Ordinal) &&
+            tipText.Contains("跨目录实装", StringComparison.Ordinal) &&
+            !tipText.Contains("deep_bug_hunt", StringComparison.Ordinal) &&
+            !tipText.Contains("cross_repo_impl", StringComparison.Ordinal),
+            $"悬浮提示中文能力且宽度不超过 310 (width={detailTip.Width}, text={tipText.Replace('\n', '|')})");
+
         var navProbe = new MainWindow(reg, suppressAutoShowFloating: true)
         {
             Width = 960,
@@ -5945,7 +6008,83 @@ public static class Program
         CollectTaggedElements(root, "tool_icon_tile").Count;
 
     private static int CountToolIconTilesWithTooltip(DependencyObject root) =>
-        CollectTaggedElements(root, "tool_icon_tile").Count(fe => fe.ToolTip != null);
+        CollectTaggedElements(root, "tool_icon_tile").Count(fe => fe.ToolTip is ToolTip or Border);
+
+    private static Button? FindButtonByContent(DependencyObject root, string content)
+    {
+        Button? found = null;
+        var seen = new HashSet<DependencyObject>();
+        void Walk(DependencyObject node)
+        {
+            if (found != null || !seen.Add(node)) return;
+            if (node is Button btn && string.Equals(btn.Content as string, content, StringComparison.Ordinal))
+            {
+                found = btn;
+                return;
+            }
+            int count = 0;
+            try { count = VisualTreeHelper.GetChildrenCount(node); } catch { }
+            for (int i = 0; i < count; i++)
+                Walk(VisualTreeHelper.GetChild(node, i));
+            foreach (var child in LogicalTreeHelper.GetChildren(node))
+            {
+                if (child is DependencyObject dep) Walk(dep);
+            }
+        }
+        Walk(root);
+        return found;
+    }
+
+    private static bool ContainsSquareTopGlow(DependencyObject root)
+    {
+        var seen = new HashSet<DependencyObject>();
+        bool Walk(DependencyObject node)
+        {
+            if (!seen.Add(node)) return false;
+            if (node is Border border &&
+                !double.IsNaN(border.Height) &&
+                border.Height > 0 &&
+                border.Height <= 2.5 &&
+                border.CornerRadius.TopLeft == 0 &&
+                border.CornerRadius.TopRight == 0)
+                return true;
+            int count = 0;
+            try { count = VisualTreeHelper.GetChildrenCount(node); } catch { }
+            for (int i = 0; i < count; i++)
+            {
+                if (Walk(VisualTreeHelper.GetChild(node, i))) return true;
+            }
+            foreach (var child in LogicalTreeHelper.GetChildren(node))
+            {
+                if (child is DependencyObject dep && Walk(dep)) return true;
+            }
+            return false;
+        }
+        return Walk(root);
+    }
+
+    private static bool VisualTreeContainsText(DependencyObject root, string text)
+    {
+        var seen = new HashSet<DependencyObject>();
+        bool Walk(DependencyObject node)
+        {
+            if (!seen.Add(node)) return false;
+            if (node is TextBlock block && block.Text.Contains(text, StringComparison.Ordinal))
+                return true;
+            int count = 0;
+            try { count = VisualTreeHelper.GetChildrenCount(node); } catch { }
+            for (int i = 0; i < count; i++)
+            {
+                if (Walk(VisualTreeHelper.GetChild(node, i))) return true;
+            }
+            foreach (var child in LogicalTreeHelper.GetChildren(node))
+            {
+                if (child is DependencyObject dep && Walk(dep)) return true;
+            }
+            return false;
+        }
+        return Walk(root);
+    }
 
     private static List<FrameworkElement> CollectTaggedElements(DependencyObject root, string tag)
     {

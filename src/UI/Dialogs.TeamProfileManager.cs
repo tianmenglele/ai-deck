@@ -2474,27 +2474,20 @@ public static partial class Dialogs
                 CaptionHeight = 36,
                 ResizeBorderThickness = new Thickness(5),
                 GlassFrameThickness = new Thickness(0),
-                CornerRadius = new CornerRadius(10)
+                CornerRadius = new CornerRadius(8)
             });
+            ApplyModalDwmRoundedCorners(confirmWin);
 
             bool confirmed = false;
             var outerBorder = new Border
             {
                 Background = BrushHex("#131D2E"),
-                BorderBrush = BrushHex("#5B84BA"),
+                BorderBrush = CreateModalSeamlessBorderBrush(),
                 BorderThickness = new Thickness(1.8),
-                CornerRadius = new CornerRadius(10),
+                CornerRadius = new CornerRadius(8),
                 ClipToBounds = true
             };
             var dock = new DockPanel();
-            var topGlow = new Border
-            {
-                Height = 2,
-                Background = BrushHex("#38BDF8"),
-                IsHitTestVisible = false
-            };
-            DockPanel.SetDock(topGlow, Dock.Top);
-            dock.Children.Add(topGlow);
 
             // 标题栏
             var titleGrid = new Grid { Height = 36 };
@@ -2504,6 +2497,7 @@ public static partial class Dialogs
                 Background = BrushHex("#1A273D"),
                 BorderBrush = BrushHex("#334E73"),
                 BorderThickness = new Thickness(0, 0, 0, 1),
+                CornerRadius = new CornerRadius(6, 6, 0, 0),
                 Child = titleGrid
             };
             titleGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });

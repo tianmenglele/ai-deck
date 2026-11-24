@@ -33,6 +33,14 @@ public sealed class OnboardingWizardDialog : Window
         FontSize = 12.5,
         Margin = new Thickness(0, 0, 0, 8)
     };
+    private readonly TextBlock _step1Guide = new()
+    {
+        Text = "点击图标勾选要启用的 AI，悬停查看详情",
+        Foreground = Brush("#8EA0B8"),
+        FontSize = 13,
+        TextWrapping = TextWrapping.Wrap,
+        Margin = new Thickness(0, 0, 0, 8)
+    };
     private readonly Button _rescanBtn = new()
     {
         Content = "重新扫描",
@@ -49,8 +57,11 @@ public sealed class OnboardingWizardDialog : Window
 
     private readonly WrapPanel _masterWrap = new() { Margin = new Thickness(0, 6, 0, 0) };
     private readonly WrapPanel _workerWrap = new() { Margin = new Thickness(0, 4, 0, 0) };
+    private readonly HashSet<string> _step2PoolIds = new(StringComparer.OrdinalIgnoreCase);
     private string _selectedMasterId = "";
     public string SelectedMasterIdForTest => _selectedMasterId;
+    public int Step2MasterTileCountForTest => _masterWrap.Children.Count;
+    public int Step2WorkerTileCountForTest => _workerWrap.Children.Count;
     private readonly TextBlock _step2Note = new()
     {
         Text = "主脑派活，勾选的人来做",
@@ -110,15 +121,21 @@ public sealed class OnboardingWizardDialog : Window
             CaptionHeight = 0,
             ResizeBorderThickness = new Thickness(0),
             GlassFrameThickness = new Thickness(0),
-            CornerRadius = new CornerRadius(12),
+            CornerRadius = new CornerRadius(8),
             UseAeroCaptionButtons = false
         });
+        Dialogs.ApplyModalDwmRoundedCorners(this);
 
         _prevBtn = MakeQuietButton("上一步");
         _nextBtn = MakePrimaryButton("下一步");
         _prevBtn.Click += (_, _) => { if (_step > 1) ShowStep(_step - 1); };
         _nextBtn.Click += (_, _) =>
         {
+            if (_step == 1 && CountStep1Checked() <= 0)
+            {
+                WarnNeedOneEnabled();
+                return;
+            }
             if (_step < 3) ShowStep(_step + 1);
             else Commit(skip: false, closeDialog: true, touchStartupRegistry: true);
         };
@@ -216,6 +233,9 @@ public sealed class OnboardingWizardDialog : Window
 
     private void ShowStep(int step)
     {
+        int prev = _step;
+        if (step == 2 && prev == 1)
+            CaptureStep2Pool();
         _step = step;
         _page1.Visibility = step == 1 ? Visibility.Visible : Visibility.Collapsed;
         _page2.Visibility = step == 2 ? Visibility.Visible : Visibility.Collapsed;
@@ -275,32 +295,15 @@ public sealed class OnboardingWizardDialog : Window
         Grid.SetRow(footer, 3);
         root.Children.Add(footer);
 
-        var glow = new LinearGradientBrush
-        {
-            StartPoint = new Point(0, 0.5),
-            EndPoint = new Point(1, 0.5)
-        };
-        glow.GradientStops.Add(new GradientStop((Color)ColorConverter.ConvertFromString("#38BDF8")!, 0));
-        glow.GradientStops.Add(new GradientStop((Color)ColorConverter.ConvertFromString("#6366F1")!, 1));
-        var shell = new DockPanel();
-        var topGlow = new Border
-        {
-            Height = 2,
-            Background = glow,
-            IsHitTestVisible = false
-        };
-        DockPanel.SetDock(topGlow, Dock.Top);
-        shell.Children.Add(topGlow);
-        shell.Children.Add(root);
         var frame = new Border
         {
             Name = "WizardOuterFrame",
             Background = Brush("#131D2E"),
-            BorderBrush = Brush("#5B84BA"),
-            BorderThickness = new Thickness(2),
-            CornerRadius = new CornerRadius(12),
+            BorderBrush = Dialogs.CreateModalSeamlessBorderBrush(),
+            BorderThickness = new Thickness(1.8),
+            CornerRadius = new CornerRadius(8),
             ClipToBounds = true,
-            Child = shell
+            Child = root
         };
         if (NameScope.GetNameScope(this) == null)
             NameScope.SetNameScope(this, new NameScope());
@@ -397,6 +400,8 @@ public sealed class OnboardingWizardDialog : Window
     private void BuildPage1()
     {
         var dock = new DockPanel();
+        DockPanel.SetDock(_step1Guide, Dock.Top);
+        dock.Children.Add(_step1Guide);
         var top = new DockPanel { Margin = new Thickness(0, 0, 0, 8), LastChildFill = false };
         DockPanel.SetDock(_rescanBtn, Dock.Right);
         top.Children.Add(_rescanBtn);
@@ -620,7 +625,12 @@ public sealed class OnboardingWizardDialog : Window
                 var captured = ag;
                 _detectedList.Children.Add(Dialogs.BuildToolIconTile(
                     captured, captured.Enabled, singleSelectMaster: false, interactive: true,
-                    on => captured.Enabled = on));
+                    on =>
+                    {
+                        captured.Enabled = on;
+                        if (CountStep1Checked() > 0)
+                            ResetStep1Guide();
+                    }));
             }
         }
 
@@ -630,12 +640,15 @@ public sealed class OnboardingWizardDialog : Window
 
     private void RebuildStep2()
     {
+        var agents = AgentsForStep2();
+        if (agents.Count == 0 && _step2PoolIds.Count == 0)
+            return;
+
         _building = true;
         try
         {
             _masterWrap.Children.Clear();
             _workerWrap.Children.Clear();
-            var agents = CandidateAgents();
             string picked = ResolveWizardMasterId(agents);
             _selectedMasterId = picked;
             if (!string.IsNullOrEmpty(picked))
@@ -705,41 +718,64 @@ public sealed class OnboardingWizardDialog : Window
 
     private void ApplyRecommendedSplit()
     {
-        var pool = CandidateAgents();
+        var pool = AgentsForStep2();
         if (pool.Count == 0)
         {
             _step2Note.Text = "还没发现可用助手";
             return;
         }
 
-        var chosen = pool.Where(a => a.Enabled).ToList();
-        if (chosen.Count == 0)
-        {
-            var ranked = pool.OrderByDescending(RoutingService.ComputeMasterPlannerPowerScore).ToList();
-            ranked[0].Enabled = true;
-            chosen.Add(ranked[0]);
-            foreach (var id in new[] { "cursor", "codex_cli", "windsurf", "claude_code", "grok_bot" })
-            {
-                if (chosen.Count >= 3) break;
-                var hit = pool.FirstOrDefault(a => string.Equals(a.Id, id, StringComparison.OrdinalIgnoreCase));
-                if (hit == null || chosen.Any(a => string.Equals(a.Id, hit.Id, StringComparison.OrdinalIgnoreCase))) continue;
-                hit.Enabled = true;
-                chosen.Add(hit);
-            }
-        }
-
-        var master = chosen.OrderByDescending(RoutingService.ComputeMasterPlannerPowerScore).First();
-        master.Enabled = true;
+        var rankPool = pool.Where(a => a.Enabled).ToList();
+        if (rankPool.Count == 0) rankPool = pool;
+        var master = rankPool.OrderByDescending(RoutingService.ComputeMasterPlannerPowerScore).First();
         AssignMaster(master.Id);
-        var backup = chosen.FirstOrDefault(a =>
+        _selectedMasterId = master.Id;
+        var backup = rankPool.FirstOrDefault(a =>
                          !string.Equals(a.Id, master.Id, StringComparison.OrdinalIgnoreCase) &&
                          string.Equals(a.Id, "cursor", StringComparison.OrdinalIgnoreCase))
-                     ?? chosen.FirstOrDefault(a => !string.Equals(a.Id, master.Id, StringComparison.OrdinalIgnoreCase));
+                     ?? rankPool.FirstOrDefault(a => !string.Equals(a.Id, master.Id, StringComparison.OrdinalIgnoreCase));
         _reg.UserConfig.GlobalFallbackBuilderId = backup?.Id ?? "";
         var active = ActiveProfile();
         if (active != null) active.FallbackBuilderId = _reg.UserConfig.GlobalFallbackBuilderId ?? "";
         RebuildStep2();
         _step2Note.Text = "主脑派活，勾选的人来做";
+    }
+
+    private int CountStep1Checked() =>
+        (_reg.UserConfig.Agents ?? new List<AgentRosterEntry>()).Count(a => a.Detected && a.Enabled);
+
+    private void ResetStep1Guide()
+    {
+        _step1Guide.Text = "点击图标勾选要启用的 AI，悬停查看详情";
+        _step1Guide.Foreground = Brush("#8EA0B8");
+    }
+
+    private void WarnNeedOneEnabled()
+    {
+        _step1Guide.Text = "请至少勾选 1 个要启用的 AI 工具";
+        _step1Guide.Foreground = Brush("#FBBF24");
+    }
+
+    private void CaptureStep2Pool()
+    {
+        _step2PoolIds.Clear();
+        var agents = _reg.UserConfig.Agents ?? new List<AgentRosterEntry>();
+        foreach (var agent in agents)
+        {
+            if (agent.Detected && agent.Enabled && !string.IsNullOrWhiteSpace(agent.Id))
+                _step2PoolIds.Add(agent.Id);
+        }
+        if (_step2PoolIds.Count > 0) return;
+        var first = CandidateAgents().FirstOrDefault();
+        if (first != null && !string.IsNullOrWhiteSpace(first.Id))
+            _step2PoolIds.Add(first.Id);
+    }
+
+    private List<AgentRosterEntry> AgentsForStep2()
+    {
+        var agents = _reg.UserConfig.Agents ?? new List<AgentRosterEntry>();
+        if (_step2PoolIds.Count == 0) return new List<AgentRosterEntry>();
+        return agents.Where(a => _step2PoolIds.Contains(a.Id)).OrderBy(a => a.Name).ToList();
     }
 
     private List<AgentRosterEntry> CandidateAgents()
